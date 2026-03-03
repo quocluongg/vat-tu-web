@@ -1,66 +1,86 @@
-import Image from "next/image";
-import styles from "./page.module.css";
+'use client';
+import Link from 'next/link';
+import { Package, Shield, GraduationCap, ArrowRight, FileText, FileOutput } from 'lucide-react';
+import ThemeToggle from '@/components/ThemeToggle';
 
-export default function Home() {
+export default function HomePage() {
   return (
-    <div className={styles.page}>
-      <main className={styles.main}>
-        <Image
-          className={styles.logo}
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className={styles.intro}>
-          <h1>To get started, edit the page.js file.</h1>
-          <p>
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Learning
-            </a>{" "}
-            center.
+    <div className="login-page">
+      <div style={{ position: 'absolute', top: 24, right: 24 }}>
+        <ThemeToggle />
+      </div>
+      <div style={{
+        display: 'flex', flexDirection: 'column', alignItems: 'center',
+        justifyContent: 'center', minHeight: '100vh', padding: 24,
+      }}>
+        {/* Logo */}
+        <div style={{ textAlign: 'center', marginBottom: 48 }}>
+          <div style={{
+            width: 72, height: 72, borderRadius: 20,
+            background: 'var(--gradient-primary)',
+            display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+            marginBottom: 20, boxShadow: '0 8px 32px rgba(14, 165, 233, 0.3)',
+          }}>
+            <Package size={36} color="white" />
+          </div>
+          <h1 style={{ fontSize: 32, fontWeight: 700, marginBottom: 8 }}>
+            Quản Lý Vật Tư
+          </h1>
+          <p style={{ color: 'var(--text-secondary)', fontSize: 16 }}>
+            Hệ thống quản lý vật tư, đề xuất dự trù và xuất kho
           </p>
         </div>
-        <div className={styles.ctas}>
-          <a
-            className={styles.primary}
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className={styles.logo}
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className={styles.secondary}
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+
+        {/* Cards */}
+        <div style={{
+          display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)',
+          gap: 24, maxWidth: 700, width: '100%',
+        }}>
+          {/* Admin Card */}
+          <Link href="/login" style={{ textDecoration: 'none' }}>
+            <div className="portal-card portal-admin">
+              <div className="portal-icon admin">
+                <Shield size={32} />
+              </div>
+              <h2>Quản trị viên</h2>
+              <p>Quản lý vật tư, duyệt đề xuất, mua sắm và xuất kho</p>
+              <div className="portal-features">
+                <span>📊 Dashboard</span>
+                <span>📋 Duyệt đề xuất</span>
+                <span>🛒 Mua sắm</span>
+                <span>📤 Xuất kho</span>
+              </div>
+              <div className="portal-action">
+                Đăng nhập Admin <ArrowRight size={18} />
+              </div>
+            </div>
+          </Link>
+
+          {/* Teacher Card */}
+          <Link href="/giao-vien" style={{ textDecoration: 'none' }}>
+            <div className="portal-card portal-teacher">
+              <div className="portal-icon teacher">
+                <GraduationCap size={32} />
+              </div>
+              <h2>Giáo viên</h2>
+              <p>Đề xuất dự trù vật tư và tạo phiếu xuất theo môn học</p>
+              <div className="portal-features">
+                <span>📝 Đề xuất vật tư</span>
+                <span>📄 Phiếu xuất</span>
+                <span>🖨️ In phiếu</span>
+                <span>📎 Theo dõi</span>
+              </div>
+              <div className="portal-action">
+                Vào trang Giáo viên <ArrowRight size={18} />
+              </div>
+            </div>
+          </Link>
         </div>
-      </main>
+
+        <p style={{ marginTop: 40, fontSize: 13, color: 'var(--text-muted)' }}>
+          © 2026 Hệ thống Quản Lý Vật Tư
+        </p>
+      </div>
     </div>
   );
 }

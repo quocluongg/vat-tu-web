@@ -1,0 +1,348 @@
+'use client';
+import { useState, useEffect } from 'react';
+import { Boxes, Plus, Edit3, Trash2, Search, Upload, Package, PackagePlus } from 'lucide-react';
+import { useToast } from '@/components/Toast';
+
+export default function VatTuPage() {
+    const [list, setList] = useState([]);
+    const [kiHocs, setKiHocs] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [showModal, setShowModal] = useState(false);
+    const [showImport, setShowImport] = useState(false);
+    const [showImportStockModal, setShowImportStockModal] = useState(false);
+    const [editing, setEditing] = useState(null);
+    const [form, setForm] = useState({ ten_vat_tu: '', yeu_cau_ky_thuat: '', don_vi_tinh: '', so_luong_kho: 0, ki_id: '' });
+    const [search, setSearch] = useState('');
+    const [selectedKi, setSelectedKi] = useState('');
+    const [importText, setImportText] = useState('');
+    const [importStockForm, setImportStockForm] = useState({ id: null, ten_vat_tu: '', yeu_cau_ky_thuat: '', don_vi_tinh: '', so_luong_hien_tai: 0, so_luong_nhap: 0 });
+    const addToast = useToast();
+
+    const fetchData = async () => {
+        const khRes = await fetch('/api/ki-hoc').then(r => r.json());
+        setKiHocs(khRes);
+        if (khRes.length > 0 && !selectedKi) {
+            setSelectedKi(khRes[0].id.toString());
+        }
+        setLoading(false);
+    };
+
+    const fetchVatTu = async () => {
+        if (!selectedKi) return;
+        const res = await fetch(`/api/vat-tu?ki_id=${selectedKi}`);
+        const data = await res.json();
+        setList(data);
+    };
+
+    useEffect(() => { fetchData(); }, []);
+    useEffect(() => { if (selectedKi) fetchVatTu(); }, [selectedKi]);
+
+    const openModal = (item = null) => {
+        setEditing(item);
+        setForm({
+            ten_vat_tu: item?.ten_vat_tu || '',
+            yeu_cau_ky_thuat: item?.yeu_cau_ky_thuat || '',
+            don_vi_tinh: item?.don_vi_tinh || '',
+            so_luong_kho: item?.so_luong_kho || 0,
+            ki_id: item?.ki_id?.toString() || selectedKi,
+        });
+        setShowModal(true);
+    };
+
+    const openImportStock = (item) => {
+        setImportStockForm({
+            id: item.id,
+            ten_vat_tu: item.ten_vat_tu,
+            yeu_cau_ky_thuat: item.yeu_cau_ky_thuat,
+            don_vi_tinh: item.don_vi_tinh,
+            so_luong_hien_tai: item.so_luong_kho,
+            so_luong_nhap: ''
+        });
+        setShowImportStockModal(true);
+    };
+
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        const method = editing ? 'PUT' : 'POST';
+        const body = editing ? { ...form, id: editing.id } : form;
+        const res = await fetch('/api/vat-tu', { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+        if (res.ok) {
+            addToast(editing ? 'Cập nhật thành công' : 'Thêm vật tư thành công');
+            setShowModal(false);
+            fetchVatTu();
+        }
+    };
+
+    const handleImportStockSubmit = async (e) => {
+        e.preventDefault();
+        const amountToAdd = parseInt(importStockForm.so_luong_nhap) || 0;
+        if (amountToAdd <= 0) {
+            addToast("Số lượng nhập phải lớn hơn 0", "error");
+            return;
+        }
+
+        const newStock = importStockForm.so_luong_hien_tai + amountToAdd;
+        const body = {
+            id: importStockForm.id,
+            ten_vat_tu: importStockForm.ten_vat_tu,
+            yeu_cau_ky_thuat: importStockForm.yeu_cau_ky_thuat,
+            don_vi_tinh: importStockForm.don_vi_tinh,
+            so_luong_kho: newStock
+        };
+
+        const res = await fetch('/api/vat-tu', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+        if (res.ok) {
+            addToast(`Đã nhập thêm ${amountToAdd} ${importStockForm.don_vi_tinh}`);
+            setShowImportStockModal(false);
+            fetchVatTu();
+        } else {
+            addToast("Có lỗi xảy ra khi nhập kho", "error");
+        }
+    };
+
+    const handleDelete = async (id) => {
+        if (!confirm('Xóa vật tư này?')) return;
+        await fetch(`/api/vat-tu?id=${id}`, { method: 'DELETE' });
+        addToast('Xóa thành công');
+        fetchVatTu();
+    };
+
+    const handleImport = async () => {
+        const lines = importText.trim().split('\n').filter(l => l.trim());
+        const items = lines.map(line => {
+            const parts = line.split('\t').length > 1 ? line.split('\t') : line.split(',');
+            return {
+                ten_vat_tu: parts[0]?.trim() || '',
+                yeu_cau_ky_thuat: parts[1]?.trim() || '',
+                don_vi_tinh: parts[2]?.trim() || '',
+                so_luong_kho: parseInt(parts[3]?.trim()) || 0,
+                ki_id: selectedKi,
+            };
+        }).filter(item => item.ten_vat_tu);
+
+        if (items.length === 0) { addToast('Không có dữ liệu hợp lệ', 'error'); return; }
+
+        const res = await fetch('/api/vat-tu', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(items),
+        });
+        if (res.ok) {
+            addToast(`Import ${items.length} vật tư thành công`);
+            setShowImport(false);
+            setImportText('');
+            fetchVatTu();
+        }
+    };
+
+    const filtered = list.filter(vt =>
+        vt.ten_vat_tu.toLowerCase().includes(search.toLowerCase()) ||
+        (vt.yeu_cau_ky_thuat && vt.yeu_cau_ky_thuat.toLowerCase().includes(search.toLowerCase()))
+    );
+
+    if (loading) return <div className="loading-overlay"><div className="spinner" /></div>;
+
+    return (
+        <div>
+            <div className="page-header">
+                <div className="page-header-left">
+                    <h1>📦 Quản lý Vật tư</h1>
+                    <p>Danh mục vật tư theo kỳ học</p>
+                </div>
+                <div className="page-header-actions">
+                    <select className="form-select" style={{ width: 220 }} value={selectedKi} onChange={e => setSelectedKi(e.target.value)}>
+                        <option value="">Chọn kỳ</option>
+                        {kiHocs.map(k => <option key={k.id} value={k.id}>{k.ten_ki} - {k.nam_hoc}</option>)}
+                    </select>
+                    <button className="btn btn-secondary" onClick={() => setShowImport(true)}>
+                        <Upload size={18} /> Import Excel
+                    </button>
+                    <button className="btn btn-primary" onClick={() => openModal()}>
+                        <Plus size={18} /> Thêm vật tư mới
+                    </button>
+                </div>
+            </div>
+
+            <div className="search-bar">
+                <div className="search-input-wrapper">
+                    <Search />
+                    <input className="search-input" placeholder="Tìm vật tư..." value={search} onChange={e => setSearch(e.target.value)} />
+                </div>
+                <span style={{ color: 'var(--text-muted)', fontSize: 13 }}>{filtered.length} vật tư</span>
+            </div>
+
+            <div className="card">
+                <div className="table-container">
+                    <table className="data-table">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Tên vật tư</th>
+                                <th>Yêu cầu kỹ thuật</th>
+                                <th>Đơn vị</th>
+                                <th>Tồn kho</th>
+                                <th style={{ width: 140 }}>Thao tác</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {filtered.length === 0 ? (
+                                <tr><td colSpan={6}><div className="empty-state"><Boxes size={48} /><h3>Chưa có vật tư</h3><p>Thêm vật tư hoặc import từ Excel</p></div></td></tr>
+                            ) : filtered.map((vt, idx) => (
+                                <tr key={vt.id}>
+                                    <td>{idx + 1}</td>
+                                    <td style={{ color: 'var(--text-primary)', fontWeight: 500 }}>{vt.ten_vat_tu}</td>
+                                    <td style={{ maxWidth: 250, overflow: 'hidden', textOverflow: 'ellipsis' }}>{vt.yeu_cau_ky_thuat || '—'}</td>
+                                    <td><span className="badge badge-info">{vt.don_vi_tinh}</span></td>
+                                    <td>
+                                        <span style={{ fontWeight: 600, color: vt.so_luong_kho > 0 ? '#34d399' : 'var(--text-muted)' }}>
+                                            {vt.so_luong_kho}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <div className="table-actions">
+                                            <button className="btn-icon" onClick={() => openImportStock(vt)} title="Cập nhật số lượng nhập kho" style={{ color: '#34d399', borderColor: 'rgba(52, 211, 153, 0.2)', backgroundColor: 'rgba(52, 211, 153, 0.05)' }}><PackagePlus size={16} /></button>
+                                            <button className="btn-icon" onClick={() => openModal(vt)} title="Sửa thông tin"><Edit3 size={16} /></button>
+                                            <button className="btn-icon" onClick={() => handleDelete(vt.id)} title="Xóa" style={{ color: '#f87171' }}><Trash2 size={16} /></button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            {showModal && (
+                <div className="modal-overlay" onClick={() => setShowModal(false)}>
+                    <div className="modal" onClick={e => e.stopPropagation()}>
+                        <div className="modal-header">
+                            <h2>{editing ? 'Sửa vật tư' : 'Thêm vật tư mới'}</h2>
+                            <button className="btn-ghost" onClick={() => setShowModal(false)}>✕</button>
+                        </div>
+                        <form onSubmit={handleSubmit}>
+                            <div className="modal-body">
+                                <div className="form-group">
+                                    <label className="form-label">Tên vật tư *</label>
+                                    <input className="form-input" value={form.ten_vat_tu} onChange={e => setForm({ ...form, ten_vat_tu: e.target.value })} required placeholder="VD: Điện trở" />
+                                </div>
+                                <div className="form-group">
+                                    <label className="form-label">Yêu cầu kỹ thuật</label>
+                                    <input className="form-input" value={form.yeu_cau_ky_thuat} onChange={e => setForm({ ...form, yeu_cau_ky_thuat: e.target.value })} placeholder="VD: 330 Ohm; 1/4W" />
+                                </div>
+                                <div className="form-grid">
+                                    <div className="form-group">
+                                        <label className="form-label">Đơn vị tính *</label>
+                                        <input className="form-input" value={form.don_vi_tinh} onChange={e => setForm({ ...form, don_vi_tinh: e.target.value })} required placeholder="VD: Con, Cái, Mét" />
+                                    </div>
+                                    <div className="form-group">
+                                        <label className="form-label">Tồn kho ban đầu</label>
+                                        <input type="number" className="form-input" value={form.so_luong_kho} onChange={e => setForm({ ...form, so_luong_kho: parseInt(e.target.value) || 0 })} min="0" />
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="modal-footer">
+                                <button type="button" className="btn btn-secondary" onClick={() => setShowModal(false)}>Hủy</button>
+                                <button type="submit" className="btn btn-primary">{editing ? 'Cập nhật' : 'Thêm'}</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Modal Nhập thêm kho */}
+            {showImportStockModal && (
+                <div className="modal-overlay" onClick={() => setShowImportStockModal(false)}>
+                    <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 450 }}>
+                        <div className="modal-header">
+                            <h2>Cập nhật nhập hàng kho</h2>
+                            <button className="btn-ghost" onClick={() => setShowImportStockModal(false)}>✕</button>
+                        </div>
+                        <form onSubmit={handleImportStockSubmit}>
+                            <div className="modal-body">
+                                <div className="alert alert-info mb-4" style={{ background: 'rgba(56, 189, 248, 0.1)', color: 'var(--text-accent)', padding: 16, borderRadius: 'var(--radius-md)' }}>
+                                    <Package size={24} style={{ marginBottom: 8 }} />
+                                    <h3 style={{ fontSize: 16, marginBottom: 4 }}>{importStockForm.ten_vat_tu}</h3>
+                                    <p style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
+                                        {importStockForm.yeu_cau_ky_thuat && `${importStockForm.yeu_cau_ky_thuat} • `}
+                                        Đơn vị: {importStockForm.don_vi_tinh}
+                                    </p>
+                                </div>
+
+                                <div className="form-grid" style={{ marginBottom: 24, gap: 16 }}>
+                                    <div style={{ background: 'var(--bg-glass)', padding: 16, borderRadius: 'var(--radius-md)', textAlign: 'center' }}>
+                                        <p style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 4 }}>Tồn kho hiện tại</p>
+                                        <h3 style={{ fontSize: 24, fontWeight: 700, color: 'var(--text-primary)' }}>{importStockForm.so_luong_hien_tai}</h3>
+                                    </div>
+                                    <div style={{ background: 'rgba(16, 185, 129, 0.1)', padding: 16, borderRadius: 'var(--radius-md)', textAlign: 'center' }}>
+                                        <p style={{ fontSize: 13, color: '#34d399', marginBottom: 4 }}>Tồn kho sau khi nhập</p>
+                                        <h3 style={{ fontSize: 24, fontWeight: 700, color: '#34d399' }}>
+                                            {importStockForm.so_luong_hien_tai + (parseInt(importStockForm.so_luong_nhap) || 0)}
+                                        </h3>
+                                    </div>
+                                </div>
+
+                                <div className="form-group">
+                                    <label className="form-label">Nhập thêm bao nhiêu hàng mới mua về? *</label>
+                                    <div style={{ position: 'relative' }}>
+                                        <Plus size={18} style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                                        <input
+                                            type="number"
+                                            className="form-input"
+                                            style={{ paddingLeft: 42, fontSize: 16, fontWeight: 600 }}
+                                            value={importStockForm.so_luong_nhap}
+                                            onChange={e => setImportStockForm({ ...importStockForm, so_luong_nhap: e.target.value })}
+                                            required
+                                            min="1"
+                                            placeholder="Nhập số lượng..."
+                                            autoFocus
+                                        />
+                                        <span style={{ position: 'absolute', right: 14, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', fontSize: 13 }}>
+                                            {importStockForm.don_vi_tinh}
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="modal-footer">
+                                <button type="button" className="btn btn-secondary" onClick={() => setShowImportStockModal(false)}>Hủy</button>
+                                <button type="submit" className="btn btn-success">Cập nhật kho</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {showImport && (
+                <div className="modal-overlay" onClick={() => setShowImport(false)}>
+                    <div className="modal modal-lg" onClick={e => e.stopPropagation()}>
+                        <div className="modal-header">
+                            <h2>Import Vật tư</h2>
+                            <button className="btn-ghost" onClick={() => setShowImport(false)}>✕</button>
+                        </div>
+                        <div className="modal-body">
+                            <div className="alert alert-info mb-4">
+                                Nhập mỗi vật tư trên 1 dòng. Định dạng: <strong>Tên vật tư, Yêu cầu KT, Đơn vị tính, Tồn kho</strong>
+                                <br />Có thể copy trực tiếp từ Excel (phân tách bằng tab)
+                            </div>
+                            <textarea
+                                className="form-textarea"
+                                style={{ minHeight: 200, fontFamily: 'monospace', fontSize: 13 }}
+                                value={importText}
+                                onChange={e => setImportText(e.target.value)}
+                                placeholder={`Điện trở\t330 Ohm; 1/4W\tCon\t0\nTụ điện\t100uF/25V\tCon\t50`}
+                            />
+                            {importText && (
+                                <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 8 }}>
+                                    {importText.trim().split('\n').filter(l => l.trim()).length} dòng sẽ được import vào kỳ hiện tại
+                                </p>
+                            )}
+                        </div>
+                        <div className="modal-footer">
+                            <button className="btn btn-secondary" onClick={() => setShowImport(false)}>Hủy</button>
+                            <button className="btn btn-primary" onClick={handleImport}>Import</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+}
