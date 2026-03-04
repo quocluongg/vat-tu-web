@@ -1,4 +1,10 @@
-'use client';
+import { writeFileSync } from 'fs';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const target = join(__dirname, '../src/app/admin/nganh-he/page.js');
+
+const code = String.raw`'use client';
 import { useState, useEffect, useCallback } from 'react';
 import { GraduationCap, Plus, Edit3, Trash2, BookOpen, UserPlus, X, Search, School, Upload, CheckCircle2, AlertCircle, ChevronDown, FolderOpen } from 'lucide-react';
 import { useToast } from '@/components/Toast';
@@ -37,9 +43,7 @@ export default function NganhHePage() {
     const [search, setSearch] = useState('');
     const [showOnlyTH, setShowOnlyTH] = useState(true);
     const [selectedMons, setSelectedMons] = useState(new Set());
-    const [selectedLops, setSelectedLops] = useState(new Set());
     const [csvText, setCsvText] = useState('');
-    const [excludeLT, setExcludeLT] = useState(true);
     const [importResult, setImportResult] = useState(null);
     const [importing, setImporting] = useState(false);
 
@@ -138,20 +142,8 @@ export default function NganhHePage() {
     const handleImport = async () => {
         if (!selectedKi) { addToast('Chọn kỳ học trước', 'error'); return; }
         if (!csvText.trim()) { addToast('Nhập dữ liệu', 'error'); return; }
-        // Filter out LT subjects nếu được bật
-        let processedText = csvText;
-        if (excludeLT) {
-            const lines = csvText.split('\n');
-            const filtered = lines.filter(line => {
-                const parts = line.split('\t').length > 1 ? line.split('\t') : line.split(',');
-                const monHoc = (parts[1] || '').trim();
-                return !monHoc.startsWith('LT');
-            });
-            processedText = filtered.join('\n');
-        }
-        if (!processedText.trim()) { addToast('Không có dòng hợp lệ sau khi lọc (tất cả đều là môn LT)', 'error'); return; }
         setImporting(true); setImportResult(null);
-        const res = await fetch('/api/import-phan-cong', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ csv_text: processedText, ki_id: parseInt(selectedKi) }) });
+        const res = await fetch('/api/import-phan-cong', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ csv_text: csvText, ki_id: parseInt(selectedKi) }) });
         const data = await res.json();
         setImporting(false);
         if (res.ok) { setImportResult(data); addToast('Import thành công: ' + data.phan_cong_them_moi + ' phân công'); fetchAll(); if (selectedKi) fetchPhanCong(); }
@@ -176,16 +168,6 @@ export default function NganhHePage() {
     };
 
     const filteredLop = lops.filter(l => !search || l.ten_lop.toLowerCase().includes(search.toLowerCase()));
-    const allLopIds = filteredLop.map(l => l.id);
-    const allLopsSelected = allLopIds.length > 0 && allLopIds.every(id => selectedLops.has(id));
-    const someLopsSelected = allLopIds.some(id => selectedLops.has(id));
-    const toggleSelectLop = id => setSelectedLops(prev => { const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id); return s; });
-    const toggleSelectAllLops = () => setSelectedLops(allLopsSelected ? new Set() : new Set(allLopIds));
-    const deleteSelectedLops = async () => {
-        if (!confirm('Xóa ' + selectedLops.size + ' lớp đã chọn?')) return;
-        await Promise.all([...selectedLops].map(id => fetch('/api/lop?id=' + id, { method: 'DELETE' })));
-        addToast('Đã xóa ' + selectedLops.size + ' lớp'); setSelectedLops(new Set()); fetchAll();
-    };
     const filteredPC = phanCongs.filter(pc => !search || pc.ten_gv?.toLowerCase().includes(search.toLowerCase()) || pc.ten_mon?.toLowerCase().includes(search.toLowerCase()) || pc.ten_lop?.toLowerCase().includes(search.toLowerCase()));
 
     const selectedKiObj = kiHocs.find(k => k.id.toString() === selectedKi);
@@ -394,19 +376,11 @@ export default function NganhHePage() {
                                                 </td>
                                                 <td>
                                                     <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexWrap: 'wrap' }}>
-                                                        {pcList.length > 0 ? (() => {
-                                                            const byGv = pcList.reduce((acc, pc) => {
-                                                                if (!acc[pc.ten_gv]) acc[pc.ten_gv] = [];
-                                                                acc[pc.ten_gv].push(pc.ten_lop);
-                                                                return acc;
-                                                            }, {});
-                                                            return Object.entries(byGv).map(([gv, lops]) => (
-                                                                <span key={gv} style={{ fontSize: 11, background: 'rgba(52,211,153,0.08)', color: '#10b981', padding: '2px 10px', borderRadius: 100, border: '1px solid rgba(52,211,153,0.2)', whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: 5 }}>
-                                                                    <span style={{ fontWeight: 600 }}>{gv}</span>
-                                                                    <span style={{ opacity: 0.55, borderLeft: '1px solid rgba(52,211,153,0.4)', paddingLeft: 5 }}>{lops.join(', ')}</span>
-                                                                </span>
-                                                            ));
-                                                        })() : <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>Chưa phân công</span>}
+                                                        {pcList.length > 0 ? pcList.map(pc => (
+                                                            <span key={pc.id} style={{ fontSize: 11, background: 'rgba(52,211,153,0.08)', color: '#10b981', padding: '2px 9px', borderRadius: 100, border: '1px solid rgba(52,211,153,0.2)', whiteSpace: 'nowrap' }}>
+                                                                {pc.ten_gv} <span style={{ opacity: 0.6 }}>· {pc.ten_lop}</span>
+                                                            </span>
+                                                        )) : <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>Chưa phân công</span>}
                                                         <button onClick={() => openPhanCongModal(mon)} style={{ display: 'inline-flex', alignItems: 'center', gap: 3, padding: '2px 9px', fontSize: 11, borderRadius: 100, border: '1px dashed rgba(14,165,233,0.5)', background: 'rgba(14,165,233,0.05)', color: '#0ea5e9', cursor: 'pointer' }}>
                                                             <Plus size={11} /> PC
                                                         </button>
@@ -433,25 +407,6 @@ export default function NganhHePage() {
             {/* ══════════════════════════════════════ */}
             {activeTab === 'lop' && (
                 <div className="card">
-                    {/* Toolbar */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 20px', borderBottom: '1px solid var(--border-color)', flexWrap: 'wrap' }}>
-                        {someLopsSelected ? (
-                            <>
-                                <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-                                    Đã chọn <b style={{ color: 'var(--text-primary)' }}>{selectedLops.size}</b> lớp
-                                </span>
-                                <button className="btn" style={{ padding: '4px 12px', fontSize: 12, background: 'rgba(239,68,68,0.1)', color: '#f87171', border: '1px solid rgba(239,68,68,0.25)' }} onClick={deleteSelectedLops}>
-                                    <Trash2 size={12} /> Xóa đã chọn
-                                </button>
-                                <button className="btn btn-secondary" style={{ padding: '4px 10px', fontSize: 12 }} onClick={() => setSelectedLops(new Set())}>
-                                    <X size={12} /> Bỏ chọn
-                                </button>
-                            </>
-                        ) : (
-                            <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Tích checkbox để chọn nhiều lớp</span>
-                        )}
-                        <span style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--text-muted)' }}>{filteredLop.length} lớp</span>
-                    </div>
                     {filteredLop.length === 0 ? (
                         <div className="empty-state"><School size={44} /><h3>Chưa có lớp nào</h3><p>Thêm lớp hoặc dùng Import</p></div>
                     ) : (
@@ -459,13 +414,7 @@ export default function NganhHePage() {
                             <table className="data-table">
                                 <thead>
                                     <tr>
-                                        <th style={{ width: 44 }}>
-                                            <input type="checkbox" checked={allLopsSelected}
-                                                ref={el => { if (el) el.indeterminate = someLopsSelected && !allLopsSelected; }}
-                                                onChange={toggleSelectAllLops}
-                                                style={{ width: 14, height: 14, accentColor: 'var(--text-accent)', cursor: 'pointer' }} />
-                                        </th>
-                                        <th style={{ width: 36 }}>#</th>
+                                        <th style={{ width: 40 }}>#</th>
                                         <th>Tên lớp</th>
                                         <th style={{ width: 120 }}>Hệ</th>
                                         <th style={{ width: 80, textAlign: 'center' }}>Sĩ số</th>
@@ -476,13 +425,8 @@ export default function NganhHePage() {
                                 <tbody>
                                     {filteredLop.map((lop, idx) => {
                                         const monList = phanCongs.filter(pc => pc.lop_id === lop.id);
-                                        const isSelected = selectedLops.has(lop.id);
                                         return (
-                                            <tr key={lop.id} style={{ background: isSelected ? 'rgba(14,165,233,0.04)' : undefined }}>
-                                                <td>
-                                                    <input type="checkbox" checked={isSelected} onChange={() => toggleSelectLop(lop.id)}
-                                                        style={{ width: 14, height: 14, accentColor: 'var(--text-accent)', cursor: 'pointer' }} />
-                                                </td>
+                                            <tr key={lop.id}>
                                                 <td style={{ color: 'var(--text-muted)', fontSize: 12 }}>{idx + 1}</td>
                                                 <td><span style={{ fontWeight: 600, fontSize: 13 }}>{lop.ten_lop}</span></td>
                                                 <td><HeBadge loai={lop.loai_he} /></td>
@@ -539,31 +483,6 @@ export default function NganhHePage() {
                                     </div>
                                 </div>
                             </div>
-                            {/* Switch: Bỏ qua môn LT */}
-                            {(() => {
-                                const ltCount = csvText ? csvText.split('\n').filter(line => {
-                                    const parts = line.split('\t').length > 1 ? line.split('\t') : line.split(',');
-                                    return (parts[1] || '').trim().startsWith('LT');
-                                }).length : 0;
-                                return (
-                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', marginBottom: 10, background: excludeLT ? 'rgba(251,191,36,0.06)' : 'var(--bg-glass)', borderRadius: 'var(--radius-md)', border: '1px solid ' + (excludeLT ? 'rgba(251,191,36,0.25)' : 'var(--border-color)') }}>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                            <span style={{ fontSize: 13, fontWeight: 500 }}>Bỏ qua môn bắt đầu bằng <span style={{ color: '#fbbf24', fontWeight: 700 }}>LT</span></span>
-                                            {ltCount > 0 && excludeLT && (
-                                                <span style={{ fontSize: 11, padding: '1px 7px', borderRadius: 100, background: 'rgba(251,191,36,0.15)', color: '#fbbf24', border: '1px solid rgba(251,191,36,0.3)', fontWeight: 600 }}>
-                                                    -{ltCount} dòng
-                                                </span>
-                                            )}
-                                        </div>
-                                        <label style={{ position: 'relative', display: 'inline-block', width: 40, height: 22, cursor: 'pointer', flexShrink: 0 }}>
-                                            <input type="checkbox" checked={excludeLT} onChange={e => setExcludeLT(e.target.checked)} style={{ opacity: 0, width: 0, height: 0 }} />
-                                            <span style={{ position: 'absolute', inset: 0, borderRadius: 100, background: excludeLT ? '#fbbf24' : 'var(--bg-glass)', border: '1px solid ' + (excludeLT ? '#fbbf24' : 'var(--border-color)'), transition: 'all 0.2s' }}>
-                                                <span style={{ position: 'absolute', top: 2, left: excludeLT ? 20 : 2, width: 16, height: 16, borderRadius: '50%', background: 'white', transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.3)' }} />
-                                            </span>
-                                        </label>
-                                    </div>
-                                );
-                            })()}
                             <textarea className="form-input" style={{ minHeight: 280, fontFamily: 'monospace', fontSize: 12, resize: 'vertical', lineHeight: 1.7 }}
                                 value={csvText} onChange={e => setCsvText(e.target.value)}
                                 placeholder={"CÁCH 1: Bôi 4 cột trong Excel → Ctrl+C → Click vào đây → Ctrl+V\n\nCÁCH 2: Gõ trực tiếp dạng CSV:\nLê Minh Tấn,TH Điều khiển khí nén,T24CD3DA-N2,16\nTrần Thị Lan,TH Máy điện,C24DC1-N1,28"}
@@ -764,3 +683,7 @@ export default function NganhHePage() {
         </div>
     );
 }
+`;
+
+writeFileSync(target, code, 'utf8');
+console.log('Done! Lines:', code.split('\n').length);

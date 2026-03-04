@@ -83,9 +83,17 @@ export default function DeXuatPublicPage() {
     const getChiTiet = () => {
         const result = [];
         Object.entries(selections).forEach(([monId, vatTuMap]) => {
+            // Find lop_id from phanCong (each phanCong entry has mon_hoc_id + lop_id)
+            const pc = phanCongs.find(p => p.mon_hoc_id === parseInt(monId));
+            const lopId = pc?.lop_id || null;
             Object.entries(vatTuMap).forEach(([vtId, soLuong]) => {
                 if (soLuong > 0) {
-                    result.push({ mon_hoc_id: parseInt(monId), vat_tu_id: parseInt(vtId), so_luong: soLuong });
+                    result.push({
+                        mon_hoc_id: parseInt(monId),
+                        lop_id: lopId,
+                        vat_tu_id: parseInt(vtId),
+                        so_luong: soLuong
+                    });
                 }
             });
         });
@@ -219,7 +227,7 @@ export default function DeXuatPublicPage() {
                                                     <BookOpen size={18} style={{ color: 'var(--text-accent)' }} />
                                                     <div>
                                                         <h3>{pc.ten_mon}</h3>
-                                                        <p style={{ fontSize: 12, color: 'var(--text-muted)' }}>{pc.ten_nganh} → {pc.ten_he}</p>
+                                                        <p style={{ fontSize: 12, color: 'var(--text-muted)' }}>Lớp: {pc.ten_lop} ({pc.si_so} HV) • {pc.ten_loai_he || pc.loai_he}</p>
                                                     </div>
                                                 </div>
                                                 {selectedCount > 0 && (

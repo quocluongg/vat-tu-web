@@ -8,8 +8,7 @@ export async function GET(request) {
         const nganh_id = searchParams.get('nganh_id');
 
         let query = `
-      SELECT h.*, n.ten_nganh,
-        (SELECT COUNT(*) FROM mon_hoc WHERE he_dao_tao_id = h.id) as so_mon
+      SELECT h.*, n.ten_nganh
       FROM he_dao_tao h
       JOIN nganh n ON h.nganh_id = n.id
     `;

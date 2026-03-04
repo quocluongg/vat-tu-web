@@ -138,7 +138,7 @@ export default function PhieuXuatAdminPage() {
                             <div>
                                 <h2>Phiếu xuất PX-{String(detail.id).padStart(4, '0')}</h2>
                                 <p style={{ color: 'var(--text-secondary)', fontSize: 13, marginTop: 4 }}>
-                                    {detail.ten_gv} • {detail.ten_mon} • {detail.ten_nganh} - {detail.ten_he}
+                                    {detail.ten_gv} • {detail.ten_mon}{detail.ten_lop ? ` • Lớp: ${detail.ten_lop}` : ''}
                                 </p>
                             </div>
                             <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>

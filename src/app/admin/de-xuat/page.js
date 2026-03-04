@@ -168,7 +168,7 @@ export default function DeXuatAdminPage() {
                                                     <td>{i + 1}</td>
                                                     <td>
                                                         <div style={{ fontSize: 13 }}>{ct.ten_mon}</div>
-                                                        <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{ct.ten_nganh} - {ct.ten_he}</div>
+                                                        <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Lớp: {ct.ten_lop} ({ct.si_so} HV)</div>
                                                     </td>
                                                     <td style={{ fontWeight: 500, color: 'var(--text-primary)' }}>{ct.ten_vat_tu}</td>
                                                     <td style={{ fontSize: 13 }}>{ct.yeu_cau_ky_thuat || '—'}</td>

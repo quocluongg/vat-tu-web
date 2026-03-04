@@ -13,6 +13,7 @@ export default function VatTuPage() {
     const [editing, setEditing] = useState(null);
     const [form, setForm] = useState({ ten_vat_tu: '', yeu_cau_ky_thuat: '', don_vi_tinh: '', so_luong_kho: 0, ki_id: '' });
     const [search, setSearch] = useState('');
+    const [selectedVatTu, setSelectedVatTu] = useState(new Set());
     const [selectedKi, setSelectedKi] = useState('');
     const [importText, setImportText] = useState('');
     const [importStockForm, setImportStockForm] = useState({ id: null, ten_vat_tu: '', yeu_cau_ky_thuat: '', don_vi_tinh: '', so_luong_hien_tai: 0, so_luong_nhap: 0 });
@@ -107,6 +108,14 @@ export default function VatTuPage() {
         fetchVatTu();
     };
 
+    const deleteSelectedVatTu = async () => {
+        if (!confirm(`Xóa ${selectedVatTu.size} vật tư đã chọn?`)) return;
+        await Promise.all([...selectedVatTu].map(id => fetch(`/api/vat-tu?id=${id}`, { method: 'DELETE' })));
+        addToast(`Đã xóa ${selectedVatTu.size} vật tư`);
+        setSelectedVatTu(new Set());
+        fetchVatTu();
+    };
+
     const handleImport = async () => {
         const lines = importText.trim().split('\n').filter(l => l.trim());
         const items = lines.map(line => {
@@ -139,6 +148,11 @@ export default function VatTuPage() {
         vt.ten_vat_tu.toLowerCase().includes(search.toLowerCase()) ||
         (vt.yeu_cau_ky_thuat && vt.yeu_cau_ky_thuat.toLowerCase().includes(search.toLowerCase()))
     );
+    const allVtIds = filtered.map(vt => vt.id);
+    const allVtSelected = allVtIds.length > 0 && allVtIds.every(id => selectedVatTu.has(id));
+    const someVtSelected = allVtIds.some(id => selectedVatTu.has(id));
+    const toggleSelectVt = id => setSelectedVatTu(prev => { const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id); return s; });
+    const toggleSelectAllVt = () => setSelectedVatTu(allVtSelected ? new Set() : new Set(allVtIds));
 
     if (loading) return <div className="loading-overlay"><div className="spinner" /></div>;
 
@@ -171,12 +185,33 @@ export default function VatTuPage() {
                 <span style={{ color: 'var(--text-muted)', fontSize: 13 }}>{filtered.length} vật tư</span>
             </div>
 
+            {/* Bulk toolbar */}
+            {someVtSelected && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 16px', marginBottom: 12, background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 'var(--radius-md)' }}>
+                    <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>
+                        Đã chọn <b style={{ color: 'var(--text-primary)' }}>{selectedVatTu.size}</b> vật tư
+                    </span>
+                    <button className="btn" style={{ padding: '4px 14px', fontSize: 13, background: 'rgba(239,68,68,0.1)', color: '#f87171', border: '1px solid rgba(239,68,68,0.25)' }} onClick={deleteSelectedVatTu}>
+                        <Trash2 size={13} /> Xóa đã chọn
+                    </button>
+                    <button className="btn btn-secondary" style={{ padding: '4px 12px', fontSize: 13 }} onClick={() => setSelectedVatTu(new Set())}>
+                        ✕ Bỏ chọn
+                    </button>
+                </div>
+            )}
+
             <div className="card">
                 <div className="table-container">
                     <table className="data-table">
                         <thead>
                             <tr>
-                                <th>#</th>
+                                <th style={{ width: 44 }}>
+                                    <input type="checkbox" checked={allVtSelected}
+                                        ref={el => { if (el) el.indeterminate = someVtSelected && !allVtSelected; }}
+                                        onChange={toggleSelectAllVt}
+                                        style={{ width: 14, height: 14, accentColor: 'var(--text-accent)', cursor: 'pointer' }} />
+                                </th>
+                                <th style={{ width: 36 }}>#</th>
                                 <th>Tên vật tư</th>
                                 <th>Yêu cầu kỹ thuật</th>
                                 <th>Đơn vị</th>
@@ -186,27 +221,35 @@ export default function VatTuPage() {
                         </thead>
                         <tbody>
                             {filtered.length === 0 ? (
-                                <tr><td colSpan={6}><div className="empty-state"><Boxes size={48} /><h3>Chưa có vật tư</h3><p>Thêm vật tư hoặc import từ Excel</p></div></td></tr>
-                            ) : filtered.map((vt, idx) => (
-                                <tr key={vt.id}>
-                                    <td>{idx + 1}</td>
-                                    <td style={{ color: 'var(--text-primary)', fontWeight: 500 }}>{vt.ten_vat_tu}</td>
-                                    <td style={{ maxWidth: 250, overflow: 'hidden', textOverflow: 'ellipsis' }}>{vt.yeu_cau_ky_thuat || '—'}</td>
-                                    <td><span className="badge badge-info">{vt.don_vi_tinh}</span></td>
-                                    <td>
-                                        <span style={{ fontWeight: 600, color: vt.so_luong_kho > 0 ? '#34d399' : 'var(--text-muted)' }}>
-                                            {vt.so_luong_kho}
-                                        </span>
-                                    </td>
-                                    <td>
-                                        <div className="table-actions">
-                                            <button className="btn-icon" onClick={() => openImportStock(vt)} title="Cập nhật số lượng nhập kho" style={{ color: '#34d399', borderColor: 'rgba(52, 211, 153, 0.2)', backgroundColor: 'rgba(52, 211, 153, 0.05)' }}><PackagePlus size={16} /></button>
-                                            <button className="btn-icon" onClick={() => openModal(vt)} title="Sửa thông tin"><Edit3 size={16} /></button>
-                                            <button className="btn-icon" onClick={() => handleDelete(vt.id)} title="Xóa" style={{ color: '#f87171' }}><Trash2 size={16} /></button>
-                                        </div>
-                                    </td>
-                                </tr>
-                            ))}
+                                <tr><td colSpan={7}><div className="empty-state"><Boxes size={48} /><h3>Chưa có vật tư</h3><p>Thêm vật tư hoặc import từ Excel</p></div></td></tr>
+                            ) : filtered.map((vt, idx) => {
+                                const isSelected = selectedVatTu.has(vt.id);
+                                return (
+                                    <tr key={vt.id} style={{ background: isSelected ? 'rgba(14,165,233,0.04)' : undefined }}>
+                                        <td>
+                                            <input type="checkbox" checked={isSelected} onChange={() => toggleSelectVt(vt.id)}
+                                                style={{ width: 14, height: 14, accentColor: 'var(--text-accent)', cursor: 'pointer' }} />
+                                        </td>
+                                        <td style={{ color: 'var(--text-muted)', fontSize: 12 }}>{idx + 1}</td>
+                                        <td style={{ color: 'var(--text-primary)', fontWeight: 500 }}>{vt.ten_vat_tu}</td>
+                                        <td style={{ maxWidth: 250, overflow: 'hidden', textOverflow: 'ellipsis', color: 'var(--text-secondary)', fontSize: 13 }}>{vt.yeu_cau_ky_thuat || '—'}</td>
+                                        <td><span className="badge badge-info">{vt.don_vi_tinh}</span></td>
+                                        <td>
+                                            <span style={{ fontWeight: 700, color: vt.so_luong_kho > 0 ? '#34d399' : '#f87171' }}>
+                                                {vt.so_luong_kho}
+                                            </span>
+                                            <span style={{ fontSize: 11, color: 'var(--text-muted)', marginLeft: 4 }}>{vt.don_vi_tinh}</span>
+                                        </td>
+                                        <td>
+                                            <div className="table-actions">
+                                                <button className="btn-icon" onClick={() => openImportStock(vt)} title="Nhập thêm kho" style={{ color: '#34d399' }}><PackagePlus size={15} /></button>
+                                                <button className="btn-icon" onClick={() => openModal(vt)} title="Sửa"><Edit3 size={15} /></button>
+                                                <button className="btn-icon" onClick={() => handleDelete(vt.id)} title="Xóa" style={{ color: '#f87171' }}><Trash2 size={15} /></button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                );
+                            })}
                         </tbody>
                     </table>
                 </div>

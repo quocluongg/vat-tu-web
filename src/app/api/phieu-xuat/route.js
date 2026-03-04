@@ -12,12 +12,12 @@ export async function GET(request) {
         if (id) {
             const px = db.prepare(`
         SELECT px.*, gv.ho_ten as ten_gv, gv.email, gv.so_dien_thoai,
-               m.ten_mon, h.ten_he, n.ten_nganh
+               m.ten_mon,
+               l.ten_lop, l.si_so, l.loai_he
         FROM phieu_xuat px
         JOIN giao_vien gv ON px.giao_vien_id = gv.id
         JOIN mon_hoc m ON px.mon_hoc_id = m.id
-        JOIN he_dao_tao h ON m.he_dao_tao_id = h.id
-        JOIN nganh n ON h.nganh_id = n.id
+        LEFT JOIN lop l ON px.lop_id = l.id
         WHERE px.id = ?
       `).get(id);
 

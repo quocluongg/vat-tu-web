@@ -21,14 +21,19 @@ export async function GET(request) {
 
             const chiTiet = db.prepare(`
         SELECT dxct.*, vt.ten_vat_tu, vt.yeu_cau_ky_thuat, vt.don_vi_tinh, vt.so_luong_kho,
-               m.ten_mon, h.ten_he, n.ten_nganh
+               m.ten_mon,
+               l.ten_lop, l.si_so, l.loai_he,
+               CASE l.loai_he
+                 WHEN 'T' THEN 'Trung cấp'
+                 WHEN 'C' THEN 'Cao đẳng'
+                 WHEN 'L' THEN 'Liên thông'
+               END as ten_loai_he
         FROM de_xuat_chi_tiet dxct
         JOIN vat_tu vt ON dxct.vat_tu_id = vt.id
         JOIN mon_hoc m ON dxct.mon_hoc_id = m.id
-        JOIN he_dao_tao h ON m.he_dao_tao_id = h.id
-        JOIN nganh n ON h.nganh_id = n.id
+        JOIN lop l ON dxct.lop_id = l.id
         WHERE dxct.de_xuat_id = ?
-        ORDER BY m.ten_mon, vt.ten_vat_tu
+        ORDER BY l.ten_lop, m.ten_mon, vt.ten_vat_tu
       `).all(id);
 
             return NextResponse.json({ ...dx, chi_tiet: chiTiet });
@@ -71,9 +76,9 @@ export async function POST(request) {
             db.prepare("UPDATE de_xuat SET trang_thai = 'da_nop', ngay_nop = CURRENT_TIMESTAMP WHERE id = ?").run(existing.id);
 
             if (chi_tiet && chi_tiet.length > 0) {
-                const stmt = db.prepare('INSERT INTO de_xuat_chi_tiet (de_xuat_id, mon_hoc_id, vat_tu_id, so_luong, ghi_chu) VALUES (?, ?, ?, ?, ?)');
+                const stmt = db.prepare('INSERT INTO de_xuat_chi_tiet (de_xuat_id, mon_hoc_id, lop_id, vat_tu_id, so_luong, ghi_chu) VALUES (?, ?, ?, ?, ?, ?)');
                 for (const ct of chi_tiet) {
-                    stmt.run(existing.id, ct.mon_hoc_id, ct.vat_tu_id, ct.so_luong, ct.ghi_chu || null);
+                    stmt.run(existing.id, ct.mon_hoc_id, ct.lop_id, ct.vat_tu_id, ct.so_luong, ct.ghi_chu || null);
                 }
             }
 
@@ -87,9 +92,9 @@ export async function POST(request) {
         const deXuatId = result.lastInsertRowid;
 
         if (chi_tiet && chi_tiet.length > 0) {
-            const stmt = db.prepare('INSERT INTO de_xuat_chi_tiet (de_xuat_id, mon_hoc_id, vat_tu_id, so_luong, ghi_chu) VALUES (?, ?, ?, ?, ?)');
+            const stmt = db.prepare('INSERT INTO de_xuat_chi_tiet (de_xuat_id, mon_hoc_id, lop_id, vat_tu_id, so_luong, ghi_chu) VALUES (?, ?, ?, ?, ?, ?)');
             for (const ct of chi_tiet) {
-                stmt.run(deXuatId, ct.mon_hoc_id, ct.vat_tu_id, ct.so_luong, ct.ghi_chu || null);
+                stmt.run(deXuatId, ct.mon_hoc_id, ct.lop_id, ct.vat_tu_id, ct.so_luong, ct.ghi_chu || null);
             }
         }
 

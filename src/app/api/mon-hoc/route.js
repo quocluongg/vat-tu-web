@@ -5,19 +5,13 @@ export async function GET(request) {
     try {
         const db = getDb();
         const { searchParams } = new URL(request.url);
-        const he_dao_tao_id = searchParams.get('he_dao_tao_id');
+        const search = searchParams.get('search');
 
-        let query = `
-      SELECT m.*, h.ten_he, n.ten_nganh
-      FROM mon_hoc m
-      JOIN he_dao_tao h ON m.he_dao_tao_id = h.id
-      JOIN nganh n ON h.nganh_id = n.id
-    `;
-
-        if (he_dao_tao_id) {
-            query += ` WHERE m.he_dao_tao_id = ${he_dao_tao_id}`;
+        let query = `SELECT id, ten_mon, created_at FROM mon_hoc`;
+        if (search) {
+            query += ` WHERE ten_mon LIKE '%${search.replace(/'/g, "''")}%'`;
         }
-        query += ' ORDER BY n.ten_nganh, h.ten_he, m.ten_mon';
+        query += ' ORDER BY ten_mon';
 
         const list = db.prepare(query).all();
         return NextResponse.json(list);
@@ -32,18 +26,23 @@ export async function POST(request) {
         const body = await request.json();
 
         if (Array.isArray(body)) {
-            const stmt = db.prepare('INSERT INTO mon_hoc (he_dao_tao_id, ten_mon) VALUES (?, ?)');
+            const stmt = db.prepare('INSERT OR IGNORE INTO mon_hoc (ten_mon) VALUES (?)');
             const insertMany = db.transaction((items) => {
                 for (const item of items) {
-                    stmt.run(item.he_dao_tao_id, item.ten_mon);
+                    stmt.run(item.ten_mon);
                 }
             });
             insertMany(body);
             return NextResponse.json({ message: `Thêm ${body.length} môn học thành công` });
         }
 
-        const { he_dao_tao_id, ten_mon } = body;
-        const result = db.prepare('INSERT INTO mon_hoc (he_dao_tao_id, ten_mon) VALUES (?, ?)').run(he_dao_tao_id, ten_mon);
+        const { ten_mon } = body;
+        if (!ten_mon) return NextResponse.json({ error: 'Vui lòng nhập tên môn học' }, { status: 400 });
+
+        const existing = db.prepare('SELECT id FROM mon_hoc WHERE ten_mon = ?').get(ten_mon.trim());
+        if (existing) return NextResponse.json({ error: 'Môn học này đã tồn tại', id: existing.id }, { status: 409 });
+
+        const result = db.prepare('INSERT INTO mon_hoc (ten_mon) VALUES (?)').run(ten_mon.trim());
         return NextResponse.json({ id: result.lastInsertRowid, message: 'Thêm môn học thành công' });
     } catch (error) {
         return NextResponse.json({ error: error.message }, { status: 500 });
@@ -53,8 +52,9 @@ export async function POST(request) {
 export async function PUT(request) {
     try {
         const db = getDb();
-        const { id, he_dao_tao_id, ten_mon } = await request.json();
-        db.prepare('UPDATE mon_hoc SET he_dao_tao_id = ?, ten_mon = ? WHERE id = ?').run(he_dao_tao_id, ten_mon, id);
+        const { id, ten_mon } = await request.json();
+        if (!id || !ten_mon) return NextResponse.json({ error: 'Thiếu id hoặc tên môn' }, { status: 400 });
+        db.prepare('UPDATE mon_hoc SET ten_mon = ? WHERE id = ?').run(ten_mon.trim(), id);
         return NextResponse.json({ message: 'Cập nhật thành công' });
     } catch (error) {
         return NextResponse.json({ error: error.message }, { status: 500 });
