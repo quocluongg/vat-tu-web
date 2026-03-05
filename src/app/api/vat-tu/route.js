@@ -7,11 +7,20 @@ export async function GET(request) {
         const { searchParams } = new URL(request.url);
         const ki_id = searchParams.get('ki_id');
 
-        let query = 'SELECT * FROM vat_tu';
+        let query = `
+            SELECT vt.*, 
+                   COALESCE(SUM(
+                       CASE WHEN dx.trang_thai IN ('da_nop', 'duyet', 'dang_lam') 
+                       THEN dxct.so_luong ELSE 0 END
+                   ), 0) as dang_de_xuat
+            FROM vat_tu vt
+            LEFT JOIN de_xuat_chi_tiet dxct ON vt.id = dxct.vat_tu_id
+            LEFT JOIN de_xuat dx ON dxct.de_xuat_id = dx.id
+        `;
         if (ki_id) {
-            query += ` WHERE ki_id = ${ki_id}`;
+            query += ` WHERE vt.ki_id = ${ki_id}`;
         }
-        query += ' ORDER BY ten_vat_tu';
+        query += ' GROUP BY vt.id ORDER BY vt.ten_vat_tu';
 
         const list = db.prepare(query).all();
         return NextResponse.json(list);

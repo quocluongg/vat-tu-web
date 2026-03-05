@@ -1,8 +1,106 @@
 'use client';
-import { useState, useEffect } from 'react';
-import { FileText, ChevronDown, Plus, Minus, Send, CheckCircle, BookOpen, Package } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { FileText, ChevronDown, Plus, Minus, Send, CheckCircle, BookOpen, Package, Search, X } from 'lucide-react';
 import ThemeToggle from '@/components/ThemeToggle';
 
+const SearchableMaterialSelect = ({ vatTus, onSelect }) => {
+    const [isOpen, setIsOpen] = useState(false);
+    const [search, setSearch] = useState('');
+    const wrapperRef = useRef(null);
+
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (wrapperRef.current && !wrapperRef.current.contains(event.target)) {
+                setIsOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
+    const sortedVatTus = [...vatTus].sort((a, b) => a.ten_vat_tu.localeCompare(b.ten_vat_tu));
+    const filteredVatTus = sortedVatTus.filter(vt => {
+        const str = `${vt.ten_vat_tu} ${vt.yeu_cau_ky_thuat || ''}`.toLowerCase();
+        return str.includes(search.toLowerCase());
+    });
+
+    return (
+        <div ref={wrapperRef} style={{ position: 'relative', width: '100%' }}>
+            <div
+                className="form-input"
+                style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', background: 'var(--bg-input)' }}
+                onClick={() => setIsOpen(!isOpen)}
+            >
+                <span style={{ color: 'var(--text-secondary)' }}>
+                    <Search size={16} style={{ display: 'inline', marginRight: 8, verticalAlign: 'text-bottom' }} />
+                    Tìm và thêm vật tư...
+                </span>
+                <ChevronDown size={18} style={{ color: 'var(--text-muted)' }} />
+            </div>
+
+            {isOpen && (
+                <div style={{
+                    position: 'absolute', top: '100%', left: 0, right: 0, marginTop: 4,
+                    background: 'var(--bg-card)', border: '1px solid var(--border-color)',
+                    backdropFilter: 'blur(20px)',
+                    borderRadius: 'var(--radius-md)', boxShadow: 'var(--shadow-lg)',
+                    zIndex: 50, maxHeight: 350, display: 'flex', flexDirection: 'column', overflow: 'hidden'
+                }}>
+                    <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', gap: 8, background: 'rgba(0,0,0,0.1)' }}>
+                        <Search size={16} style={{ color: 'var(--text-accent)' }} />
+                        <input
+                            type="text"
+                            style={{ border: 'none', padding: 0, height: 'auto', background: 'transparent', boxShadow: 'none', color: 'var(--text-primary)', outline: 'none', flex: 1, fontSize: 14 }}
+                            placeholder="Gõ tên hoặc yêu cầu kĩ thuật để tìm..."
+                            value={search}
+                            onChange={e => setSearch(e.target.value)}
+                            autoFocus
+                        />
+                        {search && <X size={16} style={{ color: 'var(--text-muted)', cursor: 'pointer' }} onClick={() => setSearch('')} />}
+                    </div>
+
+                    <div style={{ overflowY: 'auto', flex: 1 }} className="custom-scrollbar">
+                        {filteredVatTus.length === 0 ? (
+                            <div style={{ padding: 24, textAlign: 'center', color: 'var(--text-muted)' }}>Không tìm thấy vật tư "{search}"</div>
+                        ) : (
+                            filteredVatTus.map((vt, idx) => (
+                                <div
+                                    key={vt.id}
+                                    className="material-dropdown-item"
+                                    style={{
+                                        padding: '12px 16px',
+                                        borderBottom: idx === filteredVatTus.length - 1 ? 'none' : '1px solid var(--border-color)',
+                                        cursor: 'pointer',
+                                    }}
+                                    onClick={() => {
+                                        onSelect(vt.id);
+                                        setIsOpen(false);
+                                        setSearch('');
+                                    }}
+                                >
+                                    <div style={{ fontWeight: 600, color: 'var(--text-primary)', marginBottom: 4, fontSize: 14 }}>{vt.ten_vat_tu}</div>
+                                    <div style={{ fontSize: 13, color: 'var(--text-secondary)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                        <span style={{ flex: 1, paddingRight: 8 }}>{vt.yeu_cau_ky_thuat || '—'} • {vt.don_vi_tinh}</span>
+                                        <div style={{ display: 'flex', gap: 6 }}>
+                                            {vt.dang_de_xuat > 0 && (
+                                                <span className="badge" style={{ fontSize: 11, background: 'rgba(245, 158, 11, 0.15)', color: '#d97706' }}>
+                                                    Đang ĐX: {vt.dang_de_xuat}
+                                                </span>
+                                            )}
+                                            <span className={`badge ${vt.so_luong_kho > 0 ? 'badge-success' : 'badge-danger'}`} style={{ fontSize: 11 }}>
+                                                Kho: {vt.so_luong_kho}
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))
+                        )}
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+};
 export default function DeXuatPublicPage() {
     const [kiHocs, setKiHocs] = useState([]);
     const [giaoViens, setGiaoViens] = useState([]);
@@ -38,37 +136,37 @@ export default function DeXuatPublicPage() {
         }
     }, [selectedKi, selectedGv]);
 
-    const toggleMon = (monId) => {
-        setExpandedMon(prev => ({ ...prev, [monId]: !prev[monId] }));
+    const togglePc = (pcId) => {
+        setExpandedMon(prev => ({ ...prev, [pcId]: !prev[pcId] }));
     };
 
-    const updateQuantity = (monId, vtId, delta) => {
+    const updateQuantity = (pcId, vtId, delta) => {
         setSelections(prev => {
-            const monSelections = prev[monId] || {};
-            const current = monSelections[vtId] || 0;
+            const pcSelections = prev[pcId] || {};
+            const current = pcSelections[vtId] || 0;
             const newVal = Math.max(0, current + delta);
 
-            const updatedMon = { ...monSelections };
+            const updatedPc = { ...pcSelections };
             if (newVal === 0) {
-                delete updatedMon[vtId];
+                delete updatedPc[vtId];
             } else {
-                updatedMon[vtId] = newVal;
+                updatedPc[vtId] = newVal;
             }
 
-            return { ...prev, [monId]: updatedMon };
+            return { ...prev, [pcId]: updatedPc };
         });
     };
 
-    const setQuantity = (monId, vtId, value) => {
+    const setQuantity = (pcId, vtId, value) => {
         const val = parseInt(value) || 0;
         setSelections(prev => {
-            const monSelections = { ...(prev[monId] || {}) };
+            const pcSelections = { ...(prev[pcId] || {}) };
             if (val === 0) {
-                delete monSelections[vtId];
+                delete pcSelections[vtId];
             } else {
-                monSelections[vtId] = val;
+                pcSelections[vtId] = val;
             }
-            return { ...prev, [monId]: monSelections };
+            return { ...prev, [pcId]: pcSelections };
         });
     };
 
@@ -82,15 +180,14 @@ export default function DeXuatPublicPage() {
 
     const getChiTiet = () => {
         const result = [];
-        Object.entries(selections).forEach(([monId, vatTuMap]) => {
-            // Find lop_id from phanCong (each phanCong entry has mon_hoc_id + lop_id)
-            const pc = phanCongs.find(p => p.mon_hoc_id === parseInt(monId));
-            const lopId = pc?.lop_id || null;
+        Object.entries(selections).forEach(([pcId, vatTuMap]) => {
+            const pc = phanCongs.find(p => p.id === parseInt(pcId));
+            if (!pc) return;
             Object.entries(vatTuMap).forEach(([vtId, soLuong]) => {
                 if (soLuong > 0) {
                     result.push({
-                        mon_hoc_id: parseInt(monId),
-                        lop_id: lopId,
+                        mon_hoc_id: pc.mon_hoc_id,
+                        lop_id: pc.lop_id,
                         vat_tu_id: parseInt(vtId),
                         so_luong: soLuong
                     });
@@ -213,14 +310,14 @@ export default function DeXuatPublicPage() {
                                 </div>
                             ) : (
                                 phanCongs.map(pc => {
-                                    const isExpanded = expandedMon[pc.mon_hoc_id];
-                                    const monSelections = selections[pc.mon_hoc_id] || {};
-                                    const selectedCount = Object.keys(monSelections).length;
+                                    const isExpanded = expandedMon[pc.id];
+                                    const pcSelections = selections[pc.id] || {};
+                                    const selectedCount = Object.keys(pcSelections).length;
                                     return (
                                         <div key={pc.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
                                             <div
                                                 className="accordion-header"
-                                                onClick={() => toggleMon(pc.mon_hoc_id)}
+                                                onClick={() => togglePc(pc.id)}
                                             >
                                                 <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                                                     <ChevronDown size={20} style={{ transform: isExpanded ? 'rotate(0)' : 'rotate(-90deg)', transition: 'transform 0.2s' }} />
@@ -236,36 +333,55 @@ export default function DeXuatPublicPage() {
                                             </div>
                                             {isExpanded && (
                                                 <div style={{ padding: '0 20px 16px' }}>
-                                                    {vatTus.map(vt => {
-                                                        const qty = monSelections[vt.id] || 0;
-                                                        return (
-                                                            <div className="material-item" key={vt.id} style={{ background: qty > 0 ? 'rgba(14,165,233,0.05)' : 'transparent', borderColor: qty > 0 ? 'rgba(14,165,233,0.2)' : 'var(--border-color)' }}>
-                                                                <div className="material-info">
-                                                                    <h4>{vt.ten_vat_tu}</h4>
-                                                                    <p>
-                                                                        {vt.yeu_cau_ky_thuat && `${vt.yeu_cau_ky_thuat} • `}
-                                                                        {vt.don_vi_tinh} • Kho: {vt.so_luong_kho}
-                                                                    </p>
-                                                                </div>
-                                                                <div className="material-qty">
-                                                                    <button className="btn-icon" onClick={() => updateQuantity(pc.mon_hoc_id, vt.id, -1)} disabled={qty === 0}>
-                                                                        <Minus size={16} />
-                                                                    </button>
-                                                                    <input
-                                                                        type="number"
-                                                                        className="form-input"
-                                                                        style={{ width: 70, textAlign: 'center', padding: '6px' }}
-                                                                        value={qty}
-                                                                        onChange={e => setQuantity(pc.mon_hoc_id, vt.id, e.target.value)}
-                                                                        min="0"
-                                                                    />
-                                                                    <button className="btn-icon" onClick={() => updateQuantity(pc.mon_hoc_id, vt.id, 1)}>
-                                                                        <Plus size={16} />
-                                                                    </button>
-                                                                </div>
-                                                            </div>
-                                                        );
-                                                    })}
+                                                    <div style={{ marginBottom: 16 }}>
+                                                        <SearchableMaterialSelect
+                                                            vatTus={vatTus}
+                                                            onSelect={(val) => {
+                                                                setQuantity(pc.id, val, (pcSelections[val] || 0) + 1);
+                                                            }}
+                                                        />
+                                                    </div>
+
+                                                    {Object.keys(pcSelections).length > 0 ? (
+                                                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                                            {Object.keys(pcSelections).map(vtId => {
+                                                                const vt = vatTus.find(v => v.id === parseInt(vtId));
+                                                                if (!vt) return null;
+                                                                const qty = pcSelections[vtId];
+                                                                return (
+                                                                    <div className="material-item" key={vt.id} style={{ background: 'rgba(14,165,233,0.05)', borderColor: 'rgba(14,165,233,0.2)' }}>
+                                                                        <div className="material-info">
+                                                                            <h4>{vt.ten_vat_tu}</h4>
+                                                                            <p>
+                                                                                {vt.yeu_cau_ky_thuat && `${vt.yeu_cau_ky_thuat} • `}
+                                                                                {vt.don_vi_tinh} • Kho: {vt.so_luong_kho}
+                                                                            </p>
+                                                                        </div>
+                                                                        <div className="material-qty">
+                                                                            <button className="btn-icon" onClick={() => updateQuantity(pc.id, vt.id, -1)} disabled={qty === 0}>
+                                                                                <Minus size={16} />
+                                                                            </button>
+                                                                            <input
+                                                                                type="number"
+                                                                                className="form-input"
+                                                                                style={{ width: 70, textAlign: 'center', padding: '6px' }}
+                                                                                value={qty}
+                                                                                onChange={e => setQuantity(pc.id, vt.id, e.target.value)}
+                                                                                min="0"
+                                                                            />
+                                                                            <button className="btn-icon" onClick={() => updateQuantity(pc.id, vt.id, 1)}>
+                                                                                <Plus size={16} />
+                                                                            </button>
+                                                                        </div>
+                                                                    </div>
+                                                                );
+                                                            })}
+                                                        </div>
+                                                    ) : (
+                                                        <div style={{ textAlign: 'center', padding: 20, color: 'var(--text-muted)' }}>
+                                                            Chưa chọn vật tư nào cho môn học này
+                                                        </div>
+                                                    )}
                                                 </div>
                                             )}
                                         </div>

@@ -216,12 +216,13 @@ export default function VatTuPage() {
                                 <th>Yêu cầu kỹ thuật</th>
                                 <th>Đơn vị</th>
                                 <th>Tồn kho</th>
+                                <th>Đang đề xuất</th>
                                 <th style={{ width: 140 }}>Thao tác</th>
                             </tr>
                         </thead>
                         <tbody>
                             {filtered.length === 0 ? (
-                                <tr><td colSpan={7}><div className="empty-state"><Boxes size={48} /><h3>Chưa có vật tư</h3><p>Thêm vật tư hoặc import từ Excel</p></div></td></tr>
+                                <tr><td colSpan={8}><div className="empty-state"><Boxes size={48} /><h3>Chưa có vật tư</h3><p>Thêm vật tư hoặc import từ Excel</p></div></td></tr>
                             ) : filtered.map((vt, idx) => {
                                 const isSelected = selectedVatTu.has(vt.id);
                                 return (
@@ -238,7 +239,15 @@ export default function VatTuPage() {
                                             <span style={{ fontWeight: 700, color: vt.so_luong_kho > 0 ? '#34d399' : '#f87171' }}>
                                                 {vt.so_luong_kho}
                                             </span>
-                                            <span style={{ fontSize: 11, color: 'var(--text-muted)', marginLeft: 4 }}>{vt.don_vi_tinh}</span>
+                                        </td>
+                                        <td>
+                                            {vt.dang_de_xuat > 0 ? (
+                                                <span className="badge badge-warning" style={{ fontSize: 12 }}>
+                                                    {vt.dang_de_xuat} {vt.don_vi_tinh}
+                                                </span>
+                                            ) : (
+                                                <span style={{ color: 'var(--text-muted)', fontSize: 13 }}>0</span>
+                                            )}
                                         </td>
                                         <td>
                                             <div className="table-actions">
