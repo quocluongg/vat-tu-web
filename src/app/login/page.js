@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import { signIn } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
-import { Package, Lock, User, ArrowRight, ArrowLeft } from 'lucide-react';
+import { Lock, User, ArrowRight, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import ThemeToggle from '@/components/ThemeToggle';
 
@@ -44,11 +44,11 @@ export default function LoginPage() {
                     </Link>
 
                     <div className="login-logo">
-                        <div className="login-logo-icon">
-                            <Package size={32} color="white" />
+                        <div className="login-logo-icon" style={{ background: 'white', padding: 8 }}>
+                            <img src="http://vsvc.edu.vn/uploads/12-2017/logo.png" alt="VSVC" style={{ width: 44, height: 44, objectFit: 'contain' }} />
                         </div>
-                        <h1>Quản Lý Vật Tư</h1>
-                        <p>Đăng nhập quản trị viên</p>
+                        <h1>Đăng Nhập Cổng Quản Trị</h1>
+                        <p>Hệ Thống Quản Lý Vật Tư VSVC</p>
                     </div>
 
                     <form onSubmit={handleSubmit}>

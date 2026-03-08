@@ -43,7 +43,7 @@ export default function Sidebar() {
         <>
             <div className="mobile-nav">
                 <div className="mobile-nav-logo">
-                    <Package size={22} />
+                    <img src="http://vsvc.edu.vn/uploads/12-2017/logo.png" alt="VSVC" style={{ width: 32, height: 32, objectFit: 'contain', background: 'white', borderRadius: 6, padding: 2 }} />
                     <span>Quản Lý Vật Tư</span>
                 </div>
                 <button className="btn-icon mobile-menu-btn" onClick={() => setIsOpen(!isOpen)}>
@@ -54,12 +54,14 @@ export default function Sidebar() {
             <div className={`sidebar-overlay ${isOpen ? 'open' : ''}`} onClick={() => setIsOpen(false)}></div>
 
             <aside className={`sidebar ${isOpen ? 'open' : ''}`}>
-                <div className="sidebar-header">
-                    <h2>
-                        <Package size={22} />
-                        Quản Lý Vật Tư
-                    </h2>
-                    <p>Hệ thống quản lý kho</p>
+                <div className="sidebar-header" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                    <div style={{ background: 'white', padding: 8, borderRadius: 8, display: 'inline-block', width: 'fit-content' }}>
+                        <img src="http://vsvc.edu.vn/uploads/12-2017/logo.png" alt="VSVC" style={{ height: 40, objectFit: 'contain' }} />
+                    </div>
+                    <div>
+                        <h2 style={{ fontSize: 18, background: 'var(--gradient-primary)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', fontWeight: 800 }}>Quản Lý Vật Tư</h2>
+                        <p style={{ fontSize: 12, color: 'var(--text-muted)' }}>VSVC College System</p>
+                    </div>
                 </div>
 
                 <nav className="sidebar-nav">
