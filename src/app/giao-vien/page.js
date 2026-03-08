@@ -1,21 +1,18 @@
 'use client';
 import Link from 'next/link';
-import { ArrowLeft, FileText, FileOutput, ArrowRight, Package } from 'lucide-react';
-import ThemeToggle from '@/components/ThemeToggle';
-
+import { ArrowLeft, FileText, FileOutput, ArrowRight, Package, Users } from 'lucide-react';
+import { ArrowLeft, FileText, FileOutput, ArrowRight, Package, Users } from 'lucide-react';
 export default function GiaoVienPortalPage() {
     return (
         <div className="public-page">
-            <div style={{ position: 'absolute', top: 24, right: 24 }}>
-                <ThemeToggle />
-            </div>
+
             <div className="public-container" style={{ maxWidth: 600 }}>
                 <Link href="/" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: 'var(--text-muted)', fontSize: 13, textDecoration: 'none', marginBottom: 24 }}>
                     <ArrowLeft size={16} /> Về trang chủ
                 </Link>
 
                 <div className="public-header" style={{ marginBottom: 32 }}>
-                    <h1>👨‍🏫 Cổng Giáo viên</h1>
+                    <h1 style={{ display: 'flex', alignItems: 'center', gap: 8 }}><Users size={28} className="text-primary" /> Cổng Giáo viên</h1>
                     <p>Chọn chức năng bạn muốn sử dụng</p>
                 </div>
 
@@ -33,7 +30,7 @@ export default function GiaoVienPortalPage() {
                                     <FileText size={28} style={{ color: '#38bdf8' }} />
                                 </div>
                                 <div style={{ flex: 1 }}>
-                                    <h2 style={{ fontSize: 18, fontWeight: 600, marginBottom: 4 }}>📝 Đề xuất dự trù vật tư</h2>
+                                    <h2 style={{ fontSize: 18, fontWeight: 600, marginBottom: 4 }}>Đề xuất dự trù vật tư</h2>
                                     <p style={{ fontSize: 14, color: 'var(--text-secondary)', lineHeight: 1.5 }}>
                                         Đề xuất vật tư cần thiết cho các môn học được phân công trong kỳ
                                     </p>
@@ -56,7 +53,7 @@ export default function GiaoVienPortalPage() {
                                     <FileOutput size={28} style={{ color: '#34d399' }} />
                                 </div>
                                 <div style={{ flex: 1 }}>
-                                    <h2 style={{ fontSize: 18, fontWeight: 600, marginBottom: 4 }}>📤 Phiếu xuất vật tư</h2>
+                                    <h2 style={{ fontSize: 18, fontWeight: 600, marginBottom: 4 }}>Phiếu xuất vật tư</h2>
                                     <p style={{ fontSize: 14, color: 'var(--text-secondary)', lineHeight: 1.5 }}>
                                         Tạo phiếu xuất vật tư, theo dõi trạng thái và in phiếu
                                     </p>

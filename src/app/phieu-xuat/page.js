@@ -1,7 +1,6 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { FileOutput, Eye, Plus, Minus, Send, CheckCircle, Download, BookOpen, Package, Clock } from 'lucide-react';
-import ThemeToggle from '@/components/ThemeToggle';
 
 export default function PhieuXuatPublicPage() {
     const [kiHocs, setKiHocs] = useState([]);
@@ -217,9 +216,6 @@ export default function PhieuXuatPublicPage() {
     if (kiHocs.length === 0) {
         return (
             <div className="public-page">
-                <div style={{ position: 'absolute', top: 24, right: 24 }}>
-                    <ThemeToggle />
-                </div>
                 <div className="public-container" style={{ textAlign: 'center', paddingTop: 100 }}>
                     <FileOutput size={60} style={{ color: 'var(--text-muted)', marginBottom: 16 }} />
                     <h1 style={{ fontSize: 24, fontWeight: 600, marginBottom: 8 }}>Chưa có kỳ hoạt động</h1>
@@ -231,9 +227,6 @@ export default function PhieuXuatPublicPage() {
 
     return (
         <div className="public-page">
-            <div style={{ position: 'absolute', top: 24, right: 24 }}>
-                <ThemeToggle />
-            </div>
             <div className="public-container">
                 <div className="public-header">
                     <h1>📤 Phiếu xuất vật tư</h1>

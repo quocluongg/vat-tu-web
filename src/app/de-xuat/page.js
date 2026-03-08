@@ -1,7 +1,6 @@
 'use client';
 import { useState, useEffect, useRef } from 'react';
 import { FileText, ChevronDown, Plus, Minus, Send, CheckCircle, BookOpen, Package, Search, X } from 'lucide-react';
-import ThemeToggle from '@/components/ThemeToggle';
 
 const SearchableMaterialSelect = ({ vatTus, onSelect }) => {
     const [isOpen, setIsOpen] = useState(false);
@@ -103,7 +102,7 @@ const SearchableMaterialSelect = ({ vatTus, onSelect }) => {
 };
 export default function DeXuatPublicPage() {
     const [kiHocs, setKiHocs] = useState([]);
-    const [giaoViens, setGiaoViens] = useState([]);
+    const [giaoViens, setGiaoVien] = useState([]);
     const [selectedKi, setSelectedKi] = useState('');
     const [selectedGv, setSelectedGv] = useState('');
     const [phanCongs, setPhanCongs] = useState([]);
@@ -124,7 +123,7 @@ export default function DeXuatPublicPage() {
                 setKiInfo(activeKis[0]);
             }
         });
-        fetch('/api/giao-vien').then(r => r.json()).then(setGiaoViens);
+        fetch('/api/giao-vien').then(r => r.json()).then(setGiaoVien);
     }, []);
 
     useEffect(() => {
@@ -233,9 +232,6 @@ export default function DeXuatPublicPage() {
     if (submitted) {
         return (
             <div className="public-page">
-                <div style={{ position: 'absolute', top: 24, right: 24 }}>
-                    <ThemeToggle />
-                </div>
                 <div className="public-container" style={{ textAlign: 'center', paddingTop: 100 }}>
                     <div style={{ width: 80, height: 80, borderRadius: '50%', background: 'rgba(16,185,129,0.12)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', marginBottom: 24 }}>
                         <CheckCircle size={40} color="#34d399" />
@@ -255,9 +251,6 @@ export default function DeXuatPublicPage() {
     if (kiHocs.length === 0) {
         return (
             <div className="public-page">
-                <div style={{ position: 'absolute', top: 24, right: 24 }}>
-                    <ThemeToggle />
-                </div>
                 <div className="public-container" style={{ textAlign: 'center', paddingTop: 100 }}>
                     <FileText size={60} style={{ color: 'var(--text-muted)', marginBottom: 16 }} />
                     <h1 style={{ fontSize: 24, fontWeight: 600, marginBottom: 8 }}>Chưa mở đề xuất</h1>
@@ -269,9 +262,6 @@ export default function DeXuatPublicPage() {
 
     return (
         <div className="public-page">
-            <div style={{ position: 'absolute', top: 24, right: 24 }}>
-                <ThemeToggle />
-            </div>
             <div className="public-container">
                 <div className="public-header">
                     <h1>📋 Đề xuất dự trù vật tư</h1>

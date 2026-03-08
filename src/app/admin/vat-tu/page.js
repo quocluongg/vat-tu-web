@@ -160,7 +160,7 @@ export default function VatTuPage() {
         <div>
             <div className="page-header">
                 <div className="page-header-left">
-                    <h1>📦 Quản lý Vật tư</h1>
+                    <h1 style={{ display: 'flex', alignItems: 'center', gap: 8 }}><Boxes size={28} className="text-accent" /> Quản lý Vật tư</h1>
                     <p>Danh mục vật tư theo kỳ học</p>
                 </div>
                 <div className="page-header-actions">

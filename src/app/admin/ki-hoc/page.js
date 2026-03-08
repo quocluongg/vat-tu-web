@@ -1,14 +1,14 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { Calendar, Plus, Edit3, Trash2, ChevronRight, AlertCircle } from 'lucide-react';
+import { Calendar, Plus, Edit3, Trash2, ChevronRight, AlertCircle, Settings, FileText, ShoppingCart, Activity, Lock, CheckCircle2 } from 'lucide-react';
 import { useToast } from '@/components/Toast';
 
 const statusLabels = {
-    setup: { label: 'Thiết lập', badge: 'badge-info' },
-    de_xuat: { label: 'Đề xuất', badge: 'badge-primary' },
-    mua_sam: { label: 'Mua sắm', badge: 'badge-warning' },
-    hoat_dong: { label: 'Hoạt động', badge: 'badge-success' },
-    dong: { label: 'Đã đóng', badge: 'badge-danger' },
+    setup: { label: 'Thiết lập', icon: Settings },
+    de_xuat: { label: 'Đề xuất', icon: FileText },
+    mua_sam: { label: 'Mua sắm', icon: ShoppingCart },
+    hoat_dong: { label: 'Hoạt động', icon: Activity },
+    dong: { label: 'Đã đóng', icon: Lock },
 };
 
 const statusFlow = ['setup', 'de_xuat', 'mua_sam', 'hoat_dong', 'dong'];
@@ -80,7 +80,7 @@ export default function KiHocPage() {
         <div>
             <div className="page-header">
                 <div className="page-header-left">
-                    <h1>📅 Quản lý Kỳ học</h1>
+                    <h1 style={{ display: 'flex', alignItems: 'center', gap: 8 }}><Calendar size={28} className="text-accent" /> Quản lý Kỳ học</h1>
                     <p>Thiết lập và quản lý các kỳ học / đợt</p>
                 </div>
                 <div className="page-header-actions">
@@ -116,66 +116,93 @@ export default function KiHocPage() {
                                         <td>{item.ngay_bat_dau ? new Date(item.ngay_bat_dau).toLocaleDateString('vi-VN') : '—'}</td>
                                         <td>{item.ngay_ket_thuc ? new Date(item.ngay_ket_thuc).toLocaleDateString('vi-VN') : '—'}</td>
                                         <td>{item.han_de_xuat ? new Date(item.han_de_xuat).toLocaleDateString('vi-VN') : '—'}</td>
-                                        <td>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                                        <td style={{ minWidth: 450, padding: '16px 12px' }}>
+                                            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', width: '100%', position: 'relative' }}>
                                                 {statusFlow.map((st, idx) => {
                                                     const isPast = idx < currentIdx;
                                                     const isCurrent = idx === currentIdx;
                                                     const isNext = idx === currentIdx + 1;
                                                     const isFuture = idx > currentIdx + 1;
 
+                                                    const Icon = statusLabels[st].icon;
+
                                                     let bgColor = 'var(--bg-glass)';
+                                                    let iconColor = 'var(--text-muted)';
                                                     let textColor = 'var(--text-muted)';
-                                                    let border = '1px solid var(--border-color)';
+                                                    let border = '2px solid var(--border-color)';
                                                     let cursor = 'default';
 
                                                     if (isPast) {
-                                                        bgColor = 'rgba(16, 185, 129, 0.1)';
+                                                        bgColor = '#10b981';
+                                                        iconColor = '#fff';
                                                         textColor = '#10b981';
-                                                        border = '1px solid rgba(16, 185, 129, 0.2)';
+                                                        border = '2px solid #10b981';
                                                     } else if (isCurrent) {
-                                                        bgColor = 'var(--bg-primary)';
-                                                        textColor = 'var(--text-accent)';
-                                                        border = '1px solid var(--text-accent)';
+                                                        bgColor = 'rgba(14, 165, 233, 0.1)';
+                                                        iconColor = '#0ea5e9';
+                                                        textColor = '#0ea5e9';
+                                                        border = '2px solid #0ea5e9';
                                                     } else if (isNext) {
                                                         bgColor = 'transparent';
+                                                        iconColor = 'var(--text-primary)';
                                                         textColor = 'var(--text-primary)';
-                                                        border = '1px dashed var(--text-muted)';
+                                                        border = '2px dashed var(--text-muted)';
                                                         cursor = 'pointer';
                                                     }
 
                                                     return (
-                                                        <div key={st} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                                                        <div key={st} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', position: 'relative', flex: 1 }}>
+                                                            {/* Connecting Line (before this step) */}
+                                                            {idx > 0 && (
+                                                                <div style={{
+                                                                    position: 'absolute',
+                                                                    top: 16, // half of 32px icon
+                                                                    right: '50%',
+                                                                    width: '100%',
+                                                                    height: 3,
+                                                                    backgroundColor: isPast || isCurrent ? '#10b981' : 'var(--border-color)',
+                                                                    zIndex: 0,
+                                                                    transition: 'background-color 0.3s'
+                                                                }} />
+                                                            )}
+
+                                                            {/* Circle Icon */}
                                                             <div
                                                                 onClick={() => isNext && handleStatusChange(item, st)}
                                                                 style={{
-                                                                    padding: '4px 10px',
-                                                                    borderRadius: '20px',
-                                                                    fontSize: '12px',
-                                                                    fontWeight: isCurrent ? '600' : '400',
+                                                                    width: 34,
+                                                                    height: 34,
+                                                                    borderRadius: '50%',
                                                                     backgroundColor: bgColor,
-                                                                    color: textColor,
                                                                     border: border,
+                                                                    display: 'flex',
+                                                                    alignItems: 'center',
+                                                                    justifyContent: 'center',
+                                                                    color: iconColor,
                                                                     cursor: cursor,
-                                                                    transition: 'all 0.2s',
-                                                                    boxShadow: isCurrent ? '0 0 8px rgba(56, 189, 248, 0.15)' : 'none',
-                                                                    opacity: isFuture ? 0.3 : 1,
-                                                                    whiteSpace: 'nowrap'
+                                                                    zIndex: 1,
+                                                                    transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+                                                                    boxShadow: isCurrent ? '0 0 0 4px rgba(14, 165, 233, 0.15)' : 'none',
+                                                                    opacity: isFuture ? 0.4 : 1
                                                                 }}
-                                                                onMouseEnter={(e) => { if (isNext) e.currentTarget.style.borderColor = 'var(--text-accent)'; }}
-                                                                onMouseLeave={(e) => { if (isNext) e.currentTarget.style.borderColor = 'var(--text-muted)'; }}
+                                                                onMouseEnter={(e) => { if (isNext) { e.currentTarget.style.borderColor = '#0ea5e9'; e.currentTarget.style.color = '#0ea5e9'; e.currentTarget.style.transform = 'scale(1.1)'; } }}
+                                                                onMouseLeave={(e) => { if (isNext) { e.currentTarget.style.borderColor = 'var(--text-muted)'; e.currentTarget.style.color = 'var(--text-primary)'; e.currentTarget.style.transform = 'scale(1)'; } }}
                                                                 title={isNext ? 'Nhấn để chuyển sang bước này' : isCurrent ? 'Trạng thái hiện tại' : ''}
                                                             >
+                                                                {isPast ? <CheckCircle2 size={18} color="#fff" /> : <Icon size={16} />}
+                                                            </div>
+
+                                                            {/* Label */}
+                                                            <div style={{
+                                                                marginTop: 8,
+                                                                fontSize: 11,
+                                                                fontWeight: isCurrent ? 700 : 600,
+                                                                color: textColor,
+                                                                textAlign: 'center',
+                                                                opacity: isFuture ? 0.4 : 1,
+                                                            }}>
                                                                 {statusLabels[st].label}
                                                             </div>
-                                                            {idx < statusFlow.length - 1 && (
-                                                                <div style={{
-                                                                    width: 12,
-                                                                    height: 2,
-                                                                    backgroundColor: isPast ? '#10b981' : 'var(--border-color)',
-                                                                    borderRadius: 2
-                                                                }} />
-                                                            )}
                                                         </div>
                                                     );
                                                 })}

@@ -1,7 +1,6 @@
 'use client';
 import Link from 'next/link';
 import { Package, Shield, GraduationCap, ArrowRight, BookOpen, Layers } from 'lucide-react';
-import ThemeToggle from '@/components/ThemeToggle';
 
 export default function HomePage() {
   return (
@@ -10,7 +9,7 @@ export default function HomePage() {
       <div style={{ position: 'absolute', top: 0, right: 0, width: '100%', height: '400px', background: 'var(--gradient-primary)', opacity: 0.05, borderBottomLeftRadius: '50% 10%' }}></div>
 
       <div style={{ position: 'absolute', top: 24, right: 24, zIndex: 10 }}>
-        <ThemeToggle />
+
       </div>
 
       {/* Main Container */}

@@ -86,7 +86,7 @@ export default function MuaSamPage() {
         <div>
             <div className="page-header">
                 <div className="page-header-left">
-                    <h1>🛒 Mua sắm vật tư</h1>
+                    <h1 style={{ display: 'flex', alignItems: 'center', gap: 8 }}><ShoppingCart size={28} className="text-accent" /> Mua sắm vật tư</h1>
                     <p>Tổng hợp và quản lý mua sắm vật tư theo đề xuất</p>
                 </div>
                 <div className="page-header-actions">

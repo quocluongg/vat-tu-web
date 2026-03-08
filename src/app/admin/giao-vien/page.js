@@ -82,7 +82,7 @@ export default function GiaoVienPage() {
         <div>
             <div className="page-header">
                 <div className="page-header-left">
-                    <h1>👨‍🏫 Quản lý Giáo viên</h1>
+                    <h1 style={{ display: 'flex', alignItems: 'center', gap: 8 }}><Users size={28} className="text-accent" /> Quản lý Giáo viên</h1>
                     <p>Danh sách giáo viên trong hệ thống</p>
                 </div>
                 <div className="page-header-actions">

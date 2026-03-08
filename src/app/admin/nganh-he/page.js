@@ -1,6 +1,6 @@
 'use client';
 import { useState, useEffect, useCallback } from 'react';
-import { GraduationCap, Plus, Edit3, Trash2, BookOpen, UserPlus, X, Search, School, Upload, CheckCircle2, AlertCircle, ChevronDown, FolderOpen } from 'lucide-react';
+import { GraduationCap, Plus, Edit3, Trash2, BookOpen, UserPlus, X, Search, School, Upload, CheckCircle2, AlertCircle, ChevronDown, FolderOpen, Calendar, Settings, FileText } from 'lucide-react';
 import { useToast } from '@/components/Toast';
 
 const LOAI_HE_MAP = { T: 'Trung cấp', C: 'Cao đẳng', L: 'Liên thông' };
@@ -188,16 +188,16 @@ export default function NganhHePage() {
     };
     const filteredPC = phanCongs.filter(pc => !search || pc.ten_gv?.toLowerCase().includes(search.toLowerCase()) || pc.ten_mon?.toLowerCase().includes(search.toLowerCase()) || pc.ten_lop?.toLowerCase().includes(search.toLowerCase()));
 
-    const selectedKiObj = kiHocs.find(k => k.id.toString() === selectedKi);
+    const selectedKiObj = kiHocs?.find(k => k.id.toString() === selectedKi);
 
     if (loading) return <div className="loading-overlay"><div className="spinner" /></div>;
 
     const TABS = [
-        { key: 'phan_cong', label: 'Phân công', icon: '📝', count: phanCongs.length, desc: 'GV dạy môn nào, lớp nào' },
-        { key: 'mon', label: 'Môn học', icon: '📚', count: monHocs.filter(m => m.ten_mon.startsWith('TH')).length, desc: 'Môn TH cần vật tư' },
-        { key: 'lop', label: 'Lớp học', icon: '🏫', count: lops.length, desc: 'Danh sách lớp' },
-        { key: 'import', label: 'Import', icon: '⬆️', count: null, desc: 'Nhập dữ liệu nhanh' },
-        { key: 'cai_dat', label: 'Cài đặt', icon: '⚙️', count: null, desc: 'Ngành & Hệ' },
+        { key: 'phan_cong', label: 'Phân công', icon: <FileText size={16} />, count: phanCongs.length, desc: 'GV dạy môn nào, lớp nào' },
+        { key: 'mon', label: 'Môn học', icon: <BookOpen size={16} />, count: monHocs.filter(m => m.ten_mon.startsWith('TH')).length, desc: 'Môn TH cần vật tư' },
+        { key: 'lop', label: 'Lớp học', icon: <School size={16} />, count: lops.length, desc: 'Danh sách lớp' },
+        { key: 'import', label: 'Import', icon: <Upload size={16} />, count: null, desc: 'Nhập dữ liệu nhanh' },
+        { key: 'cai_dat', label: 'Cài đặt', icon: <Settings size={16} />, count: null, desc: 'Ngành & Hệ' },
     ];
 
     return (
@@ -205,15 +205,11 @@ export default function NganhHePage() {
             {/* ── HEADER ── */}
             <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 24, gap: 16, flexWrap: 'wrap' }}>
                 <div>
-                    <h1 style={{ fontSize: 22, fontWeight: 700, marginBottom: 4 }}>📋 Quản lý giảng dạy</h1>
+                    <h1 style={{ fontSize: 22, fontWeight: 700, marginBottom: 4, display: 'flex', alignItems: 'center', gap: 8 }}><GraduationCap size={28} className="text-accent" /> Quản lý giảng dạy</h1>
                     <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>Phân công môn học — lớp học — giáo viên</p>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    {selectedKiObj && (
-                        <span style={{ fontSize: 12, padding: '4px 12px', borderRadius: 100, background: 'rgba(14,165,233,0.1)', color: '#38bdf8', border: '1px solid rgba(14,165,233,0.2)', fontWeight: 600 }}>
-                            📅 {selectedKiObj.ten_ki} — {selectedKiObj.nam_hoc}
-                        </span>
-                    )}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}><Calendar size={14} /> {selectedKiObj?.ten_ki} — {selectedKiObj?.nam_hoc}</div>
                     <select className="form-select" style={{ width: 200, height: 36, fontSize: 13 }} value={selectedKi} onChange={e => setSelectedKi(e.target.value)}>
                         <option value="">Chọn kỳ học</option>
                         {kiHocs.map(k => <option key={k.id} value={k.id}>{k.ten_ki} - {k.nam_hoc}</option>)}
@@ -259,7 +255,7 @@ export default function NganhHePage() {
                         <div>
                             <h2 style={{ fontSize: 15, fontWeight: 600 }}>Danh sách phân công giảng dạy</h2>
                             <p style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
-                                {selectedKiObj ? selectedKiObj.ten_ki + ' — ' + selectedKiObj.nam_hoc : 'Chọn kỳ học để xem'} · {filteredPC.length} phân công
+                                {selectedKiObj ? selectedKiObj?.ten_ki + ' — ' + selectedKiObj?.nam_hoc : 'Chọn kỳ học để xem'} · {filteredPC.length} phân công
                             </p>
                         </div>
                         <div style={{ display: 'flex', gap: 8 }}>
@@ -579,10 +575,10 @@ export default function NganhHePage() {
                             <div className="card-header"><h3 style={{ fontSize: 14, display: 'flex', alignItems: 'center', gap: 6 }}><AlertCircle size={15} style={{ color: '#f59e0b' }} /> Lưu ý</h3></div>
                             <div className="card-body" style={{ paddingTop: 0 }}>
                                 {[
-                                    ['✨', 'Tự động tạo GV, Môn, Lớp nếu chưa có'],
-                                    ['🧠', 'Tự nhận hệ từ ký tự đầu tên lớp (C/T/L)'],
-                                    ['⏭️', 'Bỏ qua nếu phân công đã tồn tại'],
-                                    ['🔄', 'Cập nhật sĩ số nếu thay đổi'],
+                                    [<CheckCircle2 size={14} key="i1" />, 'Tự động tạo GV, Môn, Lớp nếu chưa có'],
+                                    [<AlertCircle size={14} key="i2" />, 'Tự nhận hệ từ ký tự đầu tên lớp (C/T/L)'],
+                                    [<FileText size={14} key="i3" />, 'Bỏ qua nếu phân công đã tồn tại'],
+                                    [<Settings size={14} key="i4" />, 'Cập nhật sĩ số nếu thay đổi'],
                                 ].map(([icon, text], i) => (
                                     <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 8, padding: '7px 10px', background: 'var(--bg-glass)', borderRadius: 'var(--radius-sm)' }}>
                                         <span>{icon}</span><span style={{ fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.5 }}>{text}</span>
@@ -622,7 +618,7 @@ export default function NganhHePage() {
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
                     <div className="card">
                         <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <h2 style={{ fontSize: 15, fontWeight: 600 }}>🏛️ Ngành đào tạo</h2>
+                            <h2 style={{ fontSize: 15, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}><GraduationCap size={18} /> Ngành đào tạo</h2>
                             <button className="btn btn-secondary" style={{ height: 32, fontSize: 12 }} onClick={() => openModal('nganh')}><Plus size={13} /> Thêm</button>
                         </div>
                         <div style={{ padding: 0 }}>
@@ -667,14 +663,14 @@ export default function NganhHePage() {
                         </div>
                     </div>
                     <div className="card">
-                        <div className="card-header"><h2 style={{ fontSize: 15, fontWeight: 600 }}>ℹ️ Thông tin hệ thống</h2></div>
+                        <div className="card-header"><h2 style={{ fontSize: 15, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}><AlertCircle size={18} /> Thông tin hệ thống</h2></div>
                         <div className="card-body">
                             {[
-                                { label: 'Tổng môn học', value: monHocs.length, icon: '📚' },
-                                { label: 'Môn TH', value: monHocs.filter(m => m.ten_mon.startsWith('TH')).length, icon: '🔬' },
-                                { label: 'Tổng lớp', value: lops.length, icon: '🏫' },
-                                { label: 'Giáo viên', value: giaoViens.length, icon: '👩‍🏫' },
-                                { label: 'Phân công kỳ này', value: phanCongs.length, icon: '📝' },
+                                { label: 'Tổng môn học', value: monHocs.length, icon: <BookOpen size={16} /> },
+                                { label: 'Môn TH', value: monHocs.filter(m => m.ten_mon.startsWith('TH')).length, icon: <AlertCircle size={16} /> },
+                                { label: 'Tổng lớp', value: lops.length, icon: <School size={16} /> },
+                                { label: 'Giáo viên', value: giaoViens.length, icon: <UserPlus size={16} /> },
+                                { label: 'Phân công kỳ này', value: phanCongs.length, icon: <FileText size={16} /> },
                             ].map(item => (
                                 <div key={item.label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: '1px solid var(--border-color)' }}>
                                     <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>{item.icon} {item.label}</span>

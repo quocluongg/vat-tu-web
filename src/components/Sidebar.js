@@ -7,7 +7,7 @@ import {
     Package, LayoutDashboard, Calendar, GraduationCap, Users, BookOpen,
     Boxes, FileText, ShoppingCart, FileOutput, LogOut, Settings, Menu, X
 } from 'lucide-react';
-import ThemeToggle from '@/components/ThemeToggle';
+
 
 
 const menuItems = [
@@ -88,7 +88,6 @@ export default function Sidebar() {
                 </nav>
 
                 <div className="sidebar-footer">
-                    <ThemeToggle showLabel={true} />
                     <button
                         className="sidebar-link"
                         onClick={() => signOut({ callbackUrl: '/' })}

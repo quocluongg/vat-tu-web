@@ -4,7 +4,6 @@ import { signIn } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { Lock, User, ArrowRight, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
-import ThemeToggle from '@/components/ThemeToggle';
 
 export default function LoginPage() {
     const [username, setUsername] = useState('');
@@ -34,9 +33,6 @@ export default function LoginPage() {
 
     return (
         <div className="login-page">
-            <div style={{ position: 'absolute', top: 24, right: 24 }}>
-                <ThemeToggle />
-            </div>
             <div className="login-container">
                 <div className="login-card">
                     <Link href="/" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: 'var(--text-muted)', fontSize: 13, textDecoration: 'none', marginBottom: 20 }}>
