@@ -1,7 +1,7 @@
 'use client';
 import Link from 'next/link';
 import { ArrowLeft, FileText, FileOutput, ArrowRight, Package, Users } from 'lucide-react';
-import { ArrowLeft, FileText, FileOutput, ArrowRight, Package, Users } from 'lucide-react';
+
 export default function GiaoVienPortalPage() {
     return (
         <div className="public-page">
