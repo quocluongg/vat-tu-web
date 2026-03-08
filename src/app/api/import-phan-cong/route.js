@@ -183,12 +183,23 @@ function parseCSV(text) {
         const si_so = parseInt(si_so_str) || 0;
 
         if (giao_vien && mon_hoc && ten_lop) {
-            rows.push({
-                giao_vien: giao_vien.trim(),
-                mon_hoc: mon_hoc.trim(),
-                ten_lop: ten_lop.trim(),
-                si_so
-            });
+            const cleanedMonHoc = mon_hoc.trim();
+            const upperMonHoc = cleanedMonHoc.toUpperCase();
+
+            // Bỏ qua môn bắt đầu bằng LT
+            if (upperMonHoc.startsWith('LT')) {
+                continue;
+            }
+
+            // Chỉ thêm các môn bắt đầu bằng TH
+            if (upperMonHoc.startsWith('TH')) {
+                rows.push({
+                    giao_vien: giao_vien.trim(),
+                    mon_hoc: cleanedMonHoc,
+                    ten_lop: ten_lop.trim(),
+                    si_so
+                });
+            }
         }
     }
 
