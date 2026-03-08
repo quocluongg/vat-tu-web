@@ -1,167 +1,189 @@
 /**
- * Migration script: Cập nhật schema database
+ * Migration script: Cập nhật schema database trên Turso
  * Chạy: node scripts/migrate.js
  */
 
-import Database from 'better-sqlite3';
+import { createClient } from '@libsql/client/web';
+import bcrypt from 'bcryptjs';
+import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const DB_PATH = path.join(__dirname, '..', 'data', 'vattu.db');
+dotenv.config({ path: path.join(__dirname, '..', '.env.local') });
 
-const db = new Database(DB_PATH);
-db.pragma('journal_mode = WAL');
-db.pragma('foreign_keys = OFF');
+const url = process.env.TURSO_DATABASE_URL;
+const authToken = process.env.TURSO_AUTH_TOKEN;
+
+if (!url || !authToken) {
+    console.error("❌ Thiếu TURSO_DATABASE_URL hoặc TURSO_AUTH_TOKEN trong .env.local");
+    process.exit(1);
+}
+
+const db = createClient({ url, authToken });
 
 console.log('🔄 Bắt đầu migration...\n');
 
-const migrate = db.transaction(() => {
+async function migrate() {
+    const tableQueries = [
+        `CREATE TABLE IF NOT EXISTS users (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      username TEXT UNIQUE NOT NULL,
+      password_hash TEXT NOT NULL,
+      ho_ten TEXT NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )`,
+        `CREATE TABLE IF NOT EXISTS nganh (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      ten_nganh TEXT NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )`,
+        `CREATE TABLE IF NOT EXISTS he_dao_tao (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      nganh_id INTEGER NOT NULL,
+      ten_he TEXT NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (nganh_id) REFERENCES nganh(id) ON DELETE CASCADE
+    )`,
+        `CREATE TABLE IF NOT EXISTS giao_vien (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      ho_ten TEXT NOT NULL,
+      email TEXT,
+      so_dien_thoai TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )`,
+        `CREATE TABLE IF NOT EXISTS ki_hoc (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      ten_ki TEXT NOT NULL,
+      nam_hoc TEXT NOT NULL,
+      ngay_bat_dau DATE,
+      ngay_ket_thuc DATE,
+      trang_thai TEXT DEFAULT 'setup' CHECK(trang_thai IN ('setup', 'de_xuat', 'mua_sam', 'hoat_dong', 'dong')),
+      han_de_xuat DATETIME,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )`,
+        `CREATE TABLE IF NOT EXISTS mon_hoc (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      ten_mon TEXT NOT NULL UNIQUE,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )`,
+        `CREATE TABLE IF NOT EXISTS lop (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      ten_lop TEXT NOT NULL UNIQUE,
+      loai_he TEXT NOT NULL CHECK(loai_he IN ('T', 'C', 'L')),
+      si_so INTEGER DEFAULT 0,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )`,
+        `CREATE TABLE IF NOT EXISTS phan_cong (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      giao_vien_id INTEGER NOT NULL,
+      mon_hoc_id INTEGER NOT NULL,
+      lop_id INTEGER NOT NULL,
+      ki_id INTEGER NOT NULL,
+      FOREIGN KEY (giao_vien_id) REFERENCES giao_vien(id) ON DELETE CASCADE,
+      FOREIGN KEY (mon_hoc_id) REFERENCES mon_hoc(id) ON DELETE CASCADE,
+      FOREIGN KEY (lop_id) REFERENCES lop(id) ON DELETE CASCADE,
+      FOREIGN KEY (ki_id) REFERENCES ki_hoc(id) ON DELETE CASCADE,
+      UNIQUE(giao_vien_id, mon_hoc_id, lop_id, ki_id)
+    )`,
+        `CREATE TABLE IF NOT EXISTS vat_tu (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      ten_vat_tu TEXT NOT NULL,
+      yeu_cau_ky_thuat TEXT,
+      don_vi_tinh TEXT NOT NULL,
+      so_luong_kho INTEGER DEFAULT 0,
+      ki_id INTEGER NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (ki_id) REFERENCES ki_hoc(id) ON DELETE CASCADE
+    )`,
+        `CREATE TABLE IF NOT EXISTS de_xuat (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      giao_vien_id INTEGER NOT NULL,
+      ki_id INTEGER NOT NULL,
+      trang_thai TEXT DEFAULT 'dang_lam' CHECK(trang_thai IN ('dang_lam', 'da_nop', 'duyet', 'tu_choi')),
+      ghi_chu TEXT,
+      ngay_nop DATETIME,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (giao_vien_id) REFERENCES giao_vien(id) ON DELETE CASCADE,
+      FOREIGN KEY (ki_id) REFERENCES ki_hoc(id) ON DELETE CASCADE
+    )`,
+        `CREATE TABLE IF NOT EXISTS de_xuat_chi_tiet (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      de_xuat_id INTEGER NOT NULL,
+      mon_hoc_id INTEGER NOT NULL,
+      lop_id INTEGER NOT NULL DEFAULT 0,
+      vat_tu_id INTEGER NOT NULL,
+      so_luong INTEGER NOT NULL DEFAULT 0,
+      ghi_chu TEXT,
+      FOREIGN KEY (de_xuat_id) REFERENCES de_xuat(id) ON DELETE CASCADE,
+      FOREIGN KEY (mon_hoc_id) REFERENCES mon_hoc(id) ON DELETE CASCADE,
+      FOREIGN KEY (lop_id) REFERENCES lop(id) ON DELETE CASCADE,
+      FOREIGN KEY (vat_tu_id) REFERENCES vat_tu(id) ON DELETE CASCADE
+    )`,
+        `CREATE TABLE IF NOT EXISTS mua_sam (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      ki_id INTEGER NOT NULL,
+      vat_tu_id INTEGER NOT NULL,
+      so_luong_de_xuat INTEGER DEFAULT 0,
+      so_luong_duyet INTEGER DEFAULT 0,
+      don_gia REAL DEFAULT 0,
+      thanh_tien REAL DEFAULT 0,
+      trang_thai TEXT DEFAULT 'cho_mua' CHECK(trang_thai IN ('cho_mua', 'da_mua')),
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (ki_id) REFERENCES ki_hoc(id) ON DELETE CASCADE,
+      FOREIGN KEY (vat_tu_id) REFERENCES vat_tu(id) ON DELETE CASCADE,
+      UNIQUE(ki_id, vat_tu_id)
+    )`,
+        `CREATE TABLE IF NOT EXISTS phieu_xuat (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      giao_vien_id INTEGER NOT NULL,
+      ki_id INTEGER NOT NULL,
+      mon_hoc_id INTEGER NOT NULL,
+      lop_id INTEGER,
+      trang_thai TEXT DEFAULT 'cho_duyet' CHECK(trang_thai IN ('cho_duyet', 'da_ky', 'da_xuat', 'tu_choi')),
+      ngay_tao DATETIME DEFAULT CURRENT_TIMESTAMP,
+      ngay_duyet DATETIME,
+      ghi_chu TEXT,
+      FOREIGN KEY (giao_vien_id) REFERENCES giao_vien(id) ON DELETE CASCADE,
+      FOREIGN KEY (ki_id) REFERENCES ki_hoc(id) ON DELETE CASCADE,
+      FOREIGN KEY (mon_hoc_id) REFERENCES mon_hoc(id) ON DELETE CASCADE,
+      FOREIGN KEY (lop_id) REFERENCES lop(id) ON DELETE SET NULL
+    )`,
+        `CREATE TABLE IF NOT EXISTS phieu_xuat_chi_tiet (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      phieu_xuat_id INTEGER NOT NULL,
+      vat_tu_id INTEGER NOT NULL,
+      so_luong INTEGER NOT NULL DEFAULT 0,
+      FOREIGN KEY (phieu_xuat_id) REFERENCES phieu_xuat(id) ON DELETE CASCADE,
+      FOREIGN KEY (vat_tu_id) REFERENCES vat_tu(id) ON DELETE CASCADE
+    )`
+    ];
 
-    // ─── 1. Bảng lop: thêm loai_he và si_so nếu chưa có ──────────────────────
-    const lopExists = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='lop'").get();
-    if (!lopExists) {
-        console.log('✅ Tạo bảng lop...');
-        db.exec(`
-            CREATE TABLE lop (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                ten_lop TEXT NOT NULL UNIQUE,
-                loai_he TEXT NOT NULL DEFAULT 'T',
-                si_so INTEGER DEFAULT 0,
-                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-            )
-        `);
-    } else {
-        const lopCols = db.prepare("PRAGMA table_info(lop)").all().map(c => c.name);
-        console.log('⏭️  Bảng lop tồn tại, kiểm tra cột...');
-
-        if (!lopCols.includes('loai_he')) {
-            console.log('✅ lop: Rebuild để thêm loai_he (tự điền từ chữ đầu tên lớp)...');
-            db.exec(`
-                CREATE TABLE lop_new (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    ten_lop TEXT NOT NULL UNIQUE,
-                    loai_he TEXT NOT NULL DEFAULT 'T',
-                    si_so INTEGER DEFAULT 0,
-                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-                );
-                INSERT OR IGNORE INTO lop_new (id, ten_lop, loai_he, si_so, created_at)
-                    SELECT id, ten_lop,
-                        CASE UPPER(SUBSTR(TRIM(ten_lop), 1, 1))
-                            WHEN 'C' THEN 'C'
-                            WHEN 'L' THEN 'L'
-                            ELSE 'T'
-                        END,
-                        COALESCE(si_so, 0),
-                        COALESCE(created_at, CURRENT_TIMESTAMP)
-                    FROM lop;
-                DROP TABLE lop;
-                ALTER TABLE lop_new RENAME TO lop;
-            `);
-            console.log('   ✅ loai_he đã tự điền từ chữ đầu tên lớp');
-        } else {
-            console.log('⏭️  lop.loai_he đã tồn tại');
-        }
-
-        if (!lopCols.includes('si_so')) {
-            console.log('✅ lop: Thêm cột si_so...');
-            db.exec(`ALTER TABLE lop ADD COLUMN si_so INTEGER DEFAULT 0`);
-        }
+    console.log('✅ Đang tạo bảng nếu chưa có...');
+    for (const sql of tableQueries) {
+        await db.execute(sql);
     }
 
-    // ─── 2. mon_hoc: Bỏ he_dao_tao_id ────────────────────────────────────────
-    const monHocCols = db.prepare("PRAGMA table_info(mon_hoc)").all().map(c => c.name);
-    if (monHocCols.includes('he_dao_tao_id')) {
-        console.log('✅ mon_hoc: Rebuild để bỏ he_dao_tao_id...');
-        db.exec(`
-            CREATE TABLE mon_hoc_new (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                ten_mon TEXT NOT NULL UNIQUE,
-                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-            );
-            INSERT OR IGNORE INTO mon_hoc_new (id, ten_mon, created_at)
-                SELECT id, ten_mon, created_at FROM mon_hoc;
-            DROP TABLE mon_hoc;
-            ALTER TABLE mon_hoc_new RENAME TO mon_hoc;
-        `);
+    console.log('✅ Đang kiểm tra admin...');
+    const adminExists = await db.execute("SELECT id FROM users WHERE username = 'admin'");
+    if (adminExists.rows.length === 0) {
+        const hash = bcrypt.hashSync('admin123', 10);
+        await db.execute({
+            sql: 'INSERT INTO users (username, password_hash, ho_ten) VALUES (?, ?, ?)',
+            args: ['admin', hash, 'Quản trị viên']
+        });
+        console.log('   ✅ Đã tạo tài khoản admin mặc định (admin/admin123)');
     } else {
-        console.log('⏭️  mon_hoc không có he_dao_tao_id');
+        console.log('   ⏭️  Admin đã tồn tại');
     }
-
-    // ─── 3. phan_cong: Rebuild để đúng UNIQUE(gv, mon, lop, ki) ──────────────
-    // Check xem UNIQUE constraint có bao gồm lop_id không
-    const pcSchema = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='phan_cong'").get();
-    // Phải có cả lop_id trong phần UNIQUE(...)
-    const pcHasLopInUnique = pcSchema?.sql?.match(/UNIQUE\s*\([^)]*lop_id[^)]*\)/i);
-
-    if (!pcHasLopInUnique) {
-        console.log('✅ phan_cong: Rebuild với UNIQUE(giao_vien_id, mon_hoc_id, lop_id, ki_id)...');
-        db.exec(`
-            CREATE TABLE phan_cong_new (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                giao_vien_id INTEGER NOT NULL,
-                mon_hoc_id INTEGER NOT NULL,
-                lop_id INTEGER NOT NULL DEFAULT 0,
-                ki_id INTEGER NOT NULL,
-                FOREIGN KEY (giao_vien_id) REFERENCES giao_vien(id) ON DELETE CASCADE,
-                FOREIGN KEY (mon_hoc_id) REFERENCES mon_hoc(id) ON DELETE CASCADE,
-                FOREIGN KEY (ki_id) REFERENCES ki_hoc(id) ON DELETE CASCADE,
-                UNIQUE(giao_vien_id, mon_hoc_id, lop_id, ki_id)
-            );
-            INSERT OR IGNORE INTO phan_cong_new (id, giao_vien_id, mon_hoc_id, lop_id, ki_id)
-                SELECT id, giao_vien_id, mon_hoc_id, COALESCE(lop_id, 0), ki_id FROM phan_cong;
-            DROP TABLE phan_cong;
-            ALTER TABLE phan_cong_new RENAME TO phan_cong;
-        `);
-        console.log('   ✅ UNIQUE constraint đã cập nhật');
-    } else {
-        console.log('⏭️  phan_cong đã có UNIQUE constraint đúng');
-    }
-
-    // ─── 4. de_xuat_chi_tiet: Thêm lop_id ────────────────────────────────────
-    const dxctCols = db.prepare("PRAGMA table_info(de_xuat_chi_tiet)").all().map(c => c.name);
-    if (!dxctCols.includes('lop_id')) {
-        console.log('✅ de_xuat_chi_tiet: Rebuild để thêm lop_id...');
-        db.exec(`
-            CREATE TABLE de_xuat_chi_tiet_new (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                de_xuat_id INTEGER NOT NULL,
-                mon_hoc_id INTEGER NOT NULL,
-                lop_id INTEGER NOT NULL DEFAULT 0,
-                vat_tu_id INTEGER NOT NULL,
-                so_luong INTEGER NOT NULL DEFAULT 0,
-                ghi_chu TEXT,
-                FOREIGN KEY (de_xuat_id) REFERENCES de_xuat(id) ON DELETE CASCADE,
-                FOREIGN KEY (mon_hoc_id) REFERENCES mon_hoc(id) ON DELETE CASCADE,
-                FOREIGN KEY (vat_tu_id) REFERENCES vat_tu(id) ON DELETE CASCADE
-            );
-            INSERT OR IGNORE INTO de_xuat_chi_tiet_new (id, de_xuat_id, mon_hoc_id, lop_id, vat_tu_id, so_luong, ghi_chu)
-                SELECT id, de_xuat_id, mon_hoc_id, 0, vat_tu_id, so_luong, ghi_chu FROM de_xuat_chi_tiet;
-            DROP TABLE de_xuat_chi_tiet;
-            ALTER TABLE de_xuat_chi_tiet_new RENAME TO de_xuat_chi_tiet;
-        `);
-    } else {
-        console.log('⏭️  de_xuat_chi_tiet đã có lop_id');
-    }
-
-    // ─── 5. phieu_xuat: Thêm lop_id (nullable) ───────────────────────────────
-    const pxCols = db.prepare("PRAGMA table_info(phieu_xuat)").all().map(c => c.name);
-    if (!pxCols.includes('lop_id')) {
-        console.log('✅ phieu_xuat: Thêm cột lop_id...');
-        db.exec(`ALTER TABLE phieu_xuat ADD COLUMN lop_id INTEGER REFERENCES lop(id) ON DELETE SET NULL`);
-    } else {
-        console.log('⏭️  phieu_xuat đã có lop_id');
-    }
-
-});
-
-try {
-    migrate();
-    console.log('\n✅ Migration hoàn thành!');
-} catch (error) {
-    console.error('\n❌ Migration thất bại:', error.message);
-    process.exit(1);
-} finally {
-    db.pragma('foreign_keys = ON');
-    db.close();
 }
+
+migrate()
+    .then(() => {
+        console.log('\n✅ Migration hoàn thành!');
+        process.exit(0);
+    })
+    .catch((error) => {
+        console.error('\n❌ Migration thất bại:', error.message);
+        process.exit(1);
+    });

@@ -22,8 +22,8 @@ export async function GET(request) {
         }
         query += ' GROUP BY vt.id ORDER BY vt.ten_vat_tu';
 
-        const list = db.prepare(query).all();
-        return NextResponse.json(list);
+        const result = await db.execute(query);
+        return NextResponse.json(result.rows);
     } catch (error) {
         return NextResponse.json({ error: error.message }, { status: 500 });
     }
@@ -35,24 +35,21 @@ export async function POST(request) {
         const body = await request.json();
 
         if (Array.isArray(body)) {
-            const stmt = db.prepare(
-                'INSERT INTO vat_tu (ten_vat_tu, yeu_cau_ky_thuat, don_vi_tinh, so_luong_kho, ki_id) VALUES (?, ?, ?, ?, ?)'
-            );
-            const insertMany = db.transaction((items) => {
-                for (const item of items) {
-                    stmt.run(item.ten_vat_tu, item.yeu_cau_ky_thuat || null, item.don_vi_tinh, item.so_luong_kho || 0, item.ki_id);
-                }
-            });
-            insertMany(body);
+            const stmts = body.map(item => ({
+                sql: 'INSERT INTO vat_tu (ten_vat_tu, yeu_cau_ky_thuat, don_vi_tinh, so_luong_kho, ki_id) VALUES (?, ?, ?, ?, ?)',
+                args: [item.ten_vat_tu, item.yeu_cau_ky_thuat || null, item.don_vi_tinh, item.so_luong_kho || 0, item.ki_id]
+            }));
+            await db.batch(stmts, "write");
             return NextResponse.json({ message: `Thêm ${body.length} vật tư thành công` });
         }
 
         const { ten_vat_tu, yeu_cau_ky_thuat, don_vi_tinh, so_luong_kho, ki_id } = body;
-        const result = db.prepare(
-            'INSERT INTO vat_tu (ten_vat_tu, yeu_cau_ky_thuat, don_vi_tinh, so_luong_kho, ki_id) VALUES (?, ?, ?, ?, ?)'
-        ).run(ten_vat_tu, yeu_cau_ky_thuat || null, don_vi_tinh, so_luong_kho || 0, ki_id);
+        const result = await db.execute({
+            sql: 'INSERT INTO vat_tu (ten_vat_tu, yeu_cau_ky_thuat, don_vi_tinh, so_luong_kho, ki_id) VALUES (?, ?, ?, ?, ?)',
+            args: [ten_vat_tu, yeu_cau_ky_thuat || null, don_vi_tinh, so_luong_kho || 0, ki_id]
+        });
 
-        return NextResponse.json({ id: result.lastInsertRowid, message: 'Thêm vật tư thành công' });
+        return NextResponse.json({ id: Number(result.lastInsertRowid), message: 'Thêm vật tư thành công' });
     } catch (error) {
         return NextResponse.json({ error: error.message }, { status: 500 });
     }
@@ -62,9 +59,10 @@ export async function PUT(request) {
     try {
         const db = getDb();
         const { id, ten_vat_tu, yeu_cau_ky_thuat, don_vi_tinh, so_luong_kho } = await request.json();
-        db.prepare(
-            'UPDATE vat_tu SET ten_vat_tu = ?, yeu_cau_ky_thuat = ?, don_vi_tinh = ?, so_luong_kho = ? WHERE id = ?'
-        ).run(ten_vat_tu, yeu_cau_ky_thuat || null, don_vi_tinh, so_luong_kho || 0, id);
+        await db.execute({
+            sql: 'UPDATE vat_tu SET ten_vat_tu = ?, yeu_cau_ky_thuat = ?, don_vi_tinh = ?, so_luong_kho = ? WHERE id = ?',
+            args: [ten_vat_tu, yeu_cau_ky_thuat || null, don_vi_tinh, so_luong_kho || 0, id]
+        });
         return NextResponse.json({ message: 'Cập nhật thành công' });
     } catch (error) {
         return NextResponse.json({ error: error.message }, { status: 500 });
@@ -76,7 +74,10 @@ export async function DELETE(request) {
         const db = getDb();
         const { searchParams } = new URL(request.url);
         const id = searchParams.get('id');
-        db.prepare('DELETE FROM vat_tu WHERE id = ?').run(id);
+        await db.execute({
+            sql: 'DELETE FROM vat_tu WHERE id = ?',
+            args: [id]
+        });
         return NextResponse.json({ message: 'Xóa thành công' });
     } catch (error) {
         return NextResponse.json({ error: error.message }, { status: 500 });

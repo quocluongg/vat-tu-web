@@ -37,8 +37,8 @@ export async function GET(request) {
         }
         query += ' ORDER BY gv.ho_ten, l.ten_lop, m.ten_mon';
 
-        const list = db.prepare(query).all();
-        return NextResponse.json(list);
+        const listResult = await db.execute(query);
+        return NextResponse.json(listResult.rows);
     } catch (error) {
         return NextResponse.json({ error: error.message }, { status: 500 });
     }
@@ -50,13 +50,11 @@ export async function POST(request) {
         const body = await request.json();
 
         if (Array.isArray(body)) {
-            const stmt = db.prepare('INSERT OR IGNORE INTO phan_cong (giao_vien_id, mon_hoc_id, lop_id, ki_id) VALUES (?, ?, ?, ?)');
-            const insertMany = db.transaction((items) => {
-                for (const item of items) {
-                    stmt.run(item.giao_vien_id, item.mon_hoc_id, item.lop_id, item.ki_id);
-                }
-            });
-            insertMany(body);
+            const stmts = body.map(item => ({
+                sql: 'INSERT OR IGNORE INTO phan_cong (giao_vien_id, mon_hoc_id, lop_id, ki_id) VALUES (?, ?, ?, ?)',
+                args: [item.giao_vien_id, item.mon_hoc_id, item.lop_id, item.ki_id]
+            }));
+            await db.batch(stmts, "write");
             return NextResponse.json({ message: 'Phân công thành công' });
         }
 
@@ -66,19 +64,21 @@ export async function POST(request) {
             return NextResponse.json({ error: 'Vui lòng chọn đầy đủ giáo viên, môn học, lớp và kỳ học' }, { status: 400 });
         }
 
-        const existing = db.prepare(
-            'SELECT id FROM phan_cong WHERE giao_vien_id = ? AND mon_hoc_id = ? AND lop_id = ? AND ki_id = ?'
-        ).get(giao_vien_id, mon_hoc_id, lop_id, ki_id);
+        const existingResult = await db.execute({
+            sql: 'SELECT id FROM phan_cong WHERE giao_vien_id = ? AND mon_hoc_id = ? AND lop_id = ? AND ki_id = ?',
+            args: [giao_vien_id, mon_hoc_id, lop_id, ki_id]
+        });
 
-        if (existing) {
+        if (existingResult.rows.length > 0) {
             return NextResponse.json({ error: 'Giáo viên đã được phân công môn này cho lớp này trong kỳ này' }, { status: 409 });
         }
 
-        const result = db.prepare(
-            'INSERT INTO phan_cong (giao_vien_id, mon_hoc_id, lop_id, ki_id) VALUES (?, ?, ?, ?)'
-        ).run(giao_vien_id, mon_hoc_id, lop_id, ki_id);
+        const result = await db.execute({
+            sql: 'INSERT INTO phan_cong (giao_vien_id, mon_hoc_id, lop_id, ki_id) VALUES (?, ?, ?, ?)',
+            args: [giao_vien_id, mon_hoc_id, lop_id, ki_id]
+        });
 
-        return NextResponse.json({ id: result.lastInsertRowid, message: 'Phân công thành công' });
+        return NextResponse.json({ id: Number(result.lastInsertRowid), message: 'Phân công thành công' });
     } catch (error) {
         return NextResponse.json({ error: error.message }, { status: 500 });
     }
@@ -89,7 +89,10 @@ export async function DELETE(request) {
         const db = getDb();
         const { searchParams } = new URL(request.url);
         const id = searchParams.get('id');
-        db.prepare('DELETE FROM phan_cong WHERE id = ?').run(id);
+        await db.execute({
+            sql: 'DELETE FROM phan_cong WHERE id = ?',
+            args: [id]
+        });
         return NextResponse.json({ message: 'Xóa phân công thành công' });
     } catch (error) {
         return NextResponse.json({ error: error.message }, { status: 500 });

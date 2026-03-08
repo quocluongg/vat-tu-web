@@ -23,7 +23,8 @@ export async function GET(request) {
         const loai_he = searchParams.get('loai_he');
 
         if (id) {
-            const lop = db.prepare(`
+            const lopResult = await db.execute({
+                sql: `
         SELECT l.*,
           CASE l.loai_he
             WHEN 'T' THEN 'Trung cấp'
@@ -31,9 +32,11 @@ export async function GET(request) {
             WHEN 'L' THEN 'Liên thông'
           END as ten_loai_he
         FROM lop l WHERE l.id = ?
-      `).get(id);
-            if (!lop) return NextResponse.json({ error: 'Không tìm thấy lớp' }, { status: 404 });
-            return NextResponse.json(lop);
+      `,
+                args: [id]
+            });
+            if (lopResult.rows.length === 0) return NextResponse.json({ error: 'Không tìm thấy lớp' }, { status: 404 });
+            return NextResponse.json(lopResult.rows[0]);
         }
 
         let query = `
@@ -48,8 +51,8 @@ export async function GET(request) {
         if (loai_he) query += ` WHERE l.loai_he = '${loai_he}'`;
         query += ' ORDER BY l.loai_he, l.ten_lop';
 
-        const list = db.prepare(query).all();
-        return NextResponse.json(list);
+        const listResult = await db.execute(query);
+        return NextResponse.json(listResult.rows);
     } catch (error) {
         return NextResponse.json({ error: error.message }, { status: 500 });
     }
@@ -60,20 +63,18 @@ export async function POST(request) {
         const db = getDb();
         const body = await request.json();
 
-        // Hỗ trợ thêm nhiều lớp cùng lúc (array)
         if (Array.isArray(body)) {
-            const stmt = db.prepare('INSERT OR IGNORE INTO lop (ten_lop, loai_he, si_so) VALUES (?, ?, ?)');
-            const results = db.transaction((items) => {
-                const ids = [];
-                for (const item of items) {
-                    const loai_he = item.loai_he || detectLoaiHe(item.ten_lop);
-                    if (!loai_he) throw new Error(`Không xác định được hệ đào tạo từ tên lớp: ${item.ten_lop}`);
-                    const r = stmt.run(item.ten_lop.trim(), loai_he, item.si_so || 0);
-                    ids.push({ ten_lop: item.ten_lop, id: r.lastInsertRowid });
-                }
-                return ids;
-            })(body);
-            return NextResponse.json({ message: 'Thêm lớp thành công', results });
+            const stmts = body.map(item => {
+                const loai_he = item.loai_he || detectLoaiHe(item.ten_lop);
+                if (!loai_he) throw new Error(`Không xác định được hệ đào tạo từ tên lớp: ${item.ten_lop}`);
+                return {
+                    sql: 'INSERT OR IGNORE INTO lop (ten_lop, loai_he, si_so) VALUES (?, ?, ?)',
+                    args: [item.ten_lop.trim(), loai_he, item.si_so || 0]
+                };
+            });
+            await db.batch(stmts, "write");
+
+            return NextResponse.json({ message: 'Thêm lớp thành công' });
         }
 
         const { ten_lop, si_so } = body;
@@ -86,13 +87,19 @@ export async function POST(request) {
             }, { status: 400 });
         }
 
-        const existing = db.prepare('SELECT id FROM lop WHERE ten_lop = ?').get(ten_lop.trim());
-        if (existing) {
-            return NextResponse.json({ error: 'Lớp này đã tồn tại', id: existing.id }, { status: 409 });
+        const existingResult = await db.execute({
+            sql: 'SELECT id FROM lop WHERE ten_lop = ?',
+            args: [ten_lop.trim()]
+        });
+        if (existingResult.rows.length > 0) {
+            return NextResponse.json({ error: 'Lớp này đã tồn tại', id: existingResult.rows[0].id }, { status: 409 });
         }
 
-        const result = db.prepare('INSERT INTO lop (ten_lop, loai_he, si_so) VALUES (?, ?, ?)').run(ten_lop.trim(), loai_he, si_so || 0);
-        return NextResponse.json({ id: result.lastInsertRowid, message: 'Thêm lớp thành công' });
+        const result = await db.execute({
+            sql: 'INSERT INTO lop (ten_lop, loai_he, si_so) VALUES (?, ?, ?)',
+            args: [ten_lop.trim(), loai_he, si_so || 0]
+        });
+        return NextResponse.json({ id: Number(result.lastInsertRowid), message: 'Thêm lớp thành công' });
     } catch (error) {
         return NextResponse.json({ error: error.message }, { status: 500 });
     }
@@ -113,7 +120,12 @@ export async function PUT(request) {
         if (si_so !== undefined) { sets.push('si_so = ?'); params.push(si_so); }
         params.push(id);
 
-        db.prepare(`UPDATE lop SET ${sets.join(', ')} WHERE id = ?`).run(...params);
+        if (sets.length > 0) {
+            await db.execute({
+                sql: `UPDATE lop SET ${sets.join(', ')} WHERE id = ?`,
+                args: params
+            });
+        }
         return NextResponse.json({ message: 'Cập nhật lớp thành công' });
     } catch (error) {
         return NextResponse.json({ error: error.message }, { status: 500 });
@@ -125,7 +137,10 @@ export async function DELETE(request) {
         const db = getDb();
         const { searchParams } = new URL(request.url);
         const id = searchParams.get('id');
-        db.prepare('DELETE FROM lop WHERE id = ?').run(id);
+        await db.execute({
+            sql: 'DELETE FROM lop WHERE id = ?',
+            args: [id]
+        });
         return NextResponse.json({ message: 'Xóa lớp thành công' });
     } catch (error) {
         return NextResponse.json({ error: error.message }, { status: 500 });

@@ -10,16 +10,20 @@ export async function GET(request) {
         const id = searchParams.get('id');
 
         if (id) {
-            const dx = db.prepare(`
+            const dxResult = await db.execute({
+                sql: `
         SELECT dx.*, gv.ho_ten as ten_gv, gv.email, gv.so_dien_thoai
         FROM de_xuat dx
         JOIN giao_vien gv ON dx.giao_vien_id = gv.id
         WHERE dx.id = ?
-      `).get(id);
+      `,
+                args: [id]
+            });
 
-            if (!dx) return NextResponse.json({ error: 'Không tìm thấy' }, { status: 404 });
+            if (dxResult.rows.length === 0) return NextResponse.json({ error: 'Không tìm thấy' }, { status: 404 });
 
-            const chiTiet = db.prepare(`
+            const chiTietResult = await db.execute({
+                sql: `
         SELECT dxct.*, vt.ten_vat_tu, vt.yeu_cau_ky_thuat, vt.don_vi_tinh, vt.so_luong_kho,
                m.ten_mon,
                l.ten_lop, l.si_so, l.loai_he,
@@ -34,9 +38,11 @@ export async function GET(request) {
         JOIN lop l ON dxct.lop_id = l.id
         WHERE dxct.de_xuat_id = ?
         ORDER BY l.ten_lop, m.ten_mon, vt.ten_vat_tu
-      `).all(id);
+      `,
+                args: [id]
+            });
 
-            return NextResponse.json({ ...dx, chi_tiet: chiTiet });
+            return NextResponse.json({ ...dxResult.rows[0], chi_tiet: chiTietResult.rows });
         }
 
         let query = `
@@ -55,8 +61,8 @@ export async function GET(request) {
         }
         query += ' ORDER BY dx.created_at DESC';
 
-        const list = db.prepare(query).all();
-        return NextResponse.json(list);
+        const listResult = await db.execute(query);
+        return NextResponse.json(listResult.rows);
     } catch (error) {
         return NextResponse.json({ error: error.message }, { status: 500 });
     }
@@ -67,35 +73,45 @@ export async function POST(request) {
         const db = getDb();
         const { giao_vien_id, ki_id, chi_tiet } = await request.json();
 
-        // Check if teacher already has a proposal for this semester
-        const existing = db.prepare('SELECT id FROM de_xuat WHERE giao_vien_id = ? AND ki_id = ?').get(giao_vien_id, ki_id);
+        const existingResult = await db.execute({
+            sql: 'SELECT id FROM de_xuat WHERE giao_vien_id = ? AND ki_id = ?',
+            args: [giao_vien_id, ki_id]
+        });
 
-        if (existing) {
-            // Update existing: delete old details, add new ones
-            db.prepare('DELETE FROM de_xuat_chi_tiet WHERE de_xuat_id = ?').run(existing.id);
-            db.prepare("UPDATE de_xuat SET trang_thai = 'da_nop', ngay_nop = CURRENT_TIMESTAMP WHERE id = ?").run(existing.id);
+        if (existingResult.rows.length > 0) {
+            const existingId = existingResult.rows[0].id;
+
+            const stmts = [
+                { sql: 'DELETE FROM de_xuat_chi_tiet WHERE de_xuat_id = ?', args: [existingId] },
+                { sql: "UPDATE de_xuat SET trang_thai = 'da_nop', ngay_nop = CURRENT_TIMESTAMP WHERE id = ?", args: [existingId] }
+            ];
 
             if (chi_tiet && chi_tiet.length > 0) {
-                const stmt = db.prepare('INSERT INTO de_xuat_chi_tiet (de_xuat_id, mon_hoc_id, lop_id, vat_tu_id, so_luong, ghi_chu) VALUES (?, ?, ?, ?, ?, ?)');
                 for (const ct of chi_tiet) {
-                    stmt.run(existing.id, ct.mon_hoc_id, ct.lop_id, ct.vat_tu_id, ct.so_luong, ct.ghi_chu || null);
+                    stmts.push({
+                        sql: 'INSERT INTO de_xuat_chi_tiet (de_xuat_id, mon_hoc_id, lop_id, vat_tu_id, so_luong, ghi_chu) VALUES (?, ?, ?, ?, ?, ?)',
+                        args: [existingId, ct.mon_hoc_id, ct.lop_id, ct.vat_tu_id, ct.so_luong, ct.ghi_chu || null]
+                    });
                 }
             }
 
-            return NextResponse.json({ id: existing.id, message: 'Cập nhật đề xuất thành công' });
+            await db.batch(stmts, "write");
+            return NextResponse.json({ id: existingId, message: 'Cập nhật đề xuất thành công' });
         }
 
-        const result = db.prepare(
-            "INSERT INTO de_xuat (giao_vien_id, ki_id, trang_thai, ngay_nop) VALUES (?, ?, 'da_nop', CURRENT_TIMESTAMP)"
-        ).run(giao_vien_id, ki_id);
+        const result = await db.execute({
+            sql: "INSERT INTO de_xuat (giao_vien_id, ki_id, trang_thai, ngay_nop) VALUES (?, ?, 'da_nop', CURRENT_TIMESTAMP)",
+            args: [giao_vien_id, ki_id]
+        });
 
-        const deXuatId = result.lastInsertRowid;
+        const deXuatId = Number(result.lastInsertRowid);
 
         if (chi_tiet && chi_tiet.length > 0) {
-            const stmt = db.prepare('INSERT INTO de_xuat_chi_tiet (de_xuat_id, mon_hoc_id, lop_id, vat_tu_id, so_luong, ghi_chu) VALUES (?, ?, ?, ?, ?, ?)');
-            for (const ct of chi_tiet) {
-                stmt.run(deXuatId, ct.mon_hoc_id, ct.lop_id, ct.vat_tu_id, ct.so_luong, ct.ghi_chu || null);
-            }
+            const stmts = chi_tiet.map(ct => ({
+                sql: 'INSERT INTO de_xuat_chi_tiet (de_xuat_id, mon_hoc_id, lop_id, vat_tu_id, so_luong, ghi_chu) VALUES (?, ?, ?, ?, ?, ?)',
+                args: [deXuatId, ct.mon_hoc_id, ct.lop_id, ct.vat_tu_id, ct.so_luong, ct.ghi_chu || null]
+            }));
+            await db.batch(stmts, "write");
         }
 
         return NextResponse.json({ id: deXuatId, message: 'Gửi đề xuất thành công' });
@@ -125,7 +141,7 @@ export async function PUT(request) {
         query += sets.join(',') + ' WHERE id = ?';
         params.push(id);
 
-        db.prepare(query).run(...params);
+        await db.execute({ sql: query, args: params });
         return NextResponse.json({ message: 'Cập nhật thành công' });
     } catch (error) {
         return NextResponse.json({ error: error.message }, { status: 500 });
@@ -137,7 +153,10 @@ export async function DELETE(request) {
         const db = getDb();
         const { searchParams } = new URL(request.url);
         const id = searchParams.get('id');
-        db.prepare('DELETE FROM de_xuat WHERE id = ?').run(id);
+        await db.execute({
+            sql: 'DELETE FROM de_xuat WHERE id = ?',
+            args: [id]
+        });
         return NextResponse.json({ message: 'Xóa thành công' });
     } catch (error) {
         return NextResponse.json({ error: error.message }, { status: 500 });

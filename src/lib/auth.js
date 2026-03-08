@@ -12,14 +12,20 @@ export const authOptions = {
             },
             async authorize(credentials) {
                 const db = getDb();
-                const user = db.prepare('SELECT * FROM users WHERE username = ?').get(credentials.username);
+                const userResult = await db.execute({
+                    sql: 'SELECT * FROM users WHERE username = ?',
+                    args: [credentials.username]
+                });
 
-                if (user && bcrypt.compareSync(credentials.password, user.password_hash)) {
-                    return {
-                        id: user.id.toString(),
-                        name: user.ho_ten,
-                        username: user.username,
-                    };
+                if (userResult.rows.length > 0) {
+                    const user = userResult.rows[0];
+                    if (bcrypt.compareSync(credentials.password, user.password_hash)) {
+                        return {
+                            id: user.id.toString(),
+                            name: user.ho_ten,
+                            username: user.username,
+                        };
+                    }
                 }
                 return null;
             }

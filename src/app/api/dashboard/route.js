@@ -6,41 +6,53 @@ export async function GET() {
         const db = getDb();
 
         const stats = {
-            giao_vien: db.prepare('SELECT COUNT(*) as count FROM giao_vien').get().count,
-            mon_hoc: db.prepare('SELECT COUNT(*) as count FROM mon_hoc').get().count,
-            vat_tu: db.prepare('SELECT COUNT(*) as count FROM vat_tu').get().count,
-            nganh: db.prepare('SELECT COUNT(*) as count FROM nganh').get().count,
+            giao_vien: (await db.execute('SELECT COUNT(*) as count FROM giao_vien')).rows[0].count,
+            mon_hoc: (await db.execute('SELECT COUNT(*) as count FROM mon_hoc')).rows[0].count,
+            vat_tu: (await db.execute('SELECT COUNT(*) as count FROM vat_tu')).rows[0].count,
+            nganh: (await db.execute('SELECT COUNT(*) as count FROM nganh')).rows[0].count,
         };
 
         // Current active semester
-        const currentKi = db.prepare("SELECT * FROM ki_hoc WHERE trang_thai != 'dong' ORDER BY created_at DESC LIMIT 1").get();
+        const currentKiResult = await db.execute("SELECT * FROM ki_hoc WHERE trang_thai != 'dong' ORDER BY created_at DESC LIMIT 1");
+        const currentKi = currentKiResult.rows[0];
 
         if (currentKi) {
             stats.ki_hoc = currentKi;
+
+            // Execute multiple queries concurrently for better performance over network
+            const [dxTotal, dxDaNop, dxDuyet, dxTuChoi, dxDangLam, pxTotal, pxChoDuyet, pxDaXuat, gvDaDeXuatResult, gvDuocPhanCongResult] = await Promise.all([
+                db.execute({ sql: 'SELECT COUNT(*) as c FROM de_xuat WHERE ki_id = ?', args: [currentKi.id] }),
+                db.execute({ sql: "SELECT COUNT(*) as c FROM de_xuat WHERE ki_id = ? AND trang_thai = 'da_nop'", args: [currentKi.id] }),
+                db.execute({ sql: "SELECT COUNT(*) as c FROM de_xuat WHERE ki_id = ? AND trang_thai = 'duyet'", args: [currentKi.id] }),
+                db.execute({ sql: "SELECT COUNT(*) as c FROM de_xuat WHERE ki_id = ? AND trang_thai = 'tu_choi'", args: [currentKi.id] }),
+                db.execute({ sql: "SELECT COUNT(*) as c FROM de_xuat WHERE ki_id = ? AND trang_thai = 'dang_lam'", args: [currentKi.id] }),
+
+                db.execute({ sql: 'SELECT COUNT(*) as c FROM phieu_xuat WHERE ki_id = ?', args: [currentKi.id] }),
+                db.execute({ sql: "SELECT COUNT(*) as c FROM phieu_xuat WHERE ki_id = ? AND trang_thai = 'cho_duyet'", args: [currentKi.id] }),
+                db.execute({ sql: "SELECT COUNT(*) as c FROM phieu_xuat WHERE ki_id = ? AND trang_thai = 'da_xuat'", args: [currentKi.id] }),
+
+                db.execute({ sql: 'SELECT DISTINCT giao_vien_id FROM de_xuat WHERE ki_id = ?', args: [currentKi.id] }),
+                db.execute({ sql: 'SELECT DISTINCT giao_vien_id FROM phan_cong WHERE ki_id = ?', args: [currentKi.id] })
+            ]);
+
             stats.de_xuat = {
-                total: db.prepare('SELECT COUNT(*) as c FROM de_xuat WHERE ki_id = ?').get(currentKi.id).c,
-                da_nop: db.prepare("SELECT COUNT(*) as c FROM de_xuat WHERE ki_id = ? AND trang_thai = 'da_nop'").get(currentKi.id).c,
-                duyet: db.prepare("SELECT COUNT(*) as c FROM de_xuat WHERE ki_id = ? AND trang_thai = 'duyet'").get(currentKi.id).c,
-                tu_choi: db.prepare("SELECT COUNT(*) as c FROM de_xuat WHERE ki_id = ? AND trang_thai = 'tu_choi'").get(currentKi.id).c,
-                dang_lam: db.prepare("SELECT COUNT(*) as c FROM de_xuat WHERE ki_id = ? AND trang_thai = 'dang_lam'").get(currentKi.id).c,
+                total: dxTotal.rows[0].c,
+                da_nop: dxDaNop.rows[0].c,
+                duyet: dxDuyet.rows[0].c,
+                tu_choi: dxTuChoi.rows[0].c,
+                dang_lam: dxDangLam.rows[0].c,
             };
             stats.phieu_xuat = {
-                total: db.prepare('SELECT COUNT(*) as c FROM phieu_xuat WHERE ki_id = ?').get(currentKi.id).c,
-                cho_duyet: db.prepare("SELECT COUNT(*) as c FROM phieu_xuat WHERE ki_id = ? AND trang_thai = 'cho_duyet'").get(currentKi.id).c,
-                da_xuat: db.prepare("SELECT COUNT(*) as c FROM phieu_xuat WHERE ki_id = ? AND trang_thai = 'da_xuat'").get(currentKi.id).c,
+                total: pxTotal.rows[0].c,
+                cho_duyet: pxChoDuyet.rows[0].c,
+                da_xuat: pxDaXuat.rows[0].c,
             };
 
-            // Teachers pending proposals
-            const gvDaDeXuat = db.prepare(`
-        SELECT DISTINCT giao_vien_id FROM de_xuat WHERE ki_id = ?
-      `).all(currentKi.id).map(r => r.giao_vien_id);
+            const gvDaDeXuatIds = gvDaDeXuatResult.rows.map(r => r.giao_vien_id);
+            const gvDuocPhanCongIds = gvDuocPhanCongResult.rows.map(r => r.giao_vien_id);
 
-            const gvDuocPhanCong = db.prepare(`
-        SELECT DISTINCT giao_vien_id FROM phan_cong WHERE ki_id = ?
-      `).all(currentKi.id).map(r => r.giao_vien_id);
-
-            stats.gv_chua_de_xuat = gvDuocPhanCong.filter(id => !gvDaDeXuat.includes(id)).length;
-            stats.gv_da_de_xuat = gvDaDeXuat.length;
+            stats.gv_chua_de_xuat = gvDuocPhanCongIds.filter(id => !gvDaDeXuatIds.includes(id)).length;
+            stats.gv_da_de_xuat = gvDaDeXuatIds.length;
         }
 
         return NextResponse.json(stats);

@@ -42,10 +42,11 @@ export async function POST(request) {
         }
 
         // Kiểm tra kỳ học tồn tại
-        const ki = db.prepare('SELECT id, ten_ki FROM ki_hoc WHERE id = ?').get(ki_id);
-        if (!ki) {
+        const kiResult = await db.execute({ sql: 'SELECT id, ten_ki FROM ki_hoc WHERE id = ?', args: [ki_id] });
+        if (kiResult.rows.length === 0) {
             return NextResponse.json({ error: 'Kỳ học không tồn tại' }, { status: 404 });
         }
+        const ki = kiResult.rows[0];
 
         const summary = {
             giao_vien_them_moi: [],
@@ -56,64 +57,71 @@ export async function POST(request) {
             loi: []
         };
 
-        const importTransaction = db.transaction(() => {
-            for (const row of rows) {
-                const { giao_vien: tenGV, mon_hoc: tenMon, ten_lop: tenLop, si_so: siSo } = row;
+        for (const row of rows) {
+            const { giao_vien: tenGV, mon_hoc: tenMon, ten_lop: tenLop, si_so: siSo } = row;
 
-                if (!tenGV || !tenMon || !tenLop) {
-                    summary.loi.push(`Thiếu dữ liệu: ${JSON.stringify(row)}`);
+            if (!tenGV || !tenMon || !tenLop) {
+                summary.loi.push(`Thiếu dữ liệu: ${JSON.stringify(row)}`);
+                continue;
+            }
+
+            // 1. Tìm/tạo giáo viên
+            const gvResult = await db.execute({ sql: 'SELECT id, ho_ten FROM giao_vien WHERE ho_ten = ?', args: [tenGV.trim()] });
+            let gvId;
+            if (gvResult.rows.length === 0) {
+                const r = await db.execute({ sql: 'INSERT INTO giao_vien (ho_ten) VALUES (?)', args: [tenGV.trim()] });
+                gvId = Number(r.lastInsertRowid);
+                summary.giao_vien_them_moi.push(tenGV.trim());
+            } else {
+                gvId = gvResult.rows[0].id;
+            }
+
+            // 2. Tìm/tạo môn học
+            const monResult = await db.execute({ sql: 'SELECT id, ten_mon FROM mon_hoc WHERE ten_mon = ?', args: [tenMon.trim()] });
+            let monId;
+            if (monResult.rows.length === 0) {
+                const r = await db.execute({ sql: 'INSERT INTO mon_hoc (ten_mon) VALUES (?)', args: [tenMon.trim()] });
+                monId = Number(r.lastInsertRowid);
+                summary.mon_hoc_them_moi.push(tenMon.trim());
+            } else {
+                monId = monResult.rows[0].id;
+            }
+
+            // 3. Tìm/tạo lớp
+            const lopResult = await db.execute({ sql: 'SELECT id, ten_lop, si_so FROM lop WHERE ten_lop = ?', args: [tenLop.trim()] });
+            let lopId;
+            if (lopResult.rows.length === 0) {
+                const loaiHe = detectLoaiHe(tenLop);
+                if (!loaiHe) {
+                    summary.loi.push(`Không xác định được hệ đào tạo từ lớp "${tenLop}". Chữ đầu phải là T, C, hoặc L.`);
                     continue;
                 }
-
-                // 1. Tìm/tạo giáo viên
-                let gv = db.prepare('SELECT id, ho_ten FROM giao_vien WHERE ho_ten = ?').get(tenGV.trim());
-                if (!gv) {
-                    const r = db.prepare('INSERT INTO giao_vien (ho_ten) VALUES (?)').run(tenGV.trim());
-                    gv = { id: r.lastInsertRowid, ho_ten: tenGV.trim() };
-                    summary.giao_vien_them_moi.push(tenGV.trim());
-                }
-
-                // 2. Tìm/tạo môn học
-                let mon = db.prepare('SELECT id, ten_mon FROM mon_hoc WHERE ten_mon = ?').get(tenMon.trim());
-                if (!mon) {
-                    const r = db.prepare('INSERT INTO mon_hoc (ten_mon) VALUES (?)').run(tenMon.trim());
-                    mon = { id: r.lastInsertRowid, ten_mon: tenMon.trim() };
-                    summary.mon_hoc_them_moi.push(tenMon.trim());
-                }
-
-                // 3. Tìm/tạo lớp
-                let lop = db.prepare('SELECT id, ten_lop, si_so FROM lop WHERE ten_lop = ?').get(tenLop.trim());
-                if (!lop) {
-                    const loaiHe = detectLoaiHe(tenLop);
-                    if (!loaiHe) {
-                        summary.loi.push(`Không xác định được hệ đào tạo từ lớp "${tenLop}". Chữ đầu phải là T, C, hoặc L.`);
-                        continue;
-                    }
-                    const r = db.prepare('INSERT INTO lop (ten_lop, loai_he, si_so) VALUES (?, ?, ?)').run(tenLop.trim(), loaiHe, siSo || 0);
-                    lop = { id: r.lastInsertRowid, ten_lop: tenLop.trim(), si_so: siSo || 0 };
-                    summary.lop_them_moi.push({ ten_lop: tenLop.trim(), si_so: siSo || 0 });
-                } else if (siSo && lop.si_so !== siSo) {
-                    // Cập nhật sĩ số nếu khác
-                    db.prepare('UPDATE lop SET si_so = ? WHERE id = ?').run(siSo, lop.id);
-                }
-
-                // 4. Tìm/tạo phân công
-                const existing = db.prepare(
-                    'SELECT id FROM phan_cong WHERE giao_vien_id = ? AND mon_hoc_id = ? AND lop_id = ? AND ki_id = ?'
-                ).get(gv.id, mon.id, lop.id, ki_id);
-
-                if (!existing) {
-                    db.prepare(
-                        'INSERT INTO phan_cong (giao_vien_id, mon_hoc_id, lop_id, ki_id) VALUES (?, ?, ?, ?)'
-                    ).run(gv.id, mon.id, lop.id, ki_id);
-                    summary.phan_cong_them_moi++;
-                } else {
-                    summary.phan_cong_da_co++;
+                const r = await db.execute({ sql: 'INSERT INTO lop (ten_lop, loai_he, si_so) VALUES (?, ?, ?)', args: [tenLop.trim(), loaiHe, siSo || 0] });
+                lopId = Number(r.lastInsertRowid);
+                summary.lop_them_moi.push({ ten_lop: tenLop.trim(), si_so: siSo || 0 });
+            } else {
+                lopId = lopResult.rows[0].id;
+                if (siSo && lopResult.rows[0].si_so !== siSo) {
+                    await db.execute({ sql: 'UPDATE lop SET si_so = ? WHERE id = ?', args: [siSo, lopId] });
                 }
             }
-        });
 
-        importTransaction();
+            // 4. Tìm/tạo phân công
+            const existingPCResult = await db.execute({
+                sql: 'SELECT id FROM phan_cong WHERE giao_vien_id = ? AND mon_hoc_id = ? AND lop_id = ? AND ki_id = ?',
+                args: [gvId, monId, lopId, ki_id]
+            });
+
+            if (existingPCResult.rows.length === 0) {
+                await db.execute({
+                    sql: 'INSERT INTO phan_cong (giao_vien_id, mon_hoc_id, lop_id, ki_id) VALUES (?, ?, ?, ?)',
+                    args: [gvId, monId, lopId, ki_id]
+                });
+                summary.phan_cong_them_moi++;
+            } else {
+                summary.phan_cong_da_co++;
+            }
+        }
 
         return NextResponse.json({
             message: 'Import phân công thành công',
@@ -141,7 +149,7 @@ export async function PUT(request) {
 
         // Trả về rows đã parse để frontend preview, hoặc nếu có ki_id thì import luôn
         if (ki_id) {
-            // Gọi lại POST logic
+            // Gọi lại POST logic bằng fake payload do POST nhận request json chuẩn NEXT js
             const fakeRequest = new Request(request.url, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -189,9 +197,7 @@ function parseCSV(text) {
 
 function parseCSVLine(line) {
     if (line.includes('\t')) {
-        // If it's pasted from Excel, it will be tab-separated
         return line.split('\t').map(item => {
-            // Remove wrapping quotes if Excel added them around fields with commas
             if (item.startsWith('"') && item.endsWith('"')) {
                 return item.slice(1, -1).trim();
             }
