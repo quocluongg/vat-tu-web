@@ -1768,3 +1768,55 @@ textarea {
     gap: 12px;
   }
 }
+
+/* ===== Print Styles ===== */
+@media print {
+  @page {
+    margin: 1.5cm;
+    size: auto;
+  }
+
+  body {
+    background: white;
+    color: black;
+    font-size: 12pt;
+    margin: 0;
+    padding: 0;
+  }
+
+  .no-print,
+  .sidebar,
+  .page-header,
+  .public-header,
+  .card-header,
+  .btn,
+  .form-select,
+  .form-input,
+  .material-qty button {
+    display: none !important;
+  }
+
+  .main-content,
+  .public-container {
+    padding: 0 !important;
+    margin: 0 !important;
+    max-width: 100% !important;
+    background: white !important;
+    box-shadow: none !important;
+  }
+
+  .card {
+    border: none !important;
+    box-shadow: none !important;
+    margin: 0 !important;
+    background: transparent !important;
+  }
+
+  .card-body {
+    padding: 0 !important;
+  }
+
+  .print-only {
+    display: block !important;
+  }
+}

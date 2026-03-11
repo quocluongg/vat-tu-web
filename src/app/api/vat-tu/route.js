@@ -9,6 +9,7 @@ export async function GET(request) {
 
         let query = `
             SELECT vt.*, 
+                   ndt.ten_nganh,
                    COALESCE(SUM(
                        CASE WHEN dx.trang_thai IN ('da_nop', 'duyet', 'dang_lam') 
                        THEN dxct.so_luong ELSE 0 END
@@ -16,6 +17,7 @@ export async function GET(request) {
             FROM vat_tu vt
             LEFT JOIN de_xuat_chi_tiet dxct ON vt.id = dxct.vat_tu_id
             LEFT JOIN de_xuat dx ON dxct.de_xuat_id = dx.id
+            LEFT JOIN nganh_dao_tao ndt ON vt.nganh_id = ndt.id
         `;
         if (ki_id) {
             query += ` WHERE vt.ki_id = ${ki_id}`;
@@ -36,17 +38,17 @@ export async function POST(request) {
 
         if (Array.isArray(body)) {
             const stmts = body.map(item => ({
-                sql: 'INSERT INTO vat_tu (ten_vat_tu, yeu_cau_ky_thuat, don_vi_tinh, so_luong_kho, ki_id) VALUES (?, ?, ?, ?, ?)',
-                args: [item.ten_vat_tu, item.yeu_cau_ky_thuat || null, item.don_vi_tinh, item.so_luong_kho || 0, item.ki_id]
+                sql: 'INSERT INTO vat_tu (ten_vat_tu, yeu_cau_ky_thuat, don_vi_tinh, so_luong_kho, ki_id, nganh_id) VALUES (?, ?, ?, ?, ?, ?)',
+                args: [item.ten_vat_tu, item.yeu_cau_ky_thuat || null, item.don_vi_tinh, item.so_luong_kho || 0, item.ki_id, item.nganh_id || null]
             }));
             await db.batch(stmts, "write");
             return NextResponse.json({ message: `Thêm ${body.length} vật tư thành công` });
         }
 
-        const { ten_vat_tu, yeu_cau_ky_thuat, don_vi_tinh, so_luong_kho, ki_id } = body;
+        const { ten_vat_tu, yeu_cau_ky_thuat, don_vi_tinh, so_luong_kho, ki_id, nganh_id } = body;
         const result = await db.execute({
-            sql: 'INSERT INTO vat_tu (ten_vat_tu, yeu_cau_ky_thuat, don_vi_tinh, so_luong_kho, ki_id) VALUES (?, ?, ?, ?, ?)',
-            args: [ten_vat_tu, yeu_cau_ky_thuat || null, don_vi_tinh, so_luong_kho || 0, ki_id]
+            sql: 'INSERT INTO vat_tu (ten_vat_tu, yeu_cau_ky_thuat, don_vi_tinh, so_luong_kho, ki_id, nganh_id) VALUES (?, ?, ?, ?, ?, ?)',
+            args: [ten_vat_tu, yeu_cau_ky_thuat || null, don_vi_tinh, so_luong_kho || 0, ki_id, nganh_id || null]
         });
 
         return NextResponse.json({ id: Number(result.lastInsertRowid), message: 'Thêm vật tư thành công' });
@@ -58,10 +60,10 @@ export async function POST(request) {
 export async function PUT(request) {
     try {
         const db = getDb();
-        const { id, ten_vat_tu, yeu_cau_ky_thuat, don_vi_tinh, so_luong_kho } = await request.json();
+        const { id, ten_vat_tu, yeu_cau_ky_thuat, don_vi_tinh, so_luong_kho, nganh_id } = await request.json();
         await db.execute({
-            sql: 'UPDATE vat_tu SET ten_vat_tu = ?, yeu_cau_ky_thuat = ?, don_vi_tinh = ?, so_luong_kho = ? WHERE id = ?',
-            args: [ten_vat_tu, yeu_cau_ky_thuat || null, don_vi_tinh, so_luong_kho || 0, id]
+            sql: 'UPDATE vat_tu SET ten_vat_tu = ?, yeu_cau_ky_thuat = ?, don_vi_tinh = ?, so_luong_kho = ?, nganh_id = ? WHERE id = ?',
+            args: [ten_vat_tu, yeu_cau_ky_thuat || null, don_vi_tinh, so_luong_kho || 0, nganh_id || null, id]
         });
         return NextResponse.json({ message: 'Cập nhật thành công' });
     } catch (error) {

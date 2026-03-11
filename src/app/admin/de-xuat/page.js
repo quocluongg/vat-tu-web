@@ -1,7 +1,8 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { FileText, Eye, Check, X, Clock, CheckCircle, XCircle, AlertCircle, RefreshCw } from 'lucide-react';
+import { FileText, Eye, Check, X, Clock, CheckCircle, XCircle, AlertCircle, RefreshCw, Download } from 'lucide-react';
 import { useToast } from '@/components/Toast';
+import * as XLSX from 'xlsx';
 
 const statusConfig = {
     dang_lam: { label: 'Đang làm', badge: 'badge-warning', icon: Clock },
@@ -58,6 +59,117 @@ export default function DeXuatAdminPage() {
         }
     };
 
+    const exportToExcel = async () => {
+        if (deXuats.length === 0) {
+            addToast('Không có đề xuất nào để xuất', 'warning');
+            return;
+        }
+
+        addToast('Đang tạo file Excel...', 'info');
+
+        try {
+            // Fetch chi tiết tất cả đề xuất
+            const allDetails = [];
+            for (const dx of deXuats) {
+                const res = await fetch(`/api/de-xuat?id=${dx.id}`);
+                const data = await res.json();
+                allDetails.push(data);
+            }
+
+            const kiName = kiHocs.find(k => k.id.toString() === selectedKi);
+            const kiLabel = kiName ? `${kiName.ten_ki} - ${kiName.nam_hoc}` : '';
+
+            // Sheet 1: Tổng hợp
+            const summaryData = allDetails.map((dx, i) => ({
+                'STT': i + 1,
+                'Giáo viên': dx.ten_gv,
+                'Email': dx.email || '',
+                'SĐT': dx.so_dien_thoai || '',
+                'Số mục vật tư': dx.chi_tiet?.length || 0,
+                'Tổng số lượng': dx.chi_tiet?.reduce((sum, ct) => sum + (ct.so_luong || 0), 0) || 0,
+                'Trạng thái': statusConfig[dx.trang_thai]?.label || dx.trang_thai,
+                'Ngày nộp': dx.ngay_nop ? new Date(dx.ngay_nop).toLocaleDateString('vi-VN') : '',
+                'Ghi chú': dx.ghi_chu || '',
+            }));
+
+            // Sheet 2: Chi tiết liệt kê
+            const detailData = [];
+            let stt = 1;
+            for (const dx of allDetails) {
+                if (!dx.chi_tiet || dx.chi_tiet.length === 0) continue;
+                for (const ct of dx.chi_tiet) {
+                    detailData.push({
+                        'STT': stt++,
+                        'Giáo viên': dx.ten_gv,
+                        'Môn học': ct.ten_mon || '',
+                        'Lớp': ct.ten_lop || '',
+                        'Sĩ số': ct.si_so || '',
+                        'Hệ': ct.ten_loai_he || ct.loai_he || '',
+                        'Tên vật tư': ct.ten_vat_tu || '',
+                        'Mã(hiệu)/YCKT': ct.yeu_cau_ky_thuat || '',
+                        'Đơn vị tính': ct.don_vi_tinh || '',
+                        'Số lượng đề xuất': ct.so_luong || 0,
+                        'Số lượng kho': ct.so_luong_kho || 0,
+                        'Trạng thái': statusConfig[dx.trang_thai]?.label || dx.trang_thai,
+                    });
+                }
+            }
+
+            // Sheet 3: Thống kê tổng hợp theo vật tư (gom nhóm)
+            const vtMap = {};
+            for (const dx of allDetails) {
+                if (!dx.chi_tiet) continue;
+                for (const ct of dx.chi_tiet) {
+                    const key = ct.ten_vat_tu;
+                    if (!vtMap[key]) {
+                        vtMap[key] = {
+                            'Tên vật tư': ct.ten_vat_tu,
+                            'Mã(hiệu)/YCKT': ct.yeu_cau_ky_thuat || '',
+                            'Đơn vị tính': ct.don_vi_tinh || '',
+                            'Tổng SL đề xuất': 0,
+                            'Số lượng kho': ct.so_luong_kho || 0,
+                            'Số GV đề xuất': new Set(),
+                        };
+                    }
+                    vtMap[key]['Tổng SL đề xuất'] += ct.so_luong || 0;
+                    vtMap[key]['Số GV đề xuất'].add(dx.ten_gv);
+                }
+            }
+            const statsData = Object.values(vtMap).map((item, i) => ({
+                'STT': i + 1,
+                'Tên vật tư': item['Tên vật tư'],
+                'Mã(hiệu)/YCKT': item['Mã(hiệu)/YCKT'],
+                'Đơn vị tính': item['Đơn vị tính'],
+                'Tổng SL đề xuất': item['Tổng SL đề xuất'],
+                'Số lượng kho': item['Số lượng kho'],
+                'Chênh lệch': item['Số lượng kho'] - item['Tổng SL đề xuất'],
+                'Số GV đề xuất': item['Số GV đề xuất'].size,
+            }));
+
+            // Tạo workbook
+            const wb = XLSX.utils.book_new();
+
+            const ws1 = XLSX.utils.json_to_sheet(summaryData);
+            ws1['!cols'] = [{ wch: 5 }, { wch: 25 }, { wch: 25 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 12 }, { wch: 15 }, { wch: 20 }];
+            XLSX.utils.book_append_sheet(wb, ws1, 'Tổng hợp GV');
+
+            const ws2 = XLSX.utils.json_to_sheet(detailData);
+            ws2['!cols'] = [{ wch: 5 }, { wch: 20 }, { wch: 20 }, { wch: 15 }, { wch: 8 }, { wch: 12 }, { wch: 30 }, { wch: 20 }, { wch: 10 }, { wch: 15 }, { wch: 12 }, { wch: 12 }];
+            XLSX.utils.book_append_sheet(wb, ws2, 'Chi tiết vật tư');
+
+            const ws3 = XLSX.utils.json_to_sheet(statsData);
+            ws3['!cols'] = [{ wch: 5 }, { wch: 30 }, { wch: 20 }, { wch: 10 }, { wch: 15 }, { wch: 12 }, { wch: 12 }, { wch: 15 }];
+            XLSX.utils.book_append_sheet(wb, ws3, 'Thống kê vật tư');
+
+            // Export
+            XLSX.writeFile(wb, `De_Xuat_Du_Tru_${kiLabel.replace(/[^a-zA-Z0-9]/g, '_')}.xlsx`);
+            addToast('Xuất file Excel thành công!', 'success');
+        } catch (err) {
+            console.error('Export error:', err);
+            addToast('Lỗi khi xuất file: ' + err.message, 'error');
+        }
+    };
+
     const columns = ['dang_lam', 'da_nop', 'duyet', 'tu_choi'];
 
     if (loading) return <div className="loading-overlay"><div className="spinner" /></div>;
@@ -73,6 +185,9 @@ export default function DeXuatAdminPage() {
                     <select className="form-select" style={{ width: 220 }} value={selectedKi} onChange={e => setSelectedKi(e.target.value)}>
                         {kiHocs.map(k => <option key={k.id} value={k.id}>{k.ten_ki} - {k.nam_hoc}</option>)}
                     </select>
+                    <button className="btn btn-success" onClick={exportToExcel} disabled={deXuats.length === 0}>
+                        <Download size={18} /> Xuất Excel
+                    </button>
                     <button className="btn btn-secondary" onClick={fetchDeXuat}>
                         <RefreshCw size={18} /> Làm mới
                     </button>

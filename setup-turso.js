@@ -80,9 +80,11 @@ async function run() {
         await client.execute(`
             CREATE TABLE IF NOT EXISTS vat_tu (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
+                nganh_id INTEGER,
                 ten_vat_tu TEXT NOT NULL,
                 don_vi_tinh TEXT NOT NULL,
-                ton_kho INTEGER DEFAULT 0
+                ton_kho INTEGER DEFAULT 0,
+                FOREIGN KEY (nganh_id) REFERENCES nganh_dao_tao(id)
             );
         `);
 

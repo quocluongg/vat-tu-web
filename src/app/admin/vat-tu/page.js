@@ -6,13 +6,15 @@ import { useToast } from '@/components/Toast';
 export default function VatTuPage() {
     const [list, setList] = useState([]);
     const [kiHocs, setKiHocs] = useState([]);
+    const [nganhs, setNganhs] = useState([]);
     const [loading, setLoading] = useState(true);
     const [showModal, setShowModal] = useState(false);
     const [showImport, setShowImport] = useState(false);
     const [showImportStockModal, setShowImportStockModal] = useState(false);
     const [editing, setEditing] = useState(null);
-    const [form, setForm] = useState({ ten_vat_tu: '', yeu_cau_ky_thuat: '', don_vi_tinh: '', so_luong_kho: 0, ki_id: '' });
+    const [form, setForm] = useState({ ten_vat_tu: '', yeu_cau_ky_thuat: '', don_vi_tinh: '', so_luong_kho: 0, ki_id: '', nganh_id: '' });
     const [search, setSearch] = useState('');
+    const [activeTab, setActiveTab] = useState('all');
     const [selectedVatTu, setSelectedVatTu] = useState(new Set());
     const [selectedKi, setSelectedKi] = useState('');
     const [importText, setImportText] = useState('');
@@ -20,8 +22,12 @@ export default function VatTuPage() {
     const addToast = useToast();
 
     const fetchData = async () => {
-        const khRes = await fetch('/api/ki-hoc').then(r => r.json());
+        const [khRes, ngRes] = await Promise.all([
+            fetch('/api/ki-hoc').then(r => r.json()),
+            fetch('/api/nganh').then(r => r.json())
+        ]);
         setKiHocs(khRes);
+        setNganhs(ngRes);
         if (khRes.length > 0 && !selectedKi) {
             setSelectedKi(khRes[0].id.toString());
         }
@@ -40,12 +46,17 @@ export default function VatTuPage() {
 
     const openModal = (item = null) => {
         setEditing(item);
+        let defaultNganhId = '';
+        if (!item && activeTab !== 'all' && activeTab !== 'chung') {
+            defaultNganhId = activeTab;
+        }
         setForm({
             ten_vat_tu: item?.ten_vat_tu || '',
             yeu_cau_ky_thuat: item?.yeu_cau_ky_thuat || '',
             don_vi_tinh: item?.don_vi_tinh || '',
             so_luong_kho: item?.so_luong_kho || 0,
             ki_id: item?.ki_id?.toString() || selectedKi,
+            nganh_id: item?.nganh_id?.toString() || defaultNganhId,
         });
         setShowModal(true);
     };
@@ -144,10 +155,19 @@ export default function VatTuPage() {
         }
     };
 
-    const filtered = list.filter(vt =>
-        vt.ten_vat_tu.toLowerCase().includes(search.toLowerCase()) ||
-        (vt.yeu_cau_ky_thuat && vt.yeu_cau_ky_thuat.toLowerCase().includes(search.toLowerCase()))
-    );
+    const filtered = list.filter(vt => {
+        const matchSearch = vt.ten_vat_tu.toLowerCase().includes(search.toLowerCase()) ||
+            (vt.yeu_cau_ky_thuat && vt.yeu_cau_ky_thuat.toLowerCase().includes(search.toLowerCase()));
+
+        let matchTab = true;
+        if (activeTab === 'chung') {
+            matchTab = !vt.nganh_id;
+        } else if (activeTab !== 'all') {
+            matchTab = vt.nganh_id?.toString() === activeTab;
+        }
+
+        return matchSearch && matchTab;
+    });
     const allVtIds = filtered.map(vt => vt.id);
     const allVtSelected = allVtIds.length > 0 && allVtIds.every(id => selectedVatTu.has(id));
     const someVtSelected = allVtIds.some(id => selectedVatTu.has(id));
@@ -175,6 +195,33 @@ export default function VatTuPage() {
                         <Plus size={18} /> Thêm vật tư mới
                     </button>
                 </div>
+            </div>
+
+            <div className="tabs" style={{ display: 'flex', gap: 8, marginBottom: 16, borderBottom: '1px solid var(--border-color)', paddingBottom: 8, overflowX: 'auto' }}>
+                <button
+                    className={`btn ${activeTab === 'all' ? 'btn-primary' : 'btn-ghost'}`}
+                    onClick={() => setActiveTab('all')}
+                    style={{ borderRadius: 20, padding: '6px 16px', fontSize: 14 }}
+                >
+                    Tất cả
+                </button>
+                <button
+                    className={`btn ${activeTab === 'chung' ? 'btn-primary' : 'btn-ghost'}`}
+                    onClick={() => setActiveTab('chung')}
+                    style={{ borderRadius: 20, padding: '6px 16px', fontSize: 14 }}
+                >
+                    Dùng chung
+                </button>
+                {nganhs.map(n => (
+                    <button
+                        key={n.id}
+                        className={`btn ${activeTab === n.id.toString() ? 'btn-primary' : 'btn-ghost'}`}
+                        onClick={() => setActiveTab(n.id.toString())}
+                        style={{ borderRadius: 20, padding: '6px 16px', fontSize: 14, whiteSpace: 'nowrap' }}
+                    >
+                        {n.ten_nganh}
+                    </button>
+                ))}
             </div>
 
             <div className="search-bar">
@@ -213,6 +260,7 @@ export default function VatTuPage() {
                                 </th>
                                 <th style={{ width: 36 }}>#</th>
                                 <th>Tên vật tư</th>
+                                <th>Ngành</th>
                                 <th>Yêu cầu kỹ thuật</th>
                                 <th>Đơn vị</th>
                                 <th>Tồn kho</th>
@@ -233,6 +281,13 @@ export default function VatTuPage() {
                                         </td>
                                         <td style={{ color: 'var(--text-muted)', fontSize: 12 }}>{idx + 1}</td>
                                         <td style={{ color: 'var(--text-primary)', fontWeight: 500 }}>{vt.ten_vat_tu}</td>
+                                        <td>
+                                            {vt.ten_nganh ? (
+                                                <span className="badge" style={{ background: 'rgba(56, 189, 248, 0.1)', color: 'var(--text-accent)' }}>{vt.ten_nganh}</span>
+                                            ) : (
+                                                <span className="badge badge-secondary">Chung</span>
+                                            )}
+                                        </td>
                                         <td style={{ maxWidth: 250, overflow: 'hidden', textOverflow: 'ellipsis', color: 'var(--text-secondary)', fontSize: 13 }}>{vt.yeu_cau_ky_thuat || '—'}</td>
                                         <td><span className="badge badge-info">{vt.don_vi_tinh}</span></td>
                                         <td>
@@ -276,6 +331,13 @@ export default function VatTuPage() {
                                 <div className="form-group">
                                     <label className="form-label">Tên vật tư *</label>
                                     <input className="form-input" value={form.ten_vat_tu} onChange={e => setForm({ ...form, ten_vat_tu: e.target.value })} required placeholder="VD: Điện trở" />
+                                </div>
+                                <div className="form-group">
+                                    <label className="form-label">Thuộc ngành</label>
+                                    <select className="form-select" value={form.nganh_id} onChange={e => setForm({ ...form, nganh_id: e.target.value })}>
+                                        <option value="">-- Dùng chung (Tất cả ngành) --</option>
+                                        {nganhs.map(n => <option key={n.id} value={n.id}>{n.ten_nganh}</option>)}
+                                    </select>
                                 </div>
                                 <div className="form-group">
                                     <label className="form-label">Yêu cầu kỹ thuật</label>
