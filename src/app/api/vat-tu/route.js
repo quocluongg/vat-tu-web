@@ -5,7 +5,17 @@ export async function GET(request) {
     try {
         const db = getDb();
         const { searchParams } = new URL(request.url);
-        const ki_id = searchParams.get('ki_id');
+        let ki_id = searchParams.get('ki_id');
+
+        // ✅ If no ki_id specified, auto-use latest semester
+        if (!ki_id) {
+            const latestKiResult = await db.execute({
+                sql: 'SELECT id FROM ki_hoc ORDER BY id DESC LIMIT 1'
+            });
+            if (latestKiResult.rows.length > 0) {
+                ki_id = latestKiResult.rows[0].id;
+            }
+        }
 
         let query = `
             SELECT vt.*, 
@@ -17,14 +27,21 @@ export async function GET(request) {
             FROM vat_tu vt
             LEFT JOIN de_xuat_chi_tiet dxct ON vt.id = dxct.vat_tu_id
             LEFT JOIN de_xuat dx ON dxct.de_xuat_id = dx.id
-            LEFT JOIN nganh_dao_tao ndt ON vt.nganh_id = ndt.id
+            LEFT JOIN nganh ndt ON vt.nganh_id = ndt.id
         `;
+        let args = [];
         if (ki_id) {
-            query += ` WHERE vt.ki_id = ${ki_id}`;
+            query += ` WHERE vt.ki_id = ?`;
+            args = [parseInt(ki_id)];
         }
         query += ' GROUP BY vt.id ORDER BY vt.ten_vat_tu';
 
-        const result = await db.execute(query);
+        let result;
+        if (args.length > 0) {
+            result = await db.execute({ sql: query, args });
+        } else {
+            result = await db.execute(query);
+        }
         return NextResponse.json(result.rows);
     } catch (error) {
         return NextResponse.json({ error: error.message }, { status: 500 });
@@ -76,6 +93,29 @@ export async function DELETE(request) {
         const db = getDb();
         const { searchParams } = new URL(request.url);
         const id = searchParams.get('id');
+
+        // Check if material is used in proposals
+        const dxCheck = await db.execute({
+            sql: 'SELECT COUNT(*) as c FROM de_xuat_chi_tiet WHERE vat_tu_id = ?',
+            args: [id]
+        });
+        if (dxCheck.rows[0]?.c > 0) {
+            return NextResponse.json({
+                error: 'Không thể xóa vật tư vì nó đang được sử dụng trong các đề xuất. Vui lòng xóa các đề xuất trước.'
+            }, { status: 400 });
+        }
+
+        // Check if material is used in exports
+        const pxCheck = await db.execute({
+            sql: 'SELECT COUNT(*) as c FROM phieu_xuat_chi_tiet WHERE vat_tu_id = ?',
+            args: [id]
+        });
+        if (pxCheck.rows[0]?.c > 0) {
+            return NextResponse.json({
+                error: 'Không thể xóa vật tư vì nó đã được xuất. Vui lòng xóa các phiếu xuất trước.'
+            }, { status: 400 });
+        }
+
         await db.execute({
             sql: 'DELETE FROM vat_tu WHERE id = ?',
             args: [id]

@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Đề Xuất - Tất Cả Giáo Viên</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-size: 28px;
+            margin-bottom: 8px;
+        }
+        
+        .header p {
+            opacity: 0.9;
+            font-size: 14px;
+        }
+        
+        .content {
+            padding: 30px;
+        }
+        
+        .config-section {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            border-left: 4px solid #667eea;
+        }
+        
+        .config-section h3 {
+            font-size: 14px;
+            color: #667eea;
+            text-transform: uppercase;
+            margin-bottom: 15px;
+            font-weight: 600;
+        }
+        
+        .config-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+        }
+        
+        .config-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .config-item label {
+            font-size: 13px;
+            color: #666;
+            min-width: 100px;
+        }
+        
+        .config-item input {
+            padding: 6px 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 13px;
+            width: 100px;
+        }
+        
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        
+        button {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        
+        .btn-primary:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+        }
+        
+        .btn-primary:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        
+        .btn-secondary {
+            background: #e9ecef;
+            color: #333;
+        }
+        
+        .btn-secondary:hover:not(:disabled) {
+            background: #dee2e6;
+        }
+        
+        .log {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 15px;
+            border-radius: 6px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            line-height: 1.6;
+            max-height: 400px;
+            overflow-y: auto;
+            margin-bottom: 20px;
+            border: 1px solid #333;
+        }
+        
+        .log-line {
+            margin: 4px 0;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+        
+        .error { color: #f48771; }
+        .success { color: #89d185; }
+        .info { color: #75beff; }
+        .warn { color: #ffcc99; }
+        
+        .progress-section {
+            margin: 20px 0;
+        }
+        
+        .progress-bar {
+            background: #e9ecef;
+            height: 24px;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-bottom: 8px;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            width: 0%;
+            transition: width 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 11px;
+            font-weight: 600;
+        }
+        
+        .progress-text {
+            font-size: 13px;
+            color: #666;
+            text-align: center;
+        }
+        
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+        
+        .stat-card {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 6px;
+            text-align: center;
+            border: 1px solid #e9ecef;
+        }
+        
+        .stat-card .value {
+            font-size: 24px;
+            font-weight: 700;
+            color: #667eea;
+            margin: 8px 0;
+        }
+        
+        .stat-card .label {
+            font-size: 12px;
+            color: #999;
+            text-transform: uppercase;
+        }
+        
+        .scrollable {
+            max-height: 500px;
+            overflow-y: auto;
+        }
+        
+        .hidden {
+            display: none;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        .spinner {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border: 2px solid #f3f3f3;
+            border-top: 2px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🧪 Test Đề Xuất Tất Cả Giáo Viên</h1>
+            <p>Tạo đề xuất cho tất cả giáo viên với vật tư ngẫu nhiên</p>
+        </div>
+        
+        <div class="content">
+            <!-- Configuration -->
+            <div class="config-section">
+                <h3>⚙️ Cấu Hình</h3>
+                <div class="config-grid">
+                    <div class="config-item">
+                        <label>Vật tư mỗi đề xuất:</label>
+                        <input type="number" id="materiaCount" value="20" min="1" max="100">
+                    </div>
+                    <div class="config-item">
+                        <label>Độ trễ giữa request (ms):</label>
+                        <input type="number" id="delayMs" value="100" min="0" max="5000">
+                    </div>
+                    <div class="config-item">
+                        <label>Số lượng tối đa:</label>
+                        <input type="number" id="maxQty" value="20" min="1" max="100">
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Buttons -->
+            <div class="button-group">
+                <button class="btn-primary" onclick="startTest()" id="startBtn">▶️ Bắt Đầu Test</button>
+                <button class="btn-secondary" onclick="clearLog()" id="clearBtn">🗑️ Xóa Log</button>
+                <button class="btn-secondary" onclick="downloadLog()" id="downloadBtn">⬇️ Tải Log</button>
+            </div>
+            
+            <!-- Progress -->
+            <div class="progress-section" id="progressSection" style="display: none;">
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progressFill">0%</div>
+                </div>
+                <div class="progress-text">
+                    <span class="spinner"></span>
+                    Đang xử lý: <span id="progressText">0/0</span>
+                </div>
+            </div>
+            
+            <!-- Stats -->
+            <div class="stats" id="statsSection" style="display: none;">
+                <div class="stat-card">
+                    <div class="label">Thành Công</div>
+                    <div class="value" id="statsSuccess">0</div>
+                </div>
+                <div class="stat-card">
+                    <div class="label">Lỗi</div>
+                    <div class="value" id="statsError">0</div>
+                </div>
+                <div class="stat-card">
+                    <div class="label">Tổng Cộng</div>
+                    <div class="value" id="statsTotal">0</div>
+                </div>
+                <div class="stat-card">
+                    <div class="label">Thời Gian</div>
+                    <div class="value" id="statsTime">0s</div>
+                </div>
+            </div>
+            
+            <!-- Log -->
+            <div class="log scrollable" id="log"></div>
+        </div>
+    </div>
+
+    <script>
+        let testRunning = false;
+        let stats = { success: 0, error: 0, total: 0, startTime: 0 };
+
+        function log(msg, type = 'info') {
+            const logEl = document.getElementById('log');
+            const line = document.createElement('div');
+            line.className = `log-line ${type}`;
+            line.textContent = msg;
+            logEl.appendChild(line);
+            logEl.scrollTop = logEl.scrollHeight;
+        }
+
+        function clearLog() {
+            document.getElementById('log').innerHTML = '';
+            stats = { success: 0, error: 0, total: 0, startTime: 0 };
+            document.getElementById('statsSection').style.display = 'none';
+        }
+
+        function downloadLog() {
+            const content = Array.from(document.querySelectorAll('.log-line'))
+                .map(el => el.textContent)
+                .join('\n');
+            const blob = new Blob([content], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `test-log-${new Date().toISOString().slice(0, 10)}.txt`;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        function updateProgress(current, total) {
+            const percent = total > 0 ? Math.round((current / total) * 100) : 0;
+            document.getElementById('progressFill').style.width = percent + '%';
+            document.getElementById('progressFill').textContent = percent + '%';
+            document.getElementById('progressText').textContent = `${current}/${total}`;
+        }
+
+        function updateStats() {
+            document.getElementById('statsSuccess').textContent = stats.success;
+            document.getElementById('statsError').textContent = stats.error;
+            document.getElementById('statsTotal').textContent = stats.success + stats.error;
+            if (stats.startTime) {
+                const seconds = ((Date.now() - stats.startTime) / 1000).toFixed(1);
+                document.getElementById('statsTime').textContent = seconds + 's';
+            }
+        }
+
+        async function delay(ms) {
+            return new Promise(resolve => setTimeout(resolve, ms));
+        }
+
+        async function apiCall(endpoint, method = 'GET', body = null) {
+            try {
+                const options = {
+                    method,
+                    headers: { 'Content-Type': 'application/json' }
+                };
+                if (body) options.body = JSON.stringify(body);
+
+                const response = await fetch(endpoint, options);
+                if (!response.ok) {
+                    const data = await response.json();
+                    throw new Error(data.error || `HTTP ${response.status}`);
+                }
+                return await response.json();
+            } catch (err) {
+                throw err;
+            }
+        }
+
+        function getRandomItems(arr, count) {
+            const shuffled = [...arr].sort(() => 0.5 - Math.random());
+            return shuffled.slice(0, Math.min(count, arr.length));
+        }
+
+        function getRandomQty() {
+            const max = parseInt(document.getElementById('maxQty').value) || 20;
+            return Math.floor(Math.random() * max) + 1;
+        }
+
+        async function startTest() {
+            if (testRunning) return;
+            testRunning = true;
+
+            document.getElementById('startBtn').disabled = true;
+            document.getElementById('progressSection').style.display = 'block';
+            document.getElementById('statsSection').style.display = 'grid';
+            clearLog();
+
+            const materiaCount = parseInt(document.getElementById('materiaCount').value) || 20;
+            const delayMs = parseInt(document.getElementById('delayMs').value) || 100;
+
+            log('🧪 Bắt đầu test...', 'info');
+            log(`📋 Cấu hình: ${materiaCount} vật tư, độ trễ ${delayMs}ms`, 'info');
+
+            try {
+                // Fetch data
+                log('📡 Đang tải dữ liệu...', 'info');
+                const [teachers, materials, allSemesters, assignments] = await Promise.all([
+                    apiCall('/api/giao-vien'),
+                    apiCall('/api/vat-tu'),
+                    apiCall('/api/ki-hoc'),
+                    apiCall('/api/phan-cong')
+                ]);
+
+                if (!teachers.length) throw new Error('Không có giáo viên');
+                if (!materials.length) throw new Error('Không có vật tư');
+                if (!allSemesters.length) throw new Error('Không có kỳ học');
+                if (!assignments.length) throw new Error('Không có phân công');
+
+                // Filter only active semesters
+                const semesters = allSemesters.filter(s => s.trang_thai === 'hoat_dong');
+                const activeKiIds = new Set(semesters.map(s => s.id));
+                const activeAssignments = assignments.filter(a => activeKiIds.has(a.ki_id));
+
+                if (!semesters.length) throw new Error('Không có kỳ học nào đang mở');
+                if (!activeAssignments.length) throw new Error('Không có phân công cho kỳ học đang mở');
+
+                log(`✅ Giáo viên: ${teachers.length}`, 'success');
+                log(`✅ Vật tư: ${materials.length}`, 'success');
+                log(`✅ Kỳ học đang mở: ${semesters.length}/${allSemesters.length}`, 'success');
+                log(`✅ Phân công (kỳ đang mở): ${activeAssignments.length}/${assignments.length}`, 'success');
+
+                // Group assignments
+                const proposalMap = new Map();
+                activeAssignments.forEach(pc => {
+                    const key = `${pc.giao_vien_id}_${pc.ki_id}`;
+                    if (!proposalMap.has(key)) {
+                        proposalMap.set(key, {
+                            giao_vien_id: pc.giao_vien_id,
+                            ki_id: pc.ki_id,
+                            subjects: []
+                        });
+                    }
+                    const existing = proposalMap.get(key);
+                    if (!existing.subjects.find(s => s.mon_hoc_id === pc.mon_hoc_id && s.lop_id === pc.lop_id)) {
+                        existing.subjects.push({ mon_hoc_id: pc.mon_hoc_id, lop_id: pc.lop_id });
+                    }
+                });
+
+                log(`\n📋 Sẽ tạo ${proposalMap.size} đề xuất\n`, 'info');
+
+                stats.startTime = Date.now();
+                stats.total = proposalMap.size;
+                let requestNum = 0;
+
+                // Create proposals
+                for (const [key, proposal] of proposalMap.entries()) {
+                    if (!testRunning) break;
+
+                    requestNum++;
+                    const gvName = teachers.find(t => t.id === proposal.giao_vien_id)?.ho_ten || `Teacher${proposal.giao_vien_id}`;
+
+                    // Create chi_tiet
+                    const chi_tiet = [];
+                    const randomMaterials = getRandomItems(materials, materiaCount);
+
+                    for (const subject of proposal.subjects) {
+                        for (const material of randomMaterials) {
+                            chi_tiet.push({
+                                mon_hoc_id: subject.mon_hoc_id,
+                                lop_id: subject.lop_id,
+                                vat_tu_id: material.id,
+                                so_luong: getRandomQty()
+                            });
+                        }
+                    }
+
+                    if (chi_tiet.length === 0) continue;
+
+                    try {
+                        // Create proposal
+                        const result = await apiCall('/api/de-xuat', 'POST', {
+                            giao_vien_id: proposal.giao_vien_id,
+                            ki_id: proposal.ki_id,
+                            chi_tiet
+                        });
+
+                        log(`[${requestNum}] ✅ ${gvName} - ID ${result.id}`, 'success');
+                        stats.success++;
+                    } catch (err) {
+                        log(`[${requestNum}] ❌ ${gvName} - ${err.message}`, 'error');
+                        stats.error++;
+                    }
+
+                    updateProgress(requestNum, proposalMap.size);
+                    updateStats();
+
+                    if (requestNum < proposalMap.size) {
+                        await delay(delayMs);
+                    }
+                }
+
+                log('\n' + '='.repeat(50), 'info');
+                log('📊 KẾT QUẢ TEST', 'info');
+                log('='.repeat(50), 'info');
+                log(`✅ Thành công: ${stats.success}`, 'success');
+                log(`❌ Lỗi: ${stats.error}`, 'error');
+                log(`📈 Tổng cộng: ${stats.success + stats.error}`, 'info');
+                const totalTime = ((Date.now() - stats.startTime) / 1000).toFixed(1);
+                log(`⏱️  Tổng thời gian: ${totalTime}s`, 'info');
+                log('='.repeat(50), 'info');
+
+                if (stats.error === 0) {
+                    log('\n✨ Tất cả test đều thành công!', 'success');
+                } else {
+                    log(`\n⚠️  ${stats.error} đề xuất thất bại`, 'warn');
+                }
+
+            } catch (err) {
+                log(`\n❌ Lỗi: ${err.message}`, 'error');
+            }
+
+            testRunning = false;
+            document.getElementById('startBtn').disabled = false;
+            document.getElementById('progressSection').style.display = 'none';
+            updateStats();
+        }
+    </script>
+</body>
+</html>

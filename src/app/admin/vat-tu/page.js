@@ -18,7 +18,8 @@ export default function VatTuPage() {
     const [selectedVatTu, setSelectedVatTu] = useState(new Set());
     const [selectedKi, setSelectedKi] = useState('');
     const [importText, setImportText] = useState('');
-    const [importStockForm, setImportStockForm] = useState({ id: null, ten_vat_tu: '', yeu_cau_ky_thuat: '', don_vi_tinh: '', so_luong_hien_tai: 0, so_luong_nhap: 0 });
+    const [importNganhId, setImportNganhId] = useState('');
+    const [importStockForm, setImportStockForm] = useState({ id: null, ten_vat_tu: '', yeu_cau_ky_thuat: '', don_vi_tinh: '', so_luong_hien_tai: 0, so_luong_nhap: 0, dang_de_xuat: 0, nganh_id: null, ki_id: null });
     const addToast = useToast();
 
     const fetchData = async () => {
@@ -68,7 +69,10 @@ export default function VatTuPage() {
             yeu_cau_ky_thuat: item.yeu_cau_ky_thuat,
             don_vi_tinh: item.don_vi_tinh,
             so_luong_hien_tai: item.so_luong_kho,
-            so_luong_nhap: ''
+            so_luong_nhap: '',
+            dang_de_xuat: item.dang_de_xuat || 0,
+            nganh_id: item.nganh_id || null,
+            ki_id: item.ki_id
         });
         setShowImportStockModal(true);
     };
@@ -77,11 +81,13 @@ export default function VatTuPage() {
         e.preventDefault();
         const method = editing ? 'PUT' : 'POST';
         const body = editing ? { ...form, id: editing.id } : form;
+        const currentTab = activeTab; // Lưu lại tab hiện tại
         const res = await fetch('/api/vat-tu', { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
         if (res.ok) {
             addToast(editing ? 'Cập nhật thành công' : 'Thêm vật tư thành công');
             setShowModal(false);
-            fetchVatTu();
+            await fetchVatTu();
+            setActiveTab(currentTab); // Restore tab về lựa chọn trước đó
         }
     };
 
@@ -99,14 +105,18 @@ export default function VatTuPage() {
             ten_vat_tu: importStockForm.ten_vat_tu,
             yeu_cau_ky_thuat: importStockForm.yeu_cau_ky_thuat,
             don_vi_tinh: importStockForm.don_vi_tinh,
-            so_luong_kho: newStock
+            so_luong_kho: newStock,
+            nganh_id: importStockForm.nganh_id,
+            ki_id: importStockForm.ki_id
         };
 
+        const currentTab = activeTab; // Lưu lại tab hiện tại
         const res = await fetch('/api/vat-tu', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
         if (res.ok) {
             addToast(`Đã nhập thêm ${amountToAdd} ${importStockForm.don_vi_tinh}`);
             setShowImportStockModal(false);
-            fetchVatTu();
+            await fetchVatTu();
+            setActiveTab(currentTab); // Restore tab về lựa chọn trước đó
         } else {
             addToast("Có lỗi xảy ra khi nhập kho", "error");
         }
@@ -114,17 +124,21 @@ export default function VatTuPage() {
 
     const handleDelete = async (id) => {
         if (!confirm('Xóa vật tư này?')) return;
+        const currentTab = activeTab;
         await fetch(`/api/vat-tu?id=${id}`, { method: 'DELETE' });
         addToast('Xóa thành công');
-        fetchVatTu();
+        await fetchVatTu();
+        setActiveTab(currentTab);
     };
 
     const deleteSelectedVatTu = async () => {
         if (!confirm(`Xóa ${selectedVatTu.size} vật tư đã chọn?`)) return;
+        const currentTab = activeTab;
         await Promise.all([...selectedVatTu].map(id => fetch(`/api/vat-tu?id=${id}`, { method: 'DELETE' })));
         addToast(`Đã xóa ${selectedVatTu.size} vật tư`);
         setSelectedVatTu(new Set());
-        fetchVatTu();
+        await fetchVatTu();
+        setActiveTab(currentTab);
     };
 
     const handleImport = async () => {
@@ -137,11 +151,13 @@ export default function VatTuPage() {
                 don_vi_tinh: parts[2]?.trim() || '',
                 so_luong_kho: parseInt(parts[3]?.trim()) || 0,
                 ki_id: selectedKi,
+                nganh_id: importNganhId || null,
             };
         }).filter(item => item.ten_vat_tu);
 
         if (items.length === 0) { addToast('Không có dữ liệu hợp lệ', 'error'); return; }
 
+        const currentTab = activeTab; // Lưu lại tab hiện tại
         const res = await fetch('/api/vat-tu', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -151,7 +167,9 @@ export default function VatTuPage() {
             addToast(`Import ${items.length} vật tư thành công`);
             setShowImport(false);
             setImportText('');
-            fetchVatTu();
+            setImportNganhId('');
+            await fetchVatTu();
+            setActiveTab(currentTab); // Restore tab về lựa chọn trước đó
         }
     };
 
@@ -188,7 +206,7 @@ export default function VatTuPage() {
                         <option value="">Chọn kỳ</option>
                         {kiHocs.map(k => <option key={k.id} value={k.id}>{k.ten_ki} - {k.nam_hoc}</option>)}
                     </select>
-                    <button className="btn btn-secondary" onClick={() => setShowImport(true)}>
+                    <button className="btn btn-secondary" onClick={() => { setShowImport(true); setImportNganhId(activeTab !== 'all' && activeTab !== 'chung' ? activeTab : ''); }}>
                         <Upload size={18} /> Import Excel
                     </button>
                     <button className="btn btn-primary" onClick={() => openModal()}>
@@ -395,6 +413,26 @@ export default function VatTuPage() {
                                     </div>
                                 </div>
 
+                                {importStockForm.dang_de_xuat > 0 && (
+                                    <div style={{ background: 'rgba(248, 113, 113, 0.1)', padding: 12, borderRadius: 'var(--radius-md)', marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center', border: '1px solid rgba(248, 113, 113, 0.2)' }}>
+                                        <div>
+                                            <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 4 }}>Số lượng đang được đề xuất</p>
+                                            <p style={{ fontSize: 18, fontWeight: 700, color: '#f87171' }}>
+                                                {importStockForm.dang_de_xuat} {importStockForm.don_vi_tinh}
+                                            </p>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            className="btn btn-primary"
+                                            onClick={() => setImportStockForm({ ...importStockForm, so_luong_nhap: importStockForm.dang_de_xuat })}
+                                            style={{ padding: '8px 14px', fontSize: 13, whiteSpace: 'nowrap' }}
+                                        >
+                                            <PackagePlus size={14} style={{ marginRight: 6 }} />
+                                            Nhập theo đề xuất
+                                        </button>
+                                    </div>
+                                )}
+
                                 <div className="form-group">
                                     <label className="form-label">Nhập thêm bao nhiêu hàng mới mua về? *</label>
                                     <div style={{ position: 'relative' }}>
@@ -433,6 +471,13 @@ export default function VatTuPage() {
                             <button className="btn-ghost" onClick={() => setShowImport(false)}>✕</button>
                         </div>
                         <div className="modal-body">
+                            <div className="form-group mb-4">
+                                <label className="form-label">Chọn ngành chèn vật tư vào</label>
+                                <select className="form-select" value={importNganhId} onChange={e => setImportNganhId(e.target.value)}>
+                                    <option value="">-- Dùng chung (Tất cả ngành) --</option>
+                                    {nganhs.map(n => <option key={n.id} value={n.id}>{n.ten_nganh}</option>)}
+                                </select>
+                            </div>
                             <div className="alert alert-info mb-4">
                                 Nhập mỗi vật tư trên 1 dòng. Định dạng: <strong>Tên vật tư, Yêu cầu KT, Đơn vị tính, Tồn kho</strong>
                                 <br />Có thể copy trực tiếp từ Excel (phân tách bằng tab)

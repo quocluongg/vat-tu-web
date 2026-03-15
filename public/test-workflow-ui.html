@@ -1,0 +1,674 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Quy Trình Vật Tư - Full Workflow</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, sans-serif;
+            background: #1a1a2e;
+            color: #e0e0e0;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            padding: 30px;
+            border-radius: 8px;
+            margin-bottom: 30px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+        }
+
+        .header h1 {
+            font-size: 28px;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            opacity: 0.9;
+            font-size: 14px;
+        }
+
+        .main-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .section {
+            background: #2d2d44;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+        }
+
+        .section h2 {
+            color: #667eea;
+            margin-bottom: 15px;
+            font-size: 18px;
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 10px;
+        }
+
+        .buttons-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        button {
+            padding: 10px 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 600;
+            transition: all 0.3s;
+            text-transform: uppercase;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3);
+        }
+
+        .btn-secondary {
+            background: #555;
+            color: white;
+        }
+
+        .btn-secondary:hover:not(:disabled) {
+            background: #666;
+        }
+
+        .btn-success {
+            background: #4caf50;
+            color: white;
+        }
+
+        .btn-success:hover:not(:disabled) {
+            background: #45a049;
+        }
+
+        .btn-danger {
+            background: #f44336;
+            color: white;
+        }
+
+        .btn-danger:hover:not(:disabled) {
+            background: #da190b;
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .controls {
+            margin-bottom: 15px;
+        }
+
+        .control-group {
+            margin-bottom: 15px;
+        }
+
+        .control-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-size: 13px;
+            color: #999;
+            text-transform: uppercase;
+        }
+
+        .control-group input, .control-group select {
+            width: 100%;
+            padding: 8px;
+            background: #1a1a2e;
+            border: 1px solid #555;
+            border-radius: 4px;
+            color: #e0e0e0;
+            font-size: 13px;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .stat-box {
+            background: #1a1a2e;
+            padding: 15px;
+            border-radius: 4px;
+            border-left: 4px solid #667eea;
+            text-align: center;
+        }
+
+        .stat-box .value {
+            font-size: 24px;
+            font-weight: 700;
+            color: #667eea;
+            margin-bottom: 5px;
+        }
+
+        .stat-box .label {
+            font-size: 12px;
+            color: #999;
+            text-transform: uppercase;
+        }
+
+        .log-container {
+            background: #0a0a0a;
+            border: 1px solid #444;
+            border-radius: 4px;
+            padding: 12px;
+            max-height: 500px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            line-height: 1.5;
+        }
+
+        .log-entry {
+            margin-bottom: 4px;
+            padding: 4px 0;
+            display: flex;
+            gap: 8px;
+        }
+
+        .log-time {
+            color: #666;
+            min-width: 120px;
+            white-space: nowrap;
+        }
+
+        .log-icon {
+            min-width: 20px;
+            text-align: center;
+        }
+
+        .log-message {
+            flex: 1;
+            word-break: break-word;
+        }
+
+        .log-success { color: #4caf50; }
+        .log-error { color: #f44336; }
+        .log-warn { color: #ff9800; }
+        .log-info { color: #2196f3; }
+        .log-step { color: #00bcd4; }
+
+        .progress-bar {
+            background: #1a1a2e;
+            border-radius: 4px;
+            height: 24px;
+            overflow: hidden;
+            margin-bottom: 10px;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea, #764ba2);
+            transition: width 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: 600;
+            color: white;
+        }
+
+        .full-width {
+            grid-column: 1 / -1;
+        }
+
+        @media (max-width: 1024px) {
+            .main-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚀 Test Toàn Bộ Quy Trình Vật Tư</h1>
+            <p>Test: Đề xuất → Mua sắm → Cập nhật kho → Phiếu xuất</p>
+        </div>
+
+        <div class="main-grid">
+            <!-- CONTROL PANEL -->
+            <div class="section">
+                <h2>⚙️ Điều Khiển</h2>
+                
+                <div class="controls">
+                    <div class="control-group">
+                        <label>API URL</label>
+                        <input type="text" id="apiUrl" value="http://localhost:3001" />
+                    </div>
+
+                    <div class="control-group">
+                        <label>Số lượng GV test</label>
+                        <input type="number" id="numTeachers" value="3" min="1" max="10" />
+                    </div>
+
+                    <div class="control-group">
+                        <label>Vật tư mỗi ngành</label>
+                        <input type="number" id="vatTuPerNganh" value="50" min="10" max="100" />
+                    </div>
+                </div>
+
+                <div class="buttons-grid">
+                    <button class="btn-success" onclick="testFullWorkflow()">
+                        ▶️ Chạy Toàn Bộ
+                    </button>
+                    <button class="btn-primary" onclick="testStep(1)">
+                        Step 1: Dữ liệu
+                    </button>
+                    <button class="btn-primary" onclick="testStep(2)">
+                        Step 2: Vật tư
+                    </button>
+                    <button class="btn-primary" onclick="testStep(3)">
+                        Step 3: Đề xuất
+                    </button>
+                    <button class="btn-primary" onclick="testStep(4)">
+                        Step 4: Mua sắm
+                    </button>
+                    <button class="btn-primary" onclick="testStep(5)">
+                        Step 5: Kho
+                    </button>
+                    <button class="btn-primary" onclick="testStep(6)">
+                        Step 6: Phiếu xuất
+                    </button>
+                    <button class="btn-danger" onclick="clearLog()">
+                        🗑️ Xóa Log
+                    </button>
+                </div>
+
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progressBar" style="width: 0%">0%</div>
+                </div>
+
+                <div id="status" style="font-size: 13px; color: #999; text-align: center;">
+                    Sẵn sàng
+                </div>
+            </div>
+
+            <!-- STATISTICS -->
+            <div class="section">
+                <h2>📊 Thống Kê</h2>
+                <div class="stats-grid">
+                    <div class="stat-box">
+                        <div class="value" id="stat-nganhs">0</div>
+                        <div class="label">Ngành</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="value" id="stat-moHocs">0</div>
+                        <div class="label">Môn</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="value" id="stat-giaViens">0</div>
+                        <div class="label">GV</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="value" id="stat-lops">0</div>
+                        <div class="label">Lớp</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="value" id="stat-vatTus">0</div>
+                        <div class="label">Vật tư</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="value" id="stat-phanCongs">0</div>
+                        <div class="label">Phân công</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="value" id="stat-deXuats">0</div>
+                        <div class="label">Đề xuất</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="value" id="stat-muaSams">0</div>
+                        <div class="label">Mua sắm</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="value" id="stat-phieuXuats">0</div>
+                        <div class="label">Phiếu xuất</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="value" id="stat-errors">0</div>
+                        <div class="label">Lỗi</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- LOG SECTION -->
+        <div class="section full-width">
+            <h2>📋 Log Chi Tiết</h2>
+            <div class="log-container" id="logContainer"></div>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = () => document.getElementById('apiUrl').value;
+        let stats = {
+            nganhs: 0, moHocs: 0, giaViens: 0, lops: 0, vatTus: 0,
+            phanCongs: 0, deXuats: 0, deXuatChiTiets: 0, muaSams: 0, phieuXuats: 0, errors: 0
+        };
+        let testData = { nganhs: [], moHocs: [], giaViens: [], lops: [], vatTus: [], deXuatIds: [] };
+
+        function addLog(msg, type = 'info', icon = '•') {
+            const time = new Date().toLocaleTimeString('vi-VN');
+            const logContainer = document.getElementById('logContainer');
+            const entry = document.createElement('div');
+            entry.className = `log-entry log-${type}`;
+            entry.innerHTML = `
+                <span class="log-time">[${time}]</span>
+                <span class="log-icon">${icon}</span>
+                <span class="log-message">${msg}</span>
+            `;
+            logContainer.appendChild(entry);
+            logContainer.scrollTop = logContainer.scrollHeight;
+        }
+
+        function updateProgress(percent, status) {
+            document.getElementById('progressBar').style.width = percent + '%';
+            document.getElementById('progressBar').textContent = percent + '%';
+            document.getElementById('status').textContent = status;
+        }
+
+        function updateStats() {
+            Object.keys(stats).forEach(key => {
+                const elem = document.getElementById(`stat-${key}`);
+                if (elem) elem.textContent = stats[key];
+            });
+        }
+
+        function clearLog() {
+            document.getElementById('logContainer').innerHTML = '';
+            stats = { nganhs: 0, moHocs: 0, giaViens: 0, lops: 0, vatTus: 0, phanCongs: 0, deXuats: 0, deXuatChiTiets: 0, muaSams: 0, phieuXuats: 0, errors: 0 };
+            testData = { nganhs: [], moHocs: [], giaViens: [], lops: [], vatTus: [], deXuatIds: [] };
+            updateStats();
+            updateProgress(0, 'Cleared');
+            addLog('Log đã được xóa', 'warn', '🗑️');
+        }
+
+        async function api(method, endpoint, body = null) {
+            try {
+                const options = { method, headers: { 'Content-Type': 'application/json' } };
+                if (body) options.body = JSON.stringify(body);
+                const res = await fetch(`${API_URL()}${endpoint}`, options);
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+                return data;
+            } catch (e) {
+                throw e;
+            }
+        }
+
+        async function testStep(step) {
+            const buttons = document.querySelectorAll('button');
+            buttons.forEach(b => b.disabled = true);
+
+            try {
+                switch(step) {
+                    case 1: await createBasicData(); break;
+                    case 2: await createVatTu(); break;
+                    case 3: await createDeXuat(); break;
+                    case 4: await createMuaSam(); break;
+                    case 5: await updateWarehouse(); break;
+                    case 6: await createPhieuXuat(); break;
+                }
+            } catch (e) {
+                addLog(`Lỗi: ${e.message}`, 'error', '❌');
+            }
+
+            buttons.forEach(b => b.disabled = false);
+        }
+
+        async function testFullWorkflow() {
+            const buttons = document.querySelectorAll('button');
+            buttons.forEach(b => b.disabled = true);
+            clearLog();
+
+            addLog('🚀 BẮT ĐẦU TEST TOÀN BỘ QUY TRÌNH', 'step', '→');
+
+            try {
+                updateProgress(5, 'Step 1: Tạo dữ liệu cơ bản...');
+                await createBasicData();
+
+                updateProgress(20, 'Step 2: Tạo vật tư...');
+                await createVatTu();
+
+                updateProgress(40, 'Step 3: Tạo đề xuất...');
+                await createDeXuat();
+
+                updateProgress(55, 'Step 4: Tạo mua sắm...');
+                await createMuaSam();
+
+                updateProgress(70, 'Step 5: Cập nhật kho...');
+                await updateWarehouse();
+
+                updateProgress(85, 'Step 6: Tạo phiếu xuất...');
+                await createPhieuXuat();
+
+                updateProgress(100, '✅ Hoàn thành!');
+                addLog('🎉 TEST TOÀN BỘ HOÀN THÀNH!', 'success', '✅');
+            } catch (e) {
+                addLog(`FATAL: ${e.message}`, 'error', '💥');
+            }
+
+            buttons.forEach(b => b.disabled = false);
+            updateStats();
+        }
+
+        async function createBasicData() {
+            addLog('📋 Step 1: Tạo dữ liệu cơ bản', 'step', '→');
+
+            const baseData = {
+                nganhs: [
+                    { ten_nganh: 'Công nghệ thông tin' },
+                    { ten_nganh: 'Kinh tế' },
+                    { ten_nganh: 'Kỹ thuật' },
+                ],
+                moHocs: [
+                    { ten_mon: 'Toán học' },
+                    { ten_mon: 'Vật lý' },
+                    { ten_mon: 'Hóa học' },
+                    { ten_mon: 'Tiếng Anh' },
+                    { ten_mon: 'Lập trình' },
+                ],
+                giaViens: [
+                    { ho_ten: 'Nguyễn Văn A', email: 'nguyenvana@example.com', so_dien_thoai: '0901234567' },
+                    { ho_ten: 'Trần Thị B', email: 'tranthib@example.com', so_dien_thoai: '0901234568' },
+                    { ho_ten: 'Lê Minh C', email: 'leminc@example.com', so_dien_thoai: '0901234569' },
+                ],
+                lops: [
+                    { ten_lop: 'A1', si_so: 30, loai_he: 'C' },
+                    { ten_lop: 'A2', si_so: 32, loai_he: 'C' },
+                    { ten_lop: 'B1', si_so: 28, loai_he: 'T' },
+                ],
+            };
+
+            for (const n of baseData.nganhs) {
+                const result = await api('POST', '/api/nganh', n);
+                testData.nganhs.push(result);
+                stats.nganhs++;
+            }
+            addLog(`✓ Tạo ${stats.nganhs} ngành`, 'success', '✓');
+
+            for (const m of baseData.moHocs) {
+                const result = await api('POST', '/api/mon-hoc', m);
+                testData.moHocs.push(result);
+                stats.moHocs++;
+            }
+            addLog(`✓ Tạo ${stats.moHocs} môn học`, 'success', '✓');
+
+            for (const gv of baseData.giaViens) {
+                const result = await api('POST', '/api/giao-vien', gv);
+                testData.giaViens.push(result);
+                stats.giaViens++;
+            }
+            addLog(`✓ Tạo ${stats.giaViens} giáo viên`, 'success', '✓');
+
+            for (const l of baseData.lops) {
+                const result = await api('POST', '/api/lop', l);
+                testData.lops.push(result);
+                stats.lops++;
+            }
+            addLog(`✓ Tạo ${stats.lops} lớp học`, 'success', '✓');
+
+            const kis = await api('GET', '/api/ki-hoc');
+            testData.currentKi = kis[0];
+            addLog(`✓ Kỳ hiện tại: ${testData.currentKi.ten_ki}`, 'success', '✓');
+        }
+
+        async function createVatTu() {
+            addLog('📦 Step 2: Tạo vật tư', 'step', '→');
+
+            const templates = ['Bút chì', 'Bút bi', 'Giấy A4', 'Binder', 'Đèn LED', 'Pin AA', 'USB', 'HDMI', 'Cam', 'Mic',
+                'Loa', 'Tai nghe', 'Sạc', 'Cáp', 'Ổ cứng', 'RAM', 'Card SD', 'Adapter', 'Router', 'Modem',
+                'Laptop', 'Máy in', 'Scanner', 'Webcam', 'Đèn flash', 'Máy chụp', 'Giá đỡ', 'Bàn phím', 'Chuột', 'Pad',
+                'Quạt', 'Quạt máy', 'Sạc nhanh', 'Pin dự phòng', 'Ổn áp', 'Relay', 'IC chip', 'LED RGB', 'Cảm biến', 'Động cơ'];
+
+            const numVt = parseInt(document.getElementById('vatTuPerNganh').value);
+
+            for (const n of testData.nganhs) {
+                for (let i = 0; i < numVt && i < templates.length; i++) {
+                    const vt = {
+                        ten_vat_tu: `${templates[i]} - ${n.ten_nganh}`,
+                        don_vi_tinh: ['cái', 'hộp', 'bộ'][Math.floor(Math.random() * 3)],
+                        so_luong_kho: Math.floor(Math.random() * 100) + 50,
+                        ki_id: testData.currentKi.id,
+                        nganh_id: n.id,
+                    };
+                    const result = await api('POST', '/api/vat-tu', vt);
+                    testData.vatTus.push(result);
+                    stats.vatTus++;
+                }
+            }
+            addLog(`✓ Tạo ${stats.vatTus} vật tư (${numVt} mỗi ngành)`, 'success', '✓');
+        }
+
+        async function createDeXuat() {
+            addLog('📝 Step 3: Tạo đề xuất', 'step', '→');
+
+            const numTeachers = parseInt(document.getElementById('numTeachers').value);
+            const teachers = testData.giaViens.slice(0, numTeachers);
+
+            for (const gv of teachers) {
+                const chiTiet = [];
+                for (let i = 0; i < 10; i++) {
+                    const vt = testData.vatTus[Math.floor(Math.random() * testData.vatTus.length)];
+                    const mon = testData.moHocs[Math.floor(Math.random() * testData.moHocs.length)];
+                    const lop = testData.lops[Math.floor(Math.random() * testData.lops.length)];
+
+                    chiTiet.push({
+                        mon_hoc_id: mon.id,
+                        lop_id: lop.id,
+                        vat_tu_id: vt.id,
+                        so_luong: Math.floor(Math.random() * 20) + 10,
+                    });
+                    stats.deXuatChiTiets++;
+                }
+
+                const dxResult = await api('POST', '/api/de-xuat', {
+                    giao_vien_id: gv.id,
+                    ki_id: testData.currentKi.id,
+                    chi_tiet: chiTiet,
+                });
+                testData.deXuatIds.push(dxResult.id);
+                stats.deXuats++;
+            }
+            addLog(`✓ Tạo ${stats.deXuats} đề xuất (${stats.deXuatChiTiets} items)`, 'success', '✓');
+        }
+
+        async function createMuaSam() {
+            addLog('🛒 Step 4: Tạo mua sắm', 'step', '→');
+
+            for (const dxId of testData.deXuatIds) {
+                const dx = await api('GET', `/api/de-xuat?id=${dxId}`);
+                const chiTiet = dx.chi_tiet.map(ct => ({
+                    vat_tu_id: ct.vat_tu_id,
+                    so_luong: Math.floor(ct.so_luong * 0.8),
+                })).filter(ct => ct.so_luong > 0);
+
+                if (chiTiet.length > 0) {
+                    await api('POST', '/api/mua-sam', {
+                        giao_vien_id: dx.giao_vien_id,
+                        ki_id: dx.ki_id,
+                        chi_tiet: chiTiet,
+                    });
+                    stats.muaSams++;
+                }
+            }
+            addLog(`✓ Tạo ${stats.muaSams} mua sắm`, 'success', '✓');
+        }
+
+        async function updateWarehouse() {
+            addLog('📦 Step 5: Cập nhật kho', 'step', '→');
+
+            for (const vt of testData.vatTus.slice(0, 30)) {
+                await api('PUT', '/api/vat-tu', {
+                    id: vt.id,
+                    ten_vat_tu: vt.ten_vat_tu,
+                    don_vi_tinh: vt.don_vi_tinh,
+                    so_luong_kho: Math.floor(Math.random() * 100) + 50,
+                });
+            }
+            addLog(`✓ Cập nhật ${Math.min(30, testData.vatTus.length)} vật tư kho`, 'success', '✓');
+        }
+
+        async function createPhieuXuat() {
+            addLog('📤 Step 6: Tạo phiếu xuất', 'step', '→');
+
+            for (const dxId of testData.deXuatIds.slice(0, 2)) {
+                const dx = await api('GET', `/api/de-xuat?id=${dxId}`);
+                const groupedByMon = {};
+                dx.chi_tiet.forEach(ct => {
+                    if (!groupedByMon[ct.mon_hoc_id]) groupedByMon[ct.mon_hoc_id] = [];
+                    groupedByMon[ct.mon_hoc_id].push(ct);
+                });
+
+                for (const [monId, items] of Object.entries(groupedByMon)) {
+                    const chiTiet = items.filter(() => Math.random() > 0.3)
+                        .map(ct => ({ vat_tu_id: ct.vat_tu_id, so_luong: Math.floor(ct.so_luong * 0.7) }))
+                        .filter(ct => ct.so_luong > 0);
+
+                    if (chiTiet.length > 0) {
+                        await api('POST', '/api/phieu-xuat', {
+                            giao_vien_id: dx.giao_vien_id,
+                            ki_id: testData.currentKi.id,
+                            mon_hoc_id: parseInt(monId),
+                            chi_tiet: chiTiet,
+                        });
+                        stats.phieuXuats++;
+                    }
+                }
+            }
+            addLog(`✓ Tạo ${stats.phieuXuats} phiếu xuất`, 'success', '✓');
+        }
+    </script>
+</body>
+</html>

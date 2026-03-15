@@ -1,0 +1,771 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Hệ Thống - Đề Xuất & Mua Sắm</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, sans-serif;
+            background: #1e1e1e;
+            color: #e0e0e0;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: #2d2d2d;
+            border-radius: 8px;
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+            overflow: hidden;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        .header h1 { font-size: 28px; margin-bottom: 8px; }
+        .header p { opacity: 0.9; }
+        .content { padding: 30px; }
+        .section {
+            background: #3d3d3d;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            border-left: 4px solid #667eea;
+        }
+        .section h2 {
+            color: #667eea;
+            font-size: 16px;
+            margin-bottom: 15px;
+            text-transform: uppercase;
+        }
+        .controls {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+        .input-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+        .input-group label {
+            font-size: 12px;
+            color: #999;
+            text-transform: uppercase;
+        }
+        .input-group input, .input-group select {
+            padding: 8px;
+            background: #2d2d2d;
+            border: 1px solid #555;
+            border-radius: 4px;
+            color: #e0e0e0;
+            font-size: 13px;
+        }
+        .buttons {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-bottom: 15px;
+        }
+        button {
+            padding: 10px 20px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            border: none;
+            border-radius: 4px;
+            color: white;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+        button:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3);
+        }
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .btn-secondary {
+            background: #555;
+        }
+        .btn-secondary:hover:not(:disabled) {
+            background: #666;
+        }
+        .log {
+            background: #1e1e1e;
+            border: 1px solid #555;
+            border-radius: 4px;
+            padding: 15px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            max-height: 500px;
+            overflow-y: auto;
+            line-height: 1.6;
+        }
+        .log-line {
+            margin: 3px 0;
+            padding: 2px 0;
+        }
+        .error { color: #ff6b6b; }
+        .success { color: #51cf66; }
+        .info { color: #74c0fc; }
+        .warn { color: #ffd43b; }
+        .progress {
+            background: #555;
+            height: 24px;
+            border-radius: 4px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+        .progress-bar {
+            background: linear-gradient(90deg, #667eea, #764ba2);
+            height: 100%;
+            width: 0%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 11px;
+            font-weight: 600;
+            transition: width 0.3s;
+        }
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 10px;
+            margin: 15px 0;
+        }
+        .stat {
+            background: #2d2d2d;
+            padding: 10px;
+            border-radius: 4px;
+            text-align: center;
+        }
+        .stat .value {
+            font-size: 24px;
+            font-weight: 700;
+            color: #667eea;
+        }
+        .stat .label {
+            font-size: 11px;
+            color: #999;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🧪 Test Hệ Thống Quản Lý Vật Tư</h1>
+            <p>Tạo đề xuất toàn bộ giáo viên + dùng hết vật tư mỗi kỳ, sau đó tạo mua sắm</p>
+        </div>
+
+        <div class="content">
+            <!-- Phần 1: Đề Xuất -->
+            <div class="section">
+                <h2>📝 Bước 1: Tạo Đề Xuất (Dùng Hết Vật Tư Mỗi Kỳ)</h2>
+                <div class="controls">
+                    <div class="input-group">
+                        <label>Vật tư mỗi môn (ngẫu nhiên 5-10)</label>
+                        <select id="materialsPerSubject">
+                            <option value="random">Ngẫu nhiên 5-10</option>
+                            <option value="5">Cố định 5</option>
+                            <option value="10">Cố định 10</option>
+                        </select>
+                    </div>
+                    <div class="input-group">
+                        <label>Độ trễ giữa request (ms)</label>
+                        <input type="number" id="delayProposal" value="100" min="0" max="5000">
+                    </div>
+                </div>
+                <div class="buttons">
+                    <button onclick="runProposals()" id="btnProposals">▶️ Tạo Đề Xuất</button>
+                    <button class="btn-secondary" onclick="clearLog('logProposals')">🗑️ Xóa</button>
+                </div>
+                <div class="progress" id="progressProposals" style="display: none;">
+                    <div class="progress-bar" id="progressProposalsBar">0%</div>
+                </div>
+                <div class="stats" id="statsProposals" style="display: none;">
+                    <div class="stat">
+                        <div class="value" id="statsProposalsSuccess">0</div>
+                        <div class="label">Thành Công</div>
+                    </div>
+                    <div class="stat">
+                        <div class="value" id="statsProposalsError">0</div>
+                        <div class="label">Lỗi</div>
+                    </div>
+                    <div class="stat">
+                        <div class="value" id="statsProposalsTime">0s</div>
+                        <div class="label">Thời Gian</div>
+                    </div>
+                </div>
+                <div class="log" id="logProposals"></div>
+            </div>
+
+            <!-- Phần 2: Mua Sắm -->
+            <div class="section">
+                <h2>🛒 Bước 2: Tạo Mua Sắm</h2>
+                <div class="controls">
+                    <div class="input-group">
+                        <label>Loại Mua Sắm</label>
+                        <select id="purchaseMode">
+                            <option value="full">100% - Toàn bộ vật tư</option>
+                            <option value="half">50% - Một nửa vật tư</option>
+                            <option value="both">Cả 100% và 50%</option>
+                        </select>
+                    </div>
+                    <div class="input-group">
+                        <label>Độ trễ giữa request (ms)</label>
+                        <input type="number" id="delayPurchase" value="30" min="0" max="5000">
+                    </div>
+                </div>
+                <div class="buttons">
+                    <button onclick="runPurchases()" id="btnPurchases">▶️ Tạo Mua Sắm</button>
+                    <button class="btn-secondary" onclick="clearLog('logPurchases')">🗑️ Xóa</button>
+                </div>
+                <div class="progress" id="progressPurchases" style="display: none;">
+                    <div class="progress-bar" id="progressPurchasesBar">0%</div>
+                </div>
+                <div class="stats" id="statsPurchases" style="display: none;">
+                    <div class="stat">
+                        <div class="value" id="statsPurchasesSuccess">0</div>
+                        <div class="label">Thành Công</div>
+                    </div>
+                    <div class="stat">
+                        <div class="value" id="statsPurchasesError">0</div>
+                        <div class="label">Lỗi</div>
+                    </div>
+                    <div class="stat">
+                        <div class="value" id="statsPurchasesTime">0s</div>
+                        <div class="label">Thời Gian</div>
+                    </div>
+                </div>
+                <div class="log" id="logPurchases"></div>
+            </div>
+
+            <!-- Phần 3: Nhập Kho -->
+            <div class="section">
+                <h2>📦 Bước 3: Nhập Kho (Tự Động Từ Đề Xuất)</h2>
+                <div class="controls">
+                    <div class="input-group">
+                        <label>Độ trễ giữa request (ms)</label>
+                        <input type="number" id="delayWarehouse" value="30" min="0" max="5000">
+                    </div>
+                </div>
+                <div class="buttons">
+                    <button onclick="runWarehouse()" id="btnWarehouse">▶️ Nhập Kho</button>
+                    <button class="btn-secondary" onclick="clearLog('logWarehouse')">🗑️ Xóa</button>
+                </div>
+                <div class="progress" id="progressWarehouse" style="display: none;">
+                    <div class="progress-bar" id="progressWarehouseBar">0%</div>
+                </div>
+                <div class="stats" id="statsWarehouse" style="display: none;">
+                    <div class="stat">
+                        <div class="value" id="statsWarehouseSuccess">0</div>
+                        <div class="label">Thành Công</div>
+                    </div>
+                    <div class="stat">
+                        <div class="value" id="statsWarehouseError">0</div>
+                        <div class="label">Lỗi</div>
+                    </div>
+                    <div class="stat">
+                        <div class="value" id="statsWarehouseTime">0s</div>
+                        <div class="label">Thời Gian</div>
+                    </div>
+                </div>
+                <div class="log" id="logWarehouse"></div>
+            </div>
+
+            <!-- Phần 4: Test Toàn Bộ -->
+            <div class="section">
+                <h2>🚀 Bước 4: Chạy Toàn Bộ</h2>
+                <div class="buttons">
+                    <button onclick="runFullTest()" id="btnFull">🚀 Test Toàn Bộ Hệ Thống</button>
+                </div>
+                <div class="log" id="logFull"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = 'http://localhost:3000';
+        let allData = null;
+
+        function log(msg, type, logId) {
+            const el = document.getElementById(logId);
+            const line = document.createElement('div');
+            line.className = `log-line ${type}`;
+            line.textContent = msg;
+            el.appendChild(line);
+            el.scrollTop = el.scrollHeight;
+        }
+
+        function clearLog(logId) {
+            document.getElementById(logId).innerHTML = '';
+        }
+
+        function updateProgress(current, total, barId) {
+            const percent = total > 0 ? Math.round((current / total) * 100) : 0;
+            const bar = document.getElementById(barId);
+            bar.style.width = percent + '%';
+            bar.textContent = percent + '%';
+        }
+
+        async function delay(ms) {
+            return new Promise(r => setTimeout(r, ms));
+        }
+
+        async function fetch_api(url) {
+            const controller = new AbortController();
+            const timeout = setTimeout(() => controller.abort(), 60000);
+            try {
+                const response = await fetch(url, { signal: controller.signal });
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                return await response.json();
+            } finally {
+                clearTimeout(timeout);
+            }
+        }
+
+        async function post_api(url, body) {
+            const controller = new AbortController();
+            const timeout = setTimeout(() => controller.abort(), 120000);
+            try {
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body),
+                    signal: controller.signal
+                });
+                if (!response.ok) {
+                    const err = await response.json();
+                    throw new Error(err.error || `HTTP ${response.status}`);
+                }
+                return await response.json();
+            } finally {
+                clearTimeout(timeout);
+            }
+        }
+
+        async function put_api(url, body) {
+            const controller = new AbortController();
+            const timeout = setTimeout(() => controller.abort(), 120000);
+            try {
+                const response = await fetch(url, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body),
+                    signal: controller.signal
+                });
+                if (!response.ok) {
+                    const err = await response.json();
+                    throw new Error(err.error || `HTTP ${response.status}`);
+                }
+                return await response.json();
+            } finally {
+                clearTimeout(timeout);
+            }
+        }
+
+        async function loadData() {
+            if (allData) return allData;
+            log('📡 Đang tải dữ liệu...', 'info', 'logProposals');
+            
+            try {
+                const [teachers, semesters, phanCong, classes] = await Promise.all([
+                    fetch_api(`${API_URL}/api/giao-vien`),
+                    fetch_api(`${API_URL}/api/ki-hoc`),
+                    fetch_api(`${API_URL}/api/phan-cong`),
+                    fetch_api(`${API_URL}/api/lop`)
+                ]);
+
+                const useSemesters = semesters.length > 0 ? semesters : [];
+                const kiIds = new Set(useSemesters.map(s => s.id));
+                const usePhanCong = phanCong.filter(p => kiIds.has(p.ki_id));
+
+                // Load materials per semester to avoid FK constraint issues
+                const materialsByKi = new Map();
+                for (const ki of useSemesters) {
+                    const materials = await fetch_api(`${API_URL}/api/vat-tu?ki_id=${ki.id}`);
+                    materialsByKi.set(ki.id, materials);
+                }
+
+                allData = { teachers, semesters: useSemesters, phanCong: usePhanCong, classes, materialsByKi };
+                
+                log(`✅ Giáo viên: ${teachers.length}`, 'success', 'logProposals');
+                log(`✅ Kỳ học: ${useSemesters.length}`, 'success', 'logProposals');
+                
+                // Log materials per semester
+                for (const [kiId, materials] of materialsByKi.entries()) {
+                    const kiName = useSemesters.find(k => k.id === kiId)?.ten_ki || `Ki ${kiId}`;
+                    log(`✅ ${kiName}: ${materials.length} vật tư`, 'success', 'logProposals');
+                }
+                
+                log(`✅ Phân công: ${usePhanCong.length}\n`, 'success', 'logProposals');
+                
+                return allData;
+            } catch (err) {
+                log(`❌ Lỗi tải dữ liệu: ${err.message}`, 'error', 'logProposals');
+                throw err;
+            }
+        }
+
+        async function runProposals() {
+            document.getElementById('btnProposals').disabled = true;
+            document.getElementById('progressProposals').style.display = 'block';
+            document.getElementById('statsProposals').style.display = 'grid';
+            clearLog('logProposals');
+
+            const delayMs = parseInt(document.getElementById('delayProposal').value) || 100;
+            const modeSelect = document.getElementById('materialsPerSubject').value;
+            const startTime = Date.now();
+            let successCount = 0, errorCount = 0;
+
+            try {
+                const { teachers, semesters, phanCong, classes, materialsByKi } = await loadData();
+                
+                const classMap = new Map(classes.map(c => [c.id, c]));
+                const proposalMap = new Map();
+
+                // Group by teacher + semester
+                for (const pc of phanCong) {
+                    const key = `${pc.giao_vien_id}_${pc.ki_id}`;
+                    if (!proposalMap.has(key)) {
+                        proposalMap.set(key, {
+                            giao_vien_id: pc.giao_vien_id,
+                            ki_id: pc.ki_id,
+                            subjects: []
+                        });
+                    }
+                    const existing = proposalMap.get(key);
+                    if (!existing.subjects.find(s => s.mon_hoc_id === pc.mon_hoc_id && s.lop_id === pc.lop_id)) {
+                        existing.subjects.push({ mon_hoc_id: pc.mon_hoc_id, lop_id: pc.lop_id });
+                    }
+                }
+
+                log(`📋 Sẽ tạo ${proposalMap.size} đề xuất\n`, 'info', 'logProposals');
+
+                let requestNum = 0;
+
+                for (const [key, proposal] of proposalMap.entries()) {
+                    requestNum++;
+                    const gvName = teachers.find(t => t.id === proposal.giao_vien_id)?.ho_ten || `GV${proposal.giao_vien_id}`;
+
+                    try {
+                        // Get materials for this semester
+                        const kiMaterials = materialsByKi.get(proposal.ki_id) || [];
+                        if (kiMaterials.length === 0) {
+                            log(`[${requestNum}/${proposalMap.size}] ⚠️ ${gvName} - Không có vật tư cho kỳ này`, 'warn', 'logProposals');
+                            continue;
+                        }
+
+                        // Shuffle materials for this semester
+                        const shuffledMaterials = [...kiMaterials].sort(() => Math.random() - 0.5);
+                        
+                        const chi_tiet = [];
+                        let materialIndex = 0;
+
+                        // For each subject
+                        for (const subject of proposal.subjects) {
+                            const classObj = classMap.get(subject.lop_id);
+                            const siSo = classObj?.si_so || 30;
+
+                            // Decide how many materials for this subject
+                            let numMaterials;
+                            if (modeSelect === 'random') {
+                                numMaterials = Math.floor(Math.random() * 6) + 5; // 5-10
+                            } else {
+                                numMaterials = parseInt(modeSelect);
+                            }
+
+                            // Take numMaterials from shuffled pool (with wrap-around)
+                            for (let i = 0; i < numMaterials; i++) {
+                                const material = shuffledMaterials[materialIndex % shuffledMaterials.length];
+                                chi_tiet.push({
+                                    mon_hoc_id: subject.mon_hoc_id,
+                                    lop_id: subject.lop_id,
+                                    vat_tu_id: material.id,
+                                    so_luong: Math.floor(siSo / 5 + Math.random() * siSo / 5)
+                                });
+                                materialIndex++;
+                            }
+                        }
+
+                        if (chi_tiet.length === 0) continue;
+
+                        const result = await post_api(`${API_URL}/api/de-xuat`, {
+                            giao_vien_id: proposal.giao_vien_id,
+                            ki_id: proposal.ki_id,
+                            chi_tiet
+                        });
+
+                        log(`[${requestNum}/${proposalMap.size}] ✅ ${gvName} - ID ${result.id} (${chi_tiet.length} items)`, 'success', 'logProposals');
+                        successCount++;
+                    } catch (err) {
+                        log(`[${requestNum}/${proposalMap.size}] ❌ ${gvName} - ${err.message}`, 'error', 'logProposals');
+                        errorCount++;
+                    }
+
+                    updateProgress(requestNum, proposalMap.size, 'progressProposalsBar');
+                    if (requestNum < proposalMap.size) await delay(delayMs);
+                }
+
+                const totalTime = ((Date.now() - startTime) / 1000).toFixed(1);
+                log(`\n✅ Hoàn thành: ${successCount} thành công, ${errorCount} lỗi (${totalTime}s)`, 'success', 'logProposals');
+
+                document.getElementById('statsProposalsSuccess').textContent = successCount;
+                document.getElementById('statsProposalsError').textContent = errorCount;
+                document.getElementById('statsProposalsTime').textContent = totalTime + 's';
+            } catch (err) {
+                log(`❌ Lỗi: ${err.message}`, 'error', 'logProposals');
+            }
+
+            document.getElementById('btnProposals').disabled = false;
+        }
+
+        async function runPurchases() {
+            document.getElementById('btnPurchases').disabled = true;
+            document.getElementById('progressPurchases').style.display = 'block';
+            document.getElementById('statsPurchases').style.display = 'grid';
+            clearLog('logPurchases');
+
+            const delayMs = parseInt(document.getElementById('delayPurchase').value) || 30;
+            const mode = document.getElementById('purchaseMode').value;
+            const startTime = Date.now();
+            let successCount = 0, errorCount = 0;
+
+            log(`🧪 Bắt đầu tạo mua sắm (${mode === 'both' ? '100% + 50%' : mode === 'full' ? '100%' : '50%'})`, 'info', 'logPurchases');
+
+            try {
+                const { teachers, semesters } = await loadData();
+
+                log(`📡 Đang tìm đề xuất...`, 'info', 'logPurchases');
+                
+                const proposalSet = new Map();
+                let totalProposals = 0;
+
+                for (const ki of semesters) {
+                    for (const gv of teachers) {
+                        try {
+                            const proposals = await fetch_api(`${API_URL}/api/de-xuat?ki_id=${ki.id}&giao_vien_id=${gv.id}`);
+                            if (proposals.length > 0) {
+                                const key = `${ki.id}_${gv.id}`;
+                                proposalSet.set(key, { ki, gv, proposal: proposals[0] });
+                                totalProposals++;
+                            }
+                        } catch (e) {}
+                    }
+                }
+
+                log(`✅ Tìm được ${totalProposals} đề xuất\n`, 'success', 'logPurchases');
+
+                let requestNum = 0;
+                for (const [key, data] of proposalSet.entries()) {
+                    requestNum++;
+                    const gvName = data.gv.ho_ten;
+                    const modes = mode === 'both' ? ['full', 'half'] : [mode];
+
+                    for (const m of modes) {
+                        try {
+                            const detail = await fetch_api(`${API_URL}/api/de-xuat?id=${data.proposal.id}`);
+                            const chi_tiet = m === 'half' 
+                                ? detail.chi_tiet.slice(0, Math.ceil(detail.chi_tiet.length / 2))
+                                : detail.chi_tiet;
+
+                            const muaSamItems = chi_tiet.map(ct => ({
+                                ki_id: data.ki.id,
+                                vat_tu_id: ct.vat_tu_id,
+                                so_luong_de_xuat: ct.so_luong,
+                                so_luong_duyet: Math.floor(ct.so_luong * (0.5 + Math.random() * 0.5)),
+                                don_gia: 0,
+                                trang_thai: 'cho_mua'
+                            }));
+
+                            const result = await post_api(`${API_URL}/api/mua-sam`, muaSamItems);
+                            const label = m === 'half' ? ' (50%)' : ' (100%)';
+                            log(`[${requestNum}/${proposalSet.size}] ✅ ${gvName}${label} - ${chi_tiet.length} items`, 'success', 'logPurchases');
+                            successCount++;
+                        } catch (err) {
+                            const label = m === 'half' ? ' (50%)' : ' (100%)';
+                            log(`[${requestNum}/${proposalSet.size}] ❌ ${gvName}${label} - ${err.message}`, 'error', 'logPurchases');
+                            errorCount++;
+                        }
+                    }
+
+                    updateProgress(requestNum, proposalSet.size, 'progressPurchasesBar');
+                    if (requestNum < proposalSet.size) await delay(delayMs);
+                }
+
+                const totalTime = ((Date.now() - startTime) / 1000).toFixed(1);
+                log(`\n✅ Hoàn thành: ${successCount} thành công, ${errorCount} lỗi (${totalTime}s)`, 'success', 'logPurchases');
+
+                document.getElementById('statsPurchasesSuccess').textContent = successCount;
+                document.getElementById('statsPurchasesError').textContent = errorCount;
+                document.getElementById('statsPurchasesTime').textContent = totalTime + 's';
+            } catch (err) {
+                log(`❌ Lỗi: ${err.message}`, 'error', 'logPurchases');
+            }
+
+            document.getElementById('btnPurchases').disabled = false;
+        }
+
+        async function runWarehouse() {
+            document.getElementById('btnWarehouse').disabled = true;
+            document.getElementById('progressWarehouse').style.display = 'block';
+            document.getElementById('statsWarehouse').style.display = 'grid';
+            clearLog('logWarehouse');
+
+            const delayMs = parseInt(document.getElementById('delayWarehouse').value) || 30;
+            const startTime = Date.now();
+            let successCount = 0, errorCount = 0;
+
+            log(`📦 Bắt đầu nhập kho từ đề xuất...`, 'info', 'logWarehouse');
+
+            try {
+                const { semesters } = await loadData();
+                
+                // Collect all proposed quantities by material (with ki_id info)
+                const warehouseUpdates = new Map(); // vat_tu_id -> {total_qty, ki_id, name}
+
+                log(`🔍 Đang tính toán từ đề xuất...\n`, 'info', 'logWarehouse');
+
+                for (const ki of semesters) {
+                    try {
+                        // Get all proposals for this semester
+                        const proposalsResponse = await fetch_api(`${API_URL}/api/de-xuat?ki_id=${ki.id}`);
+                        const proposals = Array.isArray(proposalsResponse) ? proposalsResponse : [];
+
+                        for (const proposal of proposals) {
+                            // Get full proposal details with chi_tiet
+                            const fullProposal = await fetch_api(`${API_URL}/api/de-xuat?id=${proposal.id}`);
+                            
+                            if (fullProposal.chi_tiet && Array.isArray(fullProposal.chi_tiet)) {
+                                for (const item of fullProposal.chi_tiet) {
+                                    const key = item.vat_tu_id;
+                                    if (!warehouseUpdates.has(key)) {
+                                        warehouseUpdates.set(key, { 
+                                            qty: 0, 
+                                            ki_id: ki.id,
+                                            name: item.ten_vat_tu || `VT${key}`
+                                        });
+                                    }
+                                    const curr = warehouseUpdates.get(key);
+                                    curr.qty += item.so_luong;
+                                }
+                            }
+                        }
+                        
+                        log(`✅ Kỳ ${ki.ten_ki}: Tính từ ${proposals.length} đề xuất`, 'success', 'logWarehouse');
+                    } catch (err) {
+                        log(`⚠️ Kỳ ${ki.ten_ki}: ${err.message}`, 'warn', 'logWarehouse');
+                    }
+                }
+
+                log(`\n📊 Tổng ${warehouseUpdates.size} vật tư cần nhập\n`, 'info', 'logWarehouse');
+
+                // Update warehouse - simple direct SQL update would be best
+                // For now, we'll prepare the data for a batch update
+                let itemIndex = 0;
+                const updateCount = warehouseUpdates.size;
+
+                for (const [vatTuId, data] of warehouseUpdates.entries()) {
+                    itemIndex++;
+                    try {
+                        // Fetch current material info from ki_id
+                        const materials = await fetch_api(`${API_URL}/api/vat-tu?ki_id=${data.ki_id}`);
+                        const vatTu = materials.find(m => m.id === vatTuId);
+
+                        if (!vatTu) {
+                            log(`[${itemIndex}/${updateCount}] ⚠️ ${data.name}: Không tìm thấy trong kho`, 'warn', 'logWarehouse');
+                            continue;
+                        }
+
+                        const currentQty = vatTu.so_luong_kho || 0;
+                        const newQty = currentQty + data.qty;
+
+                        // Update via PUT
+                        await put_api(`${API_URL}/api/vat-tu`, {
+                            id: vatTuId,
+                            ten_vat_tu: vatTu.ten_vat_tu,
+                            yeu_cau_ky_thuat: vatTu.yeu_cau_ky_thuat,
+                            don_vi_tinh: vatTu.don_vi_tinh,
+                            so_luong_kho: newQty,
+                            nganh_id: vatTu.nganh_id || null
+                        });
+
+                        log(`[${itemIndex}/${updateCount}] ✅ ${data.name}: ${currentQty} +${data.qty} = ${newQty}`, 'success', 'logWarehouse');
+                        successCount++;
+                    } catch (err) {
+                        log(`[${itemIndex}/${updateCount}] ❌ VT${vatTuId}: ${err.message}`, 'error', 'logWarehouse');
+                        errorCount++;
+                    }
+
+                    updateProgress(itemIndex, updateCount, 'progressWarehouseBar');
+                    if (itemIndex < updateCount) await delay(delayMs);
+                }
+
+                const totalTime = ((Date.now() - startTime) / 1000).toFixed(1);
+                log(`\n✅ Hoàn thành: ${successCount} thành công, ${errorCount} lỗi (${totalTime}s)`, 'success', 'logWarehouse');
+
+                document.getElementById('statsWarehouseSuccess').textContent = successCount;
+                document.getElementById('statsWarehouseError').textContent = errorCount;
+                document.getElementById('statsWarehouseTime').textContent = totalTime + 's';
+            } catch (err) {
+                log(`❌ Lỗi: ${err.message}`, 'error', 'logWarehouse');
+            }
+
+            document.getElementById('btnWarehouse').disabled = false;
+        }
+
+        async function runFullTest() {
+            clearLog('logFull');
+            log('🚀 Bắt đầu test toàn bộ hệ thống...', 'info', 'logFull');
+            
+            try {
+                log('➡️ Bước 1: Tạo đề xuất...', 'info', 'logFull');
+                await new Promise(resolve => {
+                    const checkInterval = setInterval(() => {
+                        if (document.getElementById('btnProposals').disabled === false) {
+                            clearInterval(checkInterval);
+                            resolve();
+                        }
+                    }, 100);
+                    runProposals();
+                });
+
+                log('\n➡️ Bước 2: Tạo mua sắm...', 'info', 'logFull');
+                await new Promise(resolve => {
+                    const checkInterval = setInterval(() => {
+                        if (document.getElementById('btnPurchases').disabled === false) {
+                            clearInterval(checkInterval);
+                            resolve();
+                        }
+                    }, 100);
+                    runPurchases();
+                });
+
+                log('\n➡️ Bước 3: Nhập kho...', 'info', 'logFull');
+                await new Promise(resolve => {
+                    const checkInterval = setInterval(() => {
+                        if (document.getElementById('btnWarehouse').disabled === false) {
+                            clearInterval(checkInterval);
+                            resolve();
+                        }
+                    }, 100);
+                    runWarehouse();
+                });
+
+                log('\n✅ Test toàn bộ hệ thống hoàn thành!', 'success', 'logFull');
+            } catch (err) {
+                log(`\n❌ Lỗi: ${err.message}`, 'error', 'logFull');
+            }
+        }
+    </script>
+</body>
+</html>

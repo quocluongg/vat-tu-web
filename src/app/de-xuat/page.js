@@ -291,6 +291,7 @@ export default function DeXuatPublicPage() {
         setSubmitting(false);
     };
 
+
     if (submitted) {
         return (
             <div className="public-page">
@@ -304,9 +305,6 @@ export default function DeXuatPublicPage() {
                             Đề xuất dự trù vật tư của bạn đã được gửi đến quản lý kho. Vui lòng chờ duyệt.
                         </p>
                         <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
-                            <button className="btn btn-secondary btn-lg" onClick={() => window.print()}>
-                                <Printer size={20} /> Tải & In phiếu
-                            </button>
                             <button className="btn btn-warning btn-lg" onClick={() => setSubmitted(false)}>
                                 <Edit2 size={20} /> Chỉnh sửa lại
                             </button>
@@ -346,11 +344,6 @@ export default function DeXuatPublicPage() {
                                 {kiInfo?.han_de_xuat && ` • Hạn: ${new Date(kiInfo.han_de_xuat).toLocaleDateString('vi-VN')}`}
                             </p>
                         </div>
-                        {getChiTiet().length > 0 && (
-                            <button className="btn btn-secondary no-print" onClick={() => window.print()}>
-                                <Printer size={18} /> In phiếu
-                            </button>
-                        )}
                     </div>
 
                     {/* Step 1: Select Teacher */}
