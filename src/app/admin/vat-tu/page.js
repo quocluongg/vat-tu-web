@@ -125,17 +125,44 @@ export default function VatTuPage() {
     const handleDelete = async (id) => {
         if (!confirm('Xóa vật tư này?')) return;
         const currentTab = activeTab;
-        await fetch(`/api/vat-tu?id=${id}`, { method: 'DELETE' });
-        addToast('Xóa thành công');
-        await fetchVatTu();
-        setActiveTab(currentTab);
+        const res = await fetch(`/api/vat-tu?id=${id}`, { method: 'DELETE' });
+        const data = await res.json();
+        
+        if (res.ok) {
+            addToast('Xóa thành công');
+            await fetchVatTu();
+            setActiveTab(currentTab);
+        } else {
+            addToast(data.error || 'Có lỗi xảy ra khi xóa', 'error');
+        }
     };
 
     const deleteSelectedVatTu = async () => {
         if (!confirm(`Xóa ${selectedVatTu.size} vật tư đã chọn?`)) return;
         const currentTab = activeTab;
-        await Promise.all([...selectedVatTu].map(id => fetch(`/api/vat-tu?id=${id}`, { method: 'DELETE' })));
-        addToast(`Đã xóa ${selectedVatTu.size} vật tư`);
+        
+        let successCount = 0;
+        let errors = [];
+
+        await Promise.all([...selectedVatTu].map(async (id) => {
+            const res = await fetch(`/api/vat-tu?id=${id}`, { method: 'DELETE' });
+            const data = await res.json();
+            if (res.ok) {
+                successCount++;
+            } else {
+                const vt = list.find(x => x.id === id);
+                errors.push(`${vt?.ten_vat_tu || id}: ${data.error}`);
+            }
+        }));
+
+        if (successCount > 0) {
+            addToast(`Đã xóa ${successCount} vật tư`);
+        }
+        if (errors.length > 0) {
+            addToast(`Không thể xóa ${errors.length} vật tư. Vui lòng kiểm tra lại.`, 'error');
+            console.error('Delete errors:', errors);
+        }
+
         setSelectedVatTu(new Set());
         await fetchVatTu();
         setActiveTab(currentTab);

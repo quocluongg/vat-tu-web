@@ -59,8 +59,8 @@ const SearchableMaterialSelect = ({ vatTus, onSelect }) => {
                     </div>
 
                     <div style={{ padding: '8px 16px', borderBottom: '1px solid var(--border-color)', background: 'rgba(14,165,233,0.03)' }}>
-                        <button 
-                            className="btn btn-ghost btn-sm btn-full" 
+                        <button
+                            className="btn btn-ghost btn-sm btn-full"
                             style={{ justifyContent: 'flex-start', color: 'var(--text-accent)', fontWeight: 600 }}
                             onClick={() => onSelect('NEW_MATERIAL_REQUEST')}
                         >
@@ -303,10 +303,10 @@ export default function DeXuatPublicPage() {
                 const data = await res.json();
                 const newTamId = data.id;
                 const newTamItem = { ...newMaterialData, id: newTamId, is_tam: true };
-                
+
                 setVatTuTams(prev => [...prev, newTamItem]);
                 setQuantity(activePcIdForNewMaterial, `tam_${newTamId}`, 1);
-                
+
                 setShowNewMaterialModal(false);
                 setNewMaterialData({ ten_vat_tu: '', yeu_cau_ky_thuat: '', don_vi_tinh: '' });
             }
@@ -592,30 +592,30 @@ export default function DeXuatPublicPage() {
                                 <div className="modal-body">
                                     <div className="form-group">
                                         <label className="form-label">Tên vật tư <span style={{ color: 'red' }}>*</span></label>
-                                        <input 
-                                            type="text" 
-                                            className="form-input" 
-                                            placeholder="Ví dụ: Cảm biến siêu âm HC-SR04" 
+                                        <input
+                                            type="text"
+                                            className="form-input"
+                                            placeholder="Ví dụ: Cảm biến siêu âm HC-SR04"
                                             value={newMaterialData.ten_vat_tu}
                                             onChange={e => setNewMaterialData(prev => ({ ...prev, ten_vat_tu: e.target.value }))}
                                         />
                                     </div>
                                     <div className="form-group">
                                         <label className="form-label">Yêu cầu kỹ thuật / Mã hiệu / Quy cách</label>
-                                        <input 
-                                            type="text" 
-                                            className="form-input" 
-                                            placeholder="Ví dụ: 5V, dải đo 2cm-400cm" 
+                                        <input
+                                            type="text"
+                                            className="form-input"
+                                            placeholder="Ví dụ: 5V, dải đo 2cm-400cm"
                                             value={newMaterialData.yeu_cau_ky_thuat}
                                             onChange={e => setNewMaterialData(prev => ({ ...prev, yeu_cau_ky_thuat: e.target.value }))}
                                         />
                                     </div>
                                     <div className="form-group">
                                         <label className="form-label">Đơn vị tính <span style={{ color: 'red' }}>*</span></label>
-                                        <input 
-                                            type="text" 
-                                            className="form-input" 
-                                            placeholder="Ví dụ: Cái, Bộ, Mét..." 
+                                        <input
+                                            type="text"
+                                            className="form-input"
+                                            placeholder="Ví dụ: Cái, Bộ, Mét..."
                                             value={newMaterialData.don_vi_tinh}
                                             onChange={e => setNewMaterialData(prev => ({ ...prev, don_vi_tinh: e.target.value }))}
                                         />
@@ -701,7 +701,7 @@ const PrintLayout = ({ kiInfo, selectedGv, giaoViens, phanCongs, vatTus, vatTuTa
                     <div style={{ marginBottom: isCopy ? '40px' : '30px', pageBreakInside: 'avoid' }}>
                         {/* Header Trường */}
                         <div style={{ marginBottom: 15, textAlign: 'center' }}>
-                            <div style={{ fontWeight: 'bold' }}>UBND TỈNH BÌNH DƯƠNG</div>
+                            <div style={{ fontWeight: 'bold' }}>UBND THÀNH PHỐ HỒ CHÍ MINH</div>
                             <div style={{ fontWeight: 'bold' }}>TRƯỜNG CAO ĐẲNG NGHỀ VIỆT NAM – SINGAPORE</div>
                             <div>**********************</div>
                         </div>

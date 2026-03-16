@@ -205,7 +205,7 @@ export default function PhieuXuatPublicPage() {
         const copyHTML = `
             <div style="padding: 10px; margin-bottom: 20px; page-break-inside: avoid;">
                 <div style="text-align: center; margin-bottom: 15px;">
-                    <p style="font-size: 11pt; text-transform: uppercase;">UBND TỈNH BÌNH DƯƠNG</p>
+                    <p style="font-size: 11pt; text-transform: uppercase;">UBND THÀNH PHỐ HỒ CHÍ MINH</p>
                     <p style="font-size: 11pt; font-weight: bold; text-transform: uppercase;">TRƯỜNG CAO ĐẲNG NGHỀ VIỆT NAM – SINGAPORE</p>
                     <p>***************************************</p>
                     <h2 style="font-size: 16pt; font-weight: bold; margin: 15px 0; text-transform: uppercase;">Phiếu xuất vật tư cho đào tạo</h2>
@@ -350,7 +350,7 @@ export default function PhieuXuatPublicPage() {
                 const stats = exportedMap[ct.vat_tu_id] || { da_xuat: 0, total_supply: 0, total_proposed: 0 };
                 const alreadyExported = stats.da_xuat || 0;
                 const proposedQty = ct.so_luong || 0;
-                
+
                 const totalProposed = stats.total_proposed || proposedQty;
                 const supply = stats.total_supply || 0;
                 const ratio = (totalProposed > 0 && supply < totalProposed) ? supply / totalProposed : 1;
@@ -368,7 +368,7 @@ export default function PhieuXuatPublicPage() {
             setError('Không có vật tư nào khả thi để xuất cho lớp này');
             return;
         }
-        
+
         const data = {
             ten_gv: gv.ho_ten,
             ten_mon: cls.ten_mon,
@@ -378,7 +378,7 @@ export default function PhieuXuatPublicPage() {
             id: null,
             ngay_tao: deXuatDetail?.ngay_nop
         };
-        
+
         const html = getPrintHTML(data);
         const printWindow = window.open('', '_blank');
         printWindow.document.write(html);
@@ -567,8 +567,8 @@ export default function PhieuXuatPublicPage() {
                                                                     </div>
                                                                 </div>
                                                                 <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-                                                                    <button 
-                                                                        className="btn-icon" 
+                                                                    <button
+                                                                        className="btn-icon"
                                                                         title="In phiếu đề xuất lớp này"
                                                                         onClick={(e) => { e.stopPropagation(); printClassProposal(cls); }}
                                                                         style={{ width: 28, height: 28 }}
@@ -592,7 +592,7 @@ export default function PhieuXuatPublicPage() {
                                                                             const stats = exportedMap[ct.vat_tu_id] || { da_xuat: 0, total_supply: 0, total_proposed: 0 };
                                                                             const alreadyExported = stats.da_xuat || 0;
                                                                             const remainingQty = Math.max(0, proposedQty - alreadyExported);
-                                                                            
+
                                                                             // Calculate practical limit based on total supply ratio (fixed for the semester)
                                                                             const totalProposed = stats.total_proposed || proposedQty;
                                                                             const supply = stats.total_supply || 0;
