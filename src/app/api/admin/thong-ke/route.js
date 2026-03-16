@@ -41,19 +41,21 @@ export async function GET(request) {
             SELECT 
                 ndt.id as nganh_id,
                 ndt.ten_nganh,
-                vt.id as vat_tu_id,
-                vt.ten_vat_tu,
-                vt.yeu_cau_ky_thuat,
-                vt.don_vi_tinh,
+                COALESCE(vt.id, 'tam_' || vtt.id) as vat_tu_id,
+                COALESCE(vt.ten_vat_tu, vtt.ten_vat_tu) as ten_vat_tu,
+                COALESCE(vt.yeu_cau_ky_thuat, vtt.yeu_cau_ky_thuat) as yeu_cau_ky_thuat,
+                COALESCE(vt.don_vi_tinh, vtt.don_vi_tinh) as don_vi_tinh,
                 SUM(dxct.so_luong) as tong_de_xuat,
-                vt.so_luong_kho
+                vt.so_luong_kho,
+                CASE WHEN dxct.vat_tu_tam_id IS NOT NULL THEN 1 ELSE 0 END as is_tam
             FROM de_xuat_chi_tiet dxct
             JOIN de_xuat dx ON dxct.de_xuat_id = dx.id
-            JOIN vat_tu vt ON dxct.vat_tu_id = vt.id
+            LEFT JOIN vat_tu vt ON dxct.vat_tu_id = vt.id
+            LEFT JOIN vat_tu_tam vtt ON dxct.vat_tu_tam_id = vtt.id
             LEFT JOIN nganh ndt ON vt.nganh_id = ndt.id
             WHERE dx.ki_id = ? AND dx.trang_thai IN ('da_nop', 'duyet', 'dang_lam')
-            GROUP BY ndt.id, vt.id
-            ORDER BY ndt.ten_nganh, vt.ten_vat_tu
+            GROUP BY ndt.id, COALESCE(vt.id, 'tam_' || vtt.id)
+            ORDER BY ndt.ten_nganh, ten_vat_tu
         `;
 
         const materialStatsResult = await db.execute({

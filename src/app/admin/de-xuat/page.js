@@ -5,7 +5,7 @@ import { useToast } from '@/components/Toast';
 import { exportExcelTheoNganh, exportExcelMultiNganh } from '@/lib/exportExcel';
 
 export default function DeXuatAdminPage() {
-    const [activeTab, setActiveTab] = useState('overview'); // overview, materials, list
+    const [activeTab, setActiveTab] = useState('overview'); // overview, materials, list, suggestions
     const [deXuats, setDeXuats] = useState([]);
     const [kiHocs, setKiHocs] = useState([]);
     const [selectedKi, setSelectedKi] = useState('');
@@ -14,6 +14,9 @@ export default function DeXuatAdminPage() {
     const [detailData, setDetailData] = useState(null);
     const [detailViewMode, setDetailViewMode] = useState('material'); // material, subject
     const [stats, setStats] = useState(null);
+    const [vatTuTams, setVatTuTams] = useState([]);
+    const [allVatTus, setAllVatTus] = useState([]);
+    const [approvalModal, setApprovalModal] = useState({ show: false, item: null, type: 'new', mergeWithId: '' });
     const addToast = useToast();
 
     const fetchKiHoc = async () => {
@@ -38,8 +41,27 @@ export default function DeXuatAdminPage() {
         setStats(data);
     };
 
+    const fetchVatTuTam = async () => {
+        if (!selectedKi) return;
+        const res = await fetch(`/api/vat-tu-tam?ki_id=${selectedKi}`);
+        const data = await res.json();
+        setVatTuTams(data);
+    };
+
+    const fetchAllVatTus = async () => {
+        const res = await fetch(`/api/vat-tu?ki_id=${selectedKi}`);
+        const data = await res.json();
+        setAllVatTus(data);
+    };
+
     useEffect(() => { fetchKiHoc(); }, []);
-    useEffect(() => { if (selectedKi) fetchDeXuat(); }, [selectedKi]);
+    useEffect(() => { 
+        if (selectedKi) {
+            fetchDeXuat();
+            fetchVatTuTam();
+            fetchAllVatTus();
+        } 
+    }, [selectedKi]);
 
     const viewDetail = async (dx) => {
         const res = await fetch(`/api/de-xuat?id=${dx.id}`);
@@ -47,6 +69,28 @@ export default function DeXuatAdminPage() {
         setDetailData(data);
         setSelectedDx(dx);
         setDetailViewMode('material');
+    };
+
+    const handleActionVatTuTam = async (action, item, mergeWithId = null) => {
+        try {
+            const res = await fetch(`/api/admin/vat-tu-tam`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action, id: item.id, mergeWithId })
+            });
+            if (res.ok) {
+                addToast(action === 'approve' ? 'Đã thêm vật tư mới vào kho' : 'Đã gộp vật tư', 'success');
+                setApprovalModal({ show: false, item: null, type: 'new', mergeWithId: '' });
+                fetchVatTuTam();
+                fetchAllVatTus();
+                fetchStats();
+            } else {
+                const data = await res.json();
+                addToast(data.error || 'Có lỗi xảy ra', 'error');
+            }
+        } catch (error) {
+            addToast('Lỗi khi xử lý: ' + error.message, 'error');
+        }
     };
 
     const handleExportAllNganh = async () => {
@@ -71,7 +115,6 @@ export default function DeXuatAdminPage() {
         }
     };
 
-
     if (loading) return <div className="loading-overlay"><div className="spinner" /></div>;
 
     const kiNameObj = kiHocs.find(k => k.id.toString() === selectedKi);
@@ -80,7 +123,7 @@ export default function DeXuatAdminPage() {
         if (!detailData || !detailData.chi_tiet) return [];
         const map = {};
         detailData.chi_tiet.forEach(ct => {
-            const key = ct.vat_tu_id;
+            const key = ct.vat_tu_id ? `vt_${ct.vat_tu_id}` : `tam_${ct.vat_tu_tam_id}`;
             if (!map[key]) {
                 map[key] = {
                     ...ct,
@@ -157,6 +200,17 @@ export default function DeXuatAdminPage() {
                 >
                     <List size={18} style={{ display: 'inline', marginRight: 8, verticalAlign: 'text-bottom' }} />
                     Danh sách đề xuất chi tiết
+                </button>
+                <button
+                    className={`tab-item ${activeTab === 'suggestions' ? 'active' : ''}`}
+                    onClick={() => setActiveTab('suggestions')}
+                    style={{ padding: '12px 24px', borderBottom: activeTab === 'suggestions' ? '2px solid var(--text-accent)' : 'none', fontWeight: 600, color: activeTab === 'suggestions' ? 'var(--text-accent)' : 'var(--text-secondary)' }}
+                >
+                    <AlertCircle size={18} style={{ display: 'inline', marginRight: 8, verticalAlign: 'text-bottom' }} />
+                    Vật tư mới chờ duyệt
+                    {vatTuTams.filter(v => v.trang_thai === 'cho_duyet' || !v.trang_thai).length > 0 && (
+                        <span className="badge badge-danger" style={{ marginLeft: 8 }}>{vatTuTams.filter(v => v.trang_thai === 'cho_duyet' || !v.trang_thai).length}</span>
+                    )}
                 </button>
             </div>
 
@@ -324,6 +378,70 @@ export default function DeXuatAdminPage() {
                 </div>
             )}
 
+            {/* Tab 4: Suggested Materials */}
+            {activeTab === 'suggestions' && (
+                <div className="tab-content fade-in">
+                    <div className="table-container">
+                        <table className="data-table">
+                            <thead>
+                                <tr>
+                                    <th>STT</th>
+                                    <th>Giảng viên đề xuất</th>
+                                    <th>Tên vật tư đề xuất</th>
+                                    <th>Quy cách / Kỹ thuật</th>
+                                    <th>ĐVT</th>
+                                    <th>Trạng thái</th>
+                                    <th style={{ textAlign: 'right' }}>Thao tác</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {vatTuTams.map((v, idx) => (
+                                    <tr key={v.id}>
+                                        <td>{idx + 1}</td>
+                                        <td>{v.ten_gv}</td>
+                                        <td style={{ fontWeight: 600 }}>{v.ten_vat_tu}</td>
+                                        <td style={{ fontSize: 13, color: 'var(--text-secondary)' }}>{v.yeu_cau_ky_thuat || '—'}</td>
+                                        <td><span className="badge badge-info">{v.don_vi_tinh}</span></td>
+                                        <td>
+                                            {(!v.trang_thai || v.trang_thai === 'cho_duyet') ? (
+                                                <span className="badge" style={{ background: 'rgba(245,158,11,0.1)', color: '#d97706' }}>Đợi duyệt</span>
+                                            ) : v.trang_thai === 'da_duyet' ? (
+                                                <span className="badge badge-success">Đã duyệt</span>
+                                            ) : (
+                                                <span className="badge badge-danger">Từ chối</span>
+                                            )}
+                                        </td>
+                                        <td style={{ textAlign: 'right' }}>
+                                            {(!v.trang_thai || v.trang_thai === 'cho_duyet') && (
+                                                <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                                                    <button 
+                                                        className="btn btn-sm btn-primary" 
+                                                        onClick={() => setApprovalModal({ show: true, item: v, type: 'new', mergeWithId: '' })}
+                                                    >
+                                                        <Check size={14} /> Duyệt mới
+                                                    </button>
+                                                    <button 
+                                                        className="btn btn-sm btn-secondary"
+                                                        onClick={() => setApprovalModal({ show: true, item: v, type: 'merge', mergeWithId: '' })}
+                                                    >
+                                                        <RefreshCw size={14} /> Gộp vào kho
+                                                    </button>
+                                                </div>
+                                            )}
+                                        </td>
+                                    </tr>
+                                ))}
+                                {vatTuTams.length === 0 && (
+                                    <tr>
+                                        <td colSpan="7" style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)' }}>Chưa có vật tư đề xuất mới nào</td>
+                                    </tr>
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            )}
+
             {/* Detail Modal */}
             {selectedDx && detailData && (
                 <div className="modal-overlay" onClick={() => { setSelectedDx(null); setDetailData(null); }}>
@@ -383,10 +501,13 @@ export default function DeXuatAdminPage() {
                                                 </thead>
                                                 <tbody>
                                                     {getAggregatedMaterials().map((m, i) => (
-                                                        <tr key={m.vat_tu_id} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                                                        <tr key={m.vat_tu_id || `tam_${m.vat_tu_tam_id}`} style={{ borderBottom: '1px solid var(--border-color)' }}>
                                                             <td style={{ padding: '12px 20px', color: 'var(--text-muted)' }}>{i + 1}</td>
                                                             <td style={{ padding: '12px 20px' }}>
-                                                                <div style={{ fontWeight: 600, color: 'var(--text-main)', fontSize: 15 }}>{m.ten_vat_tu}</div>
+                                                                <div style={{ fontWeight: 600, color: 'var(--text-main)', fontSize: 15, display: 'flex', alignItems: 'center', gap: 8 }}>
+                                                                    {m.ten_vat_tu}
+                                                                    {m.vat_tu_tam_id && <span className="badge badge-warning" style={{ fontSize: 10 }}>Mới (Chờ duyệt)</span>}
+                                                                </div>
                                                                 <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 2 }}>{m.yeu_cau_ky_thuat || '—'}</div>
                                                             </td>
                                                             <td style={{ padding: '12px 20px' }}>
@@ -473,6 +594,70 @@ export default function DeXuatAdminPage() {
                         </div>
                         <div className="modal-footer" style={{ padding: '16px 32px', borderTop: '1px solid var(--border-color)', background: 'var(--bg-card)', justifyContent: 'flex-end', borderRadius: '0 0 20px 20px' }}>
                             <button className="btn btn-secondary" style={{ padding: '8px 24px', borderRadius: 10 }} onClick={() => { setSelectedDx(null); setDetailData(null); }}>Đóng</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Approval / Merge Modal */}
+            {approvalModal.show && (
+                <div className="modal-overlay" style={{ zIndex: 1100 }}>
+                    <div className="modal" style={{ maxWidth: 500 }}>
+                        <div className="modal-header">
+                            <h2 style={{ fontSize: 18, fontWeight: 700 }}>
+                                {approvalModal.type === 'new' ? 'Duyệt thêm vật tư mới' : 'Gộp vào vật tư hiện có'}
+                            </h2>
+                            <button className="btn-icon btn-ghost" onClick={() => setApprovalModal({ show: false, item: null, type: 'new', mergeWithId: '' })}>✕</button>
+                        </div>
+                        <div className="modal-body" style={{ padding: 24 }}>
+                            <div className="alert alert-info mb-4" style={{ borderRadius: 12 }}>
+                                <div style={{ fontSize: 12, opacity: 0.8, marginBottom: 4 }}>Vật tư đề xuất bởi {approvalModal.item.ten_gv}:</div>
+                                <div style={{ fontWeight: 700, fontSize: 16, color: 'var(--text-accent)' }}>{approvalModal.item.ten_vat_tu}</div>
+                                <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 4 }}>
+                                    {approvalModal.item.yeu_cau_ky_thuat || '—'} • {approvalModal.item.don_vi_tinh}
+                                </div>
+                            </div>
+
+                            {approvalModal.type === 'merge' && (
+                                <div className="form-group">
+                                    <label className="form-label">Chọn vật tư trong kho để gộp vào:</label>
+                                    <select 
+                                        className="form-select" 
+                                        value={approvalModal.mergeWithId}
+                                        onChange={e => setApprovalModal(prev => ({ ...prev, mergeWithId: e.target.value }))}
+                                        style={{ width: '100%' }}
+                                    >
+                                        <option value="">-- Tìm vật tư trong kho --</option>
+                                        {allVatTus.map(vt => (
+                                            <option key={vt.id} value={vt.id}>
+                                                {vt.ten_vat_tu} ({vt.yeu_cau_ky_thuat || 'N/A'}) - {vt.don_vi_tinh}
+                                            </option>
+                                        ))}
+                                    </select>
+                                    <p style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 12 }}>
+                                        <AlertCircle size={12} style={{ display: 'inline', marginRight: 4 }} />
+                                        Tất cả đề xuất liên quan sẽ được chuyển sang vật tư chính thức này.
+                                    </p>
+                                </div>
+                            )}
+
+                            {approvalModal.type === 'new' && (
+                                <p style={{ fontSize: 14, lineHeight: 1.6 }}>
+                                    Bạn có chắc chắn muốn thêm vật tư này vào danh mục chính thức của học kỳ này không? 
+                                    Sau khi duyệt, giảng viên khác có thể nhìn thấy và chọn vật tư này.
+                                </p>
+                            )}
+                        </div>
+                        <div className="modal-footer" style={{ padding: '16px 24px', background: 'rgba(0,0,0,0.02)' }}>
+                            <button className="btn btn-secondary" onClick={() => setApprovalModal({ show: false, item: null, type: 'new', mergeWithId: '' })}>Hủy</button>
+                            <button 
+                                className="btn btn-primary" 
+                                onClick={() => handleActionVatTuTam(approvalModal.type === 'new' ? 'approve' : 'merge', approvalModal.item, approvalModal.mergeWithId)}
+                                disabled={approvalModal.type === 'merge' && !approvalModal.mergeWithId}
+                                style={{ padding: '8px 24px' }}
+                            >
+                                {approvalModal.type === 'new' ? 'Xác nhận thêm mới' : 'Xác nhận gộp'}
+                            </button>
                         </div>
                     </div>
                 </div>

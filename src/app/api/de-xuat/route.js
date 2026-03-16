@@ -24,7 +24,12 @@ export async function GET(request) {
 
             const chiTietResult = await db.execute({
                 sql: `
-        SELECT dxct.*, vt.ten_vat_tu, vt.yeu_cau_ky_thuat, vt.don_vi_tinh, vt.so_luong_kho,
+        SELECT dxct.*, 
+               COALESCE(vt.ten_vat_tu, vtt.ten_vat_tu) as ten_vat_tu,
+               COALESCE(vt.yeu_cau_ky_thuat, vtt.yeu_cau_ky_thuat) as yeu_cau_ky_thuat,
+               COALESCE(vt.don_vi_tinh, vtt.don_vi_tinh) as don_vi_tinh,
+               COALESCE(vt.so_luong_kho, 0) as so_luong_kho,
+               vtt.id as vat_tu_tam_id,
                m.ten_mon,
                l.ten_lop, l.si_so, l.loai_he,
                CASE l.loai_he
@@ -33,11 +38,12 @@ export async function GET(request) {
                  WHEN 'L' THEN 'Liên thông'
                END as ten_loai_he
         FROM de_xuat_chi_tiet dxct
-        JOIN vat_tu vt ON dxct.vat_tu_id = vt.id
+        LEFT JOIN vat_tu vt ON dxct.vat_tu_id = vt.id
+        LEFT JOIN vat_tu_tam vtt ON dxct.vat_tu_tam_id = vtt.id
         JOIN mon_hoc m ON dxct.mon_hoc_id = m.id
         JOIN lop l ON dxct.lop_id = l.id
         WHERE dxct.de_xuat_id = ?
-        ORDER BY l.ten_lop, m.ten_mon, vt.ten_vat_tu
+        ORDER BY l.ten_lop, m.ten_mon, COALESCE(vt.ten_vat_tu, vtt.ten_vat_tu)
       `,
                 args: [id]
             });
@@ -113,7 +119,7 @@ export async function POST(request) {
             const ct = chi_tiet[i];
 
             // Validate subject/class/material structure
-            if (!ct.mon_hoc_id || !ct.lop_id || !ct.vat_tu_id) {
+            if (!ct.mon_hoc_id || !ct.lop_id || (!ct.vat_tu_id && !ct.vat_tu_tam_id)) {
                 return NextResponse.json({ 
                     error: `Dòng ${i + 1}: Thiếu dữ liệu (môn học, lớp hoặc vật tư)` 
                 }, { status: 400 });
@@ -141,22 +147,40 @@ export async function POST(request) {
                 }, { status: 400 });
             }
 
-            // Validate material exists AND belongs to this semester
-            const vtCheck = await db.execute({
-                sql: 'SELECT ten_vat_tu, ki_id FROM vat_tu WHERE id = ?',
-                args: [ct.vat_tu_id]
-            });
-            if (vtCheck.rows.length === 0) {
-                return NextResponse.json({ 
-                    error: `Dòng ${i + 1}: Vật tư ID ${ct.vat_tu_id} không tồn tại` 
-                }, { status: 400 });
-            }
+            if (ct.vat_tu_id) {
+                // Validate material exists AND belongs to this semester
+                const vtCheck = await db.execute({
+                    sql: 'SELECT ten_vat_tu, ki_id FROM vat_tu WHERE id = ?',
+                    args: [ct.vat_tu_id]
+                });
+                if (vtCheck.rows.length === 0) {
+                    return NextResponse.json({ 
+                        error: `Dòng ${i + 1}: Vật tư ID ${ct.vat_tu_id} không tồn tại` 
+                    }, { status: 400 });
+                }
 
-            // Validate ki_id match
-            if (vtCheck.rows[0].ki_id !== ki_id) {
-                return NextResponse.json({ 
-                    error: `Dòng ${i + 1}: Vật tư "${vtCheck.rows[0].ten_vat_tu}" không thuộc kỳ học này (expected ki_id ${ki_id}, got ${vtCheck.rows[0].ki_id})` 
-                }, { status: 400 });
+                // Validate ki_id match
+                if (vtCheck.rows[0].ki_id !== ki_id) {
+                    return NextResponse.json({ 
+                        error: `Dòng ${i + 1}: Vật tư "${vtCheck.rows[0].ten_vat_tu}" không thuộc kỳ học này` 
+                    }, { status: 400 });
+                }
+            } else if (ct.vat_tu_tam_id) {
+                // Validate suggested material exists
+                const vttCheck = await db.execute({
+                    sql: 'SELECT ten_vat_tu, ki_id FROM vat_tu_tam WHERE id = ?',
+                    args: [ct.vat_tu_tam_id]
+                });
+                if (vttCheck.rows.length === 0) {
+                    return NextResponse.json({ 
+                        error: `Dòng ${i + 1}: Vật tư gợi ý ID ${ct.vat_tu_tam_id} không tồn tại` 
+                    }, { status: 400 });
+                }
+                if (vttCheck.rows[0].ki_id !== ki_id) {
+                    return NextResponse.json({ 
+                        error: `Dòng ${i + 1}: Vật tư "${vttCheck.rows[0].ten_vat_tu}" không thuộc kỳ học này` 
+                    }, { status: 400 });
+                }
             }
 
             // Validate quantity
@@ -191,8 +215,8 @@ export async function POST(request) {
             // Add all chi_tiet records
             for (const ct of chi_tiet) {
                 stmts.push({
-                    sql: 'INSERT INTO de_xuat_chi_tiet (de_xuat_id, mon_hoc_id, lop_id, vat_tu_id, so_luong, ghi_chu) VALUES (?, ?, ?, ?, ?, ?)',
-                    args: [existingId, ct.mon_hoc_id, ct.lop_id, ct.vat_tu_id, ct.so_luong, ct.ghi_chu || null]
+                    sql: 'INSERT INTO de_xuat_chi_tiet (de_xuat_id, mon_hoc_id, lop_id, vat_tu_id, vat_tu_tam_id, so_luong, ghi_chu) VALUES (?, ?, ?, ?, ?, ?, ?)',
+                    args: [existingId, ct.mon_hoc_id, ct.lop_id, ct.vat_tu_id || null, ct.vat_tu_tam_id || null, ct.so_luong, ct.ghi_chu || null]
                 });
             }
 
@@ -251,8 +275,8 @@ export async function POST(request) {
             try {
                 console.log(`  Inserting row ${i + 1}/${chi_tiet.length}: mon_hoc_id=${ct.mon_hoc_id}, lop_id=${ct.lop_id}, vat_tu_id=${ct.vat_tu_id}`);
                 await db.execute({
-                    sql: 'INSERT INTO de_xuat_chi_tiet (de_xuat_id, mon_hoc_id, lop_id, vat_tu_id, so_luong, ghi_chu) VALUES (?, ?, ?, ?, ?, ?)',
-                    args: [deXuatId, ct.mon_hoc_id, ct.lop_id, ct.vat_tu_id, ct.so_luong, ct.ghi_chu || null]
+                    sql: 'INSERT INTO de_xuat_chi_tiet (de_xuat_id, mon_hoc_id, lop_id, vat_tu_id, vat_tu_tam_id, so_luong, ghi_chu) VALUES (?, ?, ?, ?, ?, ?, ?)',
+                    args: [deXuatId, ct.mon_hoc_id, ct.lop_id, ct.vat_tu_id || null, ct.vat_tu_tam_id || null, ct.so_luong, ct.ghi_chu || null]
                 });
             } catch (err) {
                 console.error(`  ❌ Failed on row ${i + 1}:`, err.message);

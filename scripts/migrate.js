@@ -107,18 +107,32 @@ async function migrate() {
       FOREIGN KEY (giao_vien_id) REFERENCES giao_vien(id) ON DELETE CASCADE,
       FOREIGN KEY (ki_id) REFERENCES ki_hoc(id) ON DELETE CASCADE
     )`,
+        `CREATE TABLE IF NOT EXISTS vat_tu_tam (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      ten_vat_tu TEXT NOT NULL,
+      yeu_cau_ky_thuat TEXT,
+      don_vi_tinh TEXT NOT NULL,
+      ki_id INTEGER NOT NULL,
+      giao_vien_id INTEGER NOT NULL,
+      trang_thai TEXT DEFAULT 'cho_duyet' CHECK(trang_thai IN ('cho_duyet', 'da_duyet', 'tu_choi')),
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (ki_id) REFERENCES ki_hoc(id) ON DELETE CASCADE,
+      FOREIGN KEY (giao_vien_id) REFERENCES giao_vien(id) ON DELETE CASCADE
+    )`,
         `CREATE TABLE IF NOT EXISTS de_xuat_chi_tiet (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       de_xuat_id INTEGER NOT NULL,
       mon_hoc_id INTEGER NOT NULL,
       lop_id INTEGER NOT NULL DEFAULT 0,
-      vat_tu_id INTEGER NOT NULL,
+      vat_tu_id INTEGER,
+      vat_tu_tam_id INTEGER,
       so_luong INTEGER NOT NULL DEFAULT 0,
       ghi_chu TEXT,
       FOREIGN KEY (de_xuat_id) REFERENCES de_xuat(id) ON DELETE CASCADE,
       FOREIGN KEY (mon_hoc_id) REFERENCES mon_hoc(id) ON DELETE CASCADE,
       FOREIGN KEY (lop_id) REFERENCES lop(id) ON DELETE CASCADE,
-      FOREIGN KEY (vat_tu_id) REFERENCES vat_tu(id) ON DELETE CASCADE
+      FOREIGN KEY (vat_tu_id) REFERENCES vat_tu(id) ON DELETE SET NULL,
+      FOREIGN KEY (vat_tu_tam_id) REFERENCES vat_tu_tam(id) ON DELETE SET NULL
     )`,
         `CREATE TABLE IF NOT EXISTS mua_sam (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -163,6 +177,59 @@ async function migrate() {
     for (const sql of tableQueries) {
         await db.execute(sql);
     }
+
+    console.log('✅ Đang cập nhật schema bổ sung...');
+    try {
+        await db.execute("ALTER TABLE de_xuat_chi_tiet ADD COLUMN vat_tu_tam_id INTEGER REFERENCES vat_tu_tam(id) ON DELETE SET NULL");
+        console.log('   ✅ Đã thêm cột vat_tu_tam_id');
+    } catch (e) {}
+
+    try {
+        await db.execute("ALTER TABLE vat_tu_tam ADD COLUMN trang_thai TEXT DEFAULT 'cho_duyet' CHECK(trang_thai IN ('cho_duyet', 'da_duyet', 'tu_choi'))");
+        console.log('   ✅ Đã thêm cột trang_thai cho vat_tu_tam');
+    } catch (e) {}
+
+    // Làm cho vat_tu_id có thể NULL trong de_xuat_chi_tiet (SQLite workaround)
+    // Lưu ý: SQLite không cho phép ALTER COLUMN để bỏ NOT NULL.
+    // Tuy nhiên, nếu bảng đã có dữ liệu, ta chỉ có thể chèn NULL nếu ta recreate bảng.
+    // Vì đây là dev env, ta sẽ thử rename và recreate nếu cần, hoặc chấp nhận rủi ro.
+    // Cách an toàn nhất là:
+    try {
+        const columns = await db.execute("PRAGMA table_info(de_xuat_chi_tiet)");
+        const isVatTuIdNotNull = columns.rows.find(c => c.name === 'vat_tu_id')?.notnull === 1;
+        if (isVatTuIdNotNull) {
+            console.log('   🔄 Chuyển vat_tu_id thành nullable...');
+            // Thực hiện recreate bảng chi tiết
+            await db.batch([
+                "ALTER TABLE de_xuat_chi_tiet RENAME TO de_xuat_chi_tiet_old",
+                `CREATE TABLE de_xuat_chi_tiet (
+                  id INTEGER PRIMARY KEY AUTOINCREMENT,
+                  de_xuat_id INTEGER NOT NULL,
+                  mon_hoc_id INTEGER NOT NULL,
+                  lop_id INTEGER NOT NULL DEFAULT 0,
+                  vat_tu_id INTEGER,
+                  vat_tu_tam_id INTEGER,
+                  so_luong INTEGER NOT NULL DEFAULT 0,
+                  ghi_chu TEXT,
+                  FOREIGN KEY (de_xuat_id) REFERENCES de_xuat(id) ON DELETE CASCADE,
+                  FOREIGN KEY (mon_hoc_id) REFERENCES mon_hoc(id) ON DELETE CASCADE,
+                  FOREIGN KEY (lop_id) REFERENCES lop(id) ON DELETE CASCADE,
+                  FOREIGN KEY (vat_tu_id) REFERENCES vat_tu(id) ON DELETE SET NULL,
+                  FOREIGN KEY (vat_tu_tam_id) REFERENCES vat_tu_tam(id) ON DELETE SET NULL
+                )`,
+                "INSERT INTO de_xuat_chi_tiet (id, de_xuat_id, mon_hoc_id, lop_id, vat_tu_id, vat_tu_tam_id, so_luong, ghi_chu) SELECT id, de_xuat_id, mon_hoc_id, lop_id, vat_tu_id, vat_tu_tam_id, so_luong, ghi_chu FROM de_xuat_chi_tiet_old",
+                "DROP TABLE de_xuat_chi_tiet_old"
+            ], "write");
+            console.log('   ✅ Đã chuyển vat_tu_id thành nullable');
+        }
+    } catch (e) {
+        console.error('   ❌ Lỗi cập nhật nullable:', e.message);
+    }
+
+    try {
+        await db.execute("UPDATE vat_tu_tam SET trang_thai = 'cho_duyet' WHERE trang_thai IS NULL");
+        console.log('   ✅ Đã cập nhật trang_thai mặc định cho vat_tu_tam');
+    } catch (e) {}
 
     console.log('✅ Đang kiểm tra admin...');
     const adminExists = await db.execute("SELECT id FROM users WHERE username = 'admin'");

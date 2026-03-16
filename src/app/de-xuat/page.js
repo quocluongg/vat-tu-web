@@ -58,6 +58,16 @@ const SearchableMaterialSelect = ({ vatTus, onSelect }) => {
                         {search && <X size={16} style={{ color: 'var(--text-muted)', cursor: 'pointer' }} onClick={() => setSearch('')} />}
                     </div>
 
+                    <div style={{ padding: '8px 16px', borderBottom: '1px solid var(--border-color)', background: 'rgba(14,165,233,0.03)' }}>
+                        <button 
+                            className="btn btn-ghost btn-sm btn-full" 
+                            style={{ justifyContent: 'flex-start', color: 'var(--text-accent)', fontWeight: 600 }}
+                            onClick={() => onSelect('NEW_MATERIAL_REQUEST')}
+                        >
+                            <Plus size={16} /> Thêm vật tư ngoài danh mục
+                        </button>
+                    </div>
+
                     <div style={{ overflowY: 'auto', flex: 1 }} className="custom-scrollbar">
                         {filteredVatTus.length === 0 ? (
                             <div style={{ padding: 24, textAlign: 'center', color: 'var(--text-muted)' }}>Không tìm thấy vật tư "{search}"</div>
@@ -116,6 +126,10 @@ export default function DeXuatPublicPage() {
     const [error, setError] = useState('');
     const [kiInfo, setKiInfo] = useState(null);
     const [isEditMode, setIsEditMode] = useState(false);
+    const [showNewMaterialModal, setShowNewMaterialModal] = useState(false);
+    const [activePcIdForNewMaterial, setActivePcIdForNewMaterial] = useState(null);
+    const [newMaterialData, setNewMaterialData] = useState({ ten_vat_tu: '', yeu_cau_ky_thuat: '', don_vi_tinh: '' });
+    const [vatTuTams, setVatTuTams] = useState([]); // {id, ten_vat_tu, ...}
 
     useEffect(() => {
         fetch('/api/ki-hoc').then(r => r.json()).then(data => {
@@ -138,13 +152,15 @@ export default function DeXuatPublicPage() {
             setIsEditMode(false);
             setSubmitted(false);
 
-            // Fetch phân công & vật tư
+            // Fetch phân công & vật tư & vật tư tạm của GV này
             Promise.all([
                 fetch(`/api/phan-cong?ki_id=${selectedKi}&giao_vien_id=${selectedGv}`).then(r => r.json()),
-                fetch(`/api/vat-tu?ki_id=${selectedKi}`).then(r => r.json())
-            ]).then(([pcData, vtData]) => {
+                fetch(`/api/vat-tu?ki_id=${selectedKi}`).then(r => r.json()),
+                fetch(`/api/vat-tu-tam?ki_id=${selectedKi}&giao_vien_id=${selectedGv}`).then(r => r.json())
+            ]).then(([pcData, vtData, vtTamData]) => {
                 setPhanCongs(pcData);
                 setVatTus(vtData);
+                setVatTuTams(vtTamData);
 
                 // Sau khi có pcData, đi lấy đề xuất cũ (nếu có)
                 fetch(`/api/de-xuat?ki_id=${selectedKi}&giao_vien_id=${selectedGv}`)
@@ -166,7 +182,12 @@ export default function DeXuatPublicPage() {
                                                 if (!loadedSelections[pc.id]) {
                                                     loadedSelections[pc.id] = {};
                                                 }
-                                                loadedSelections[pc.id][ct.vat_tu_id] = ct.so_luong;
+                                                // Phân biệt vat_tu_id và vat_tu_tam_id
+                                                if (ct.vat_tu_tam_id) {
+                                                    loadedSelections[pc.id][`tam_${ct.vat_tu_tam_id}`] = ct.so_luong;
+                                                } else {
+                                                    loadedSelections[pc.id][ct.vat_tu_id] = ct.so_luong;
+                                                }
                                             }
                                         });
                                         // Khôi phục form
@@ -246,18 +267,53 @@ export default function DeXuatPublicPage() {
             Object.entries(vatTuMap).forEach(([vtId, soLuong]) => {
                 const num = parseInt(soLuong);
                 if (!isNaN(num) && num > 0) {
-                    result.push({
+                    const item = {
                         mon_hoc_id: pc.mon_hoc_id,
                         lop_id: pc.lop_id,
-                        vat_tu_id: parseInt(vtId),
                         so_luong: num
-                    });
+                    };
+                    if (vtId.toString().startsWith('tam_')) {
+                        item.vat_tu_tam_id = parseInt(vtId.toString().replace('tam_', ''));
+                    } else {
+                        item.vat_tu_id = parseInt(vtId);
+                    }
+                    result.push(item);
                 }
             });
         });
         return result;
     };
 
+    const handleCreateNewMaterial = async () => {
+        if (!newMaterialData.ten_vat_tu || !newMaterialData.don_vi_tinh) {
+            alert('Vui lòng nhập tên và đơn vị tính');
+            return;
+        }
+        try {
+            const res = await fetch('/api/vat-tu-tam', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    ...newMaterialData,
+                    ki_id: parseInt(selectedKi),
+                    giao_vien_id: parseInt(selectedGv)
+                })
+            });
+            if (res.ok) {
+                const data = await res.json();
+                const newTamId = data.id;
+                const newTamItem = { ...newMaterialData, id: newTamId, is_tam: true };
+                
+                setVatTuTams(prev => [...prev, newTamItem]);
+                setQuantity(activePcIdForNewMaterial, `tam_${newTamId}`, 1);
+                
+                setShowNewMaterialModal(false);
+                setNewMaterialData({ ten_vat_tu: '', yeu_cau_ky_thuat: '', don_vi_tinh: '' });
+            }
+        } catch (err) {
+            alert('Lỗi khi thêm vật tư mới');
+        }
+    };
     const handleSubmit = async () => {
         const chiTiet = getChiTiet();
         if (chiTiet.length === 0) {
@@ -308,14 +364,14 @@ export default function DeXuatPublicPage() {
                             <button className="btn btn-warning btn-lg" onClick={() => setSubmitted(false)}>
                                 <Edit2 size={20} /> Chỉnh sửa lại
                             </button>
-                            <button className="btn btn-primary btn-lg" onClick={() => { setSubmitted(false); setSelections({}); setSelectedGv(''); }}>
+                            <button className="btn btn-primary btn-lg" onClick={() => { setSubmitted(false); setSelections({}); setSelectedGv(''); fetch('/api/vat-tu?ki_id=' + selectedKi).then(r => r.json()).then(setVatTus); }}>
                                 Tạo đề xuất mới
                             </button>
                         </div>
                     </div>
                 </div>
                 {/* Print Layout */}
-                <PrintLayout kiInfo={kiInfo} selectedGv={selectedGv} giaoViens={giaoViens} phanCongs={phanCongs} vatTus={vatTus} selections={selections} />
+                <PrintLayout kiInfo={kiInfo} selectedGv={selectedGv} giaoViens={giaoViens} phanCongs={phanCongs} vatTus={vatTus} vatTuTams={vatTuTams} selections={selections} />
             </div>
         );
     }
@@ -419,7 +475,12 @@ export default function DeXuatPublicPage() {
                                                                 <SearchableMaterialSelect
                                                                     vatTus={filteredVatTus}
                                                                     onSelect={(val) => {
-                                                                        setQuantity(pc.id, val, (pcSelections[val] || 0) + 1);
+                                                                        if (val === 'NEW_MATERIAL_REQUEST') {
+                                                                            setActivePcIdForNewMaterial(pc.id);
+                                                                            setShowNewMaterialModal(true);
+                                                                        } else {
+                                                                            setQuantity(pc.id, val, (pcSelections[val] || 0) + 1);
+                                                                        }
                                                                     }}
                                                                 />
                                                             </div>
@@ -427,11 +488,19 @@ export default function DeXuatPublicPage() {
                                                             {Object.keys(pcSelections).length > 0 ? (
                                                                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                                                                     {Object.keys(pcSelections).map(vtId => {
-                                                                        const vt = vatTus.find(v => v.id === parseInt(vtId));
+                                                                        let vt;
+                                                                        let isTam = false;
+                                                                        if (vtId.toString().startsWith('tam_')) {
+                                                                            const tId = parseInt(vtId.replace('tam_', ''));
+                                                                            vt = vatTuTams.find(v => v.id === tId);
+                                                                            isTam = true;
+                                                                        } else {
+                                                                            vt = vatTus.find(v => v.id === parseInt(vtId));
+                                                                        }
                                                                         if (!vt) return null;
                                                                         const qty = pcSelections[vtId];
                                                                         return (
-                                                                            <div className="material-item" key={vt.id} style={{ background: 'rgba(14,165,233,0.05)', borderColor: 'rgba(14,165,233,0.2)' }}>
+                                                                            <div className="material-item" key={vtId} style={{ background: 'rgba(14,165,233,0.05)', borderColor: 'rgba(14,165,233,0.2)' }}>
                                                                                 <div className="material-info">
                                                                                     <h4>{vt.ten_vat_tu}</h4>
                                                                                     <p>
@@ -441,7 +510,7 @@ export default function DeXuatPublicPage() {
                                                                                 </div>
                                                                                 <div className="material-qty" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8 }}>
                                                                                     <div style={{ display: 'flex', alignItems: 'center' }}>
-                                                                                        <button className="btn-icon" onClick={() => updateQuantity(pc.id, vt.id, -1)} disabled={qty === 0 || qty === ''}>
+                                                                                        <button className="btn-icon" onClick={() => updateQuantity(pc.id, vtId, -1)} disabled={qty === 0 || qty === ''}>
                                                                                             <Minus size={16} />
                                                                                         </button>
                                                                                         <input
@@ -449,7 +518,7 @@ export default function DeXuatPublicPage() {
                                                                                             className="form-input"
                                                                                             style={{ width: 70, textAlign: 'center', padding: '6px' }}
                                                                                             value={qty === '' ? '' : qty}
-                                                                                            onChange={e => setQuantity(pc.id, vt.id, e.target.value)}
+                                                                                            onChange={e => setQuantity(pc.id, vtId, e.target.value)}
                                                                                             onBlur={() => {
                                                                                                 if (qty === '' || parseInt(qty) === 0) {
                                                                                                     setSelections(prev => {
@@ -461,7 +530,7 @@ export default function DeXuatPublicPage() {
                                                                                             }}
                                                                                             min="0"
                                                                                         />
-                                                                                        <button className="btn-icon" onClick={() => updateQuantity(pc.id, vt.id, 1)}>
+                                                                                        <button className="btn-icon" onClick={() => updateQuantity(pc.id, vtId, 1)}>
                                                                                             <Plus size={16} />
                                                                                         </button>
                                                                                     </div>
@@ -470,7 +539,7 @@ export default function DeXuatPublicPage() {
                                                                                             <button
                                                                                                 className="btn"
                                                                                                 style={{ padding: '2px 8px', fontSize: 11, background: 'var(--bg-card)', border: '1px solid var(--border-color)', color: 'var(--text-secondary)' }}
-                                                                                                onClick={() => setQuantity(pc.id, vt.id, pc.si_so)}
+                                                                                                onClick={() => setQuantity(pc.id, vtId, pc.si_so)}
                                                                                                 title="Sĩ số lớp"
                                                                                             >
                                                                                                 SS ({pc.si_so})
@@ -479,14 +548,14 @@ export default function DeXuatPublicPage() {
                                                                                         <button
                                                                                             className="btn"
                                                                                             style={{ padding: '2px 8px', fontSize: 11, background: 'var(--bg-card)', border: '1px solid var(--border-color)', color: 'var(--text-secondary)' }}
-                                                                                            onClick={() => updateQuantity(pc.id, vt.id, 10)}
+                                                                                            onClick={() => updateQuantity(pc.id, vtId, 10)}
                                                                                         >
                                                                                             +10
                                                                                         </button>
                                                                                         <button
                                                                                             className="btn"
                                                                                             style={{ padding: '2px 8px', fontSize: 11, background: 'var(--bg-card)', border: '1px solid var(--border-color)', color: 'var(--text-secondary)' }}
-                                                                                            onClick={() => updateQuantity(pc.id, vt.id, 50)}
+                                                                                            onClick={() => updateQuantity(pc.id, vtId, 50)}
                                                                                         >
                                                                                             +50
                                                                                         </button>
@@ -511,6 +580,59 @@ export default function DeXuatPublicPage() {
                             </div>
                         );
                     })()}
+
+                    {/* New Material Modal */}
+                    {showNewMaterialModal && (
+                        <div className="modal-overlay">
+                            <div className="modal">
+                                <div className="modal-header">
+                                    <h2>Đề xuất vật tư ngoài danh mục</h2>
+                                    <button className="btn-icon btn-ghost" onClick={() => setShowNewMaterialModal(false)}><X size={20} /></button>
+                                </div>
+                                <div className="modal-body">
+                                    <div className="form-group">
+                                        <label className="form-label">Tên vật tư <span style={{ color: 'red' }}>*</span></label>
+                                        <input 
+                                            type="text" 
+                                            className="form-input" 
+                                            placeholder="Ví dụ: Cảm biến siêu âm HC-SR04" 
+                                            value={newMaterialData.ten_vat_tu}
+                                            onChange={e => setNewMaterialData(prev => ({ ...prev, ten_vat_tu: e.target.value }))}
+                                        />
+                                    </div>
+                                    <div className="form-group">
+                                        <label className="form-label">Yêu cầu kỹ thuật / Mã hiệu / Quy cách</label>
+                                        <input 
+                                            type="text" 
+                                            className="form-input" 
+                                            placeholder="Ví dụ: 5V, dải đo 2cm-400cm" 
+                                            value={newMaterialData.yeu_cau_ky_thuat}
+                                            onChange={e => setNewMaterialData(prev => ({ ...prev, yeu_cau_ky_thuat: e.target.value }))}
+                                        />
+                                    </div>
+                                    <div className="form-group">
+                                        <label className="form-label">Đơn vị tính <span style={{ color: 'red' }}>*</span></label>
+                                        <input 
+                                            type="text" 
+                                            className="form-input" 
+                                            placeholder="Ví dụ: Cái, Bộ, Mét..." 
+                                            value={newMaterialData.don_vi_tinh}
+                                            onChange={e => setNewMaterialData(prev => ({ ...prev, don_vi_tinh: e.target.value }))}
+                                        />
+                                    </div>
+                                    <p style={{ fontSize: 12, color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                                        * Vật tư này sẽ ở trạng thái "Đợi duyệt" cho đến khi quản trị viên xác nhận.
+                                    </p>
+                                </div>
+                                <div className="modal-footer">
+                                    <button className="btn btn-secondary" onClick={() => setShowNewMaterialModal(false)}>Hủy</button>
+                                    <button className="btn btn-primary" onClick={handleCreateNewMaterial}>
+                                        <Plus size={18} /> Gửi đề xuất vật tư
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
 
                     {/* Summary & Submit */}
                     {selectedGv && getChiTiet().length > 0 && (
@@ -547,14 +669,14 @@ export default function DeXuatPublicPage() {
                 </div>
 
                 {/* Print Layout */}
-                <PrintLayout kiInfo={kiInfo} selectedGv={selectedGv} giaoViens={giaoViens} phanCongs={phanCongs} vatTus={vatTus} selections={selections} />
+                <PrintLayout kiInfo={kiInfo} selectedGv={selectedGv} giaoViens={giaoViens} phanCongs={phanCongs} vatTus={vatTus} vatTuTams={vatTuTams} selections={selections} />
             </div>
         </div>
     );
 }
 
 // Print Layout Component
-const PrintLayout = ({ kiInfo, selectedGv, giaoViens, phanCongs, vatTus, selections }) => {
+const PrintLayout = ({ kiInfo, selectedGv, giaoViens, phanCongs, vatTus, vatTuTams, selections }) => {
     const gv = giaoViens.find(g => g.id === parseInt(selectedGv));
     const now = new Date();
 
@@ -619,7 +741,13 @@ const PrintLayout = ({ kiInfo, selectedGv, giaoViens, phanCongs, vatTus, selecti
                             </thead>
                             <tbody>
                                 {vtIds.map((vtId, idx) => {
-                                    const vt = vatTus.find(v => v.id === parseInt(vtId));
+                                    let vt;
+                                    if (vtId.toString().startsWith('tam_')) {
+                                        const tId = parseInt(vtId.replace('tam_', ''));
+                                        vt = vatTuTams.find(v => v.id === tId);
+                                    } else {
+                                        vt = vatTus.find(v => v.id === parseInt(vtId));
+                                    }
                                     const qty = pcSel[vtId];
                                     if (!vt || parseInt(qty) <= 0) return null;
                                     return (
