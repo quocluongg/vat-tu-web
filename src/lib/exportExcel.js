@@ -364,3 +364,100 @@ export const exportExcelTheoNganh = async (nganhData, kiInfo, fileName = 'Du_Tru
     const buffer = await workbook.xlsx.writeBuffer();
     saveAs(new Blob([buffer]), fileName);
 };
+export const exportExcelMultiNganh = async (allNganhData, kiInfo, fileName = 'Tong_Hop_Vat_Tu.xlsx') => {
+    const workbook = new ExcelJS.Workbook();
+    const kiLabel = kiInfo ? `${kiInfo.ten_ki} NĂM HỌC ${kiInfo.nam_hoc}` : 'HỌC KỲ I NĂM HỌC 2025 - 2026';
+
+    allNganhData.forEach(nganhData => {
+        const { ten_nganh, materialList } = nganhData;
+        const sheet = workbook.addWorksheet(ten_nganh.substring(0, 31).replace(/[\\/*?:\[\]]/g, ''), {
+            pageSetup: { paperSize: 9, orientation: 'portrait', fitToPage: true, fitToWidth: 1 }
+        });
+
+        // --- Header ---
+        sheet.getCell('A1').value = 'TRƯỜNG CAO ĐẲNG NGHỀ VIỆT NAM - SINGAPORE';
+        sheet.getCell('A1').font = { name: 'Times New Roman', size: 12, bold: true };
+        
+        sheet.getCell('A2').value = `KHOA: ${ten_nganh.toUpperCase()}`;
+        sheet.getCell('A2').font = { name: 'Times New Roman', size: 12, bold: true };
+
+        sheet.mergeCells('A4:F4');
+        sheet.getCell('A4').value = `BẢNG DỰ TRÙ VẬT TƯ THỰC HÀNH NGHỀ ${ten_nganh.toUpperCase()}`;
+        sheet.getCell('A4').font = { name: 'Times New Roman', size: 14, bold: true };
+        sheet.getCell('A4').alignment = { horizontal: 'center', vertical: 'middle' };
+
+        sheet.mergeCells('A5:F5');
+        sheet.getCell('A5').value = kiLabel;
+        sheet.getCell('A5').font = { name: 'Times New Roman', size: 12, bold: true };
+        sheet.getCell('A5').alignment = { horizontal: 'center', vertical: 'middle' };
+
+        // --- Table Headers ---
+        const headerRow = sheet.getRow(7);
+        const headers = ['STT', 'Tên vật tư', 'Yêu cầu kỹ thuật', 'Đơn vị tính', 'Số lượng', 'Ghi chú'];
+        const colWidths = [6, 35, 35, 12, 12, 15];
+
+        headers.forEach((h, i) => {
+            const cell = headerRow.getCell(i + 1);
+            cell.value = h;
+            cell.font = { name: 'Times New Roman', size: 11, bold: true };
+            cell.alignment = { horizontal: 'center', vertical: 'middle' };
+            cell.border = {
+                top: { style: 'thin' },
+                left: { style: 'thin' },
+                bottom: { style: 'thin' },
+                right: { style: 'thin' }
+            };
+            sheet.getColumn(i + 1).width = colWidths[i];
+        });
+
+        // --- Data Rows ---
+        let currentRow = 8;
+        materialList.forEach((item, index) => {
+            const row = sheet.getRow(currentRow);
+            row.getCell(1).value = index + 1;
+            row.getCell(2).value = item.ten_vat_tu;
+            row.getCell(3).value = item.yeu_cau_ky_thuat || '';
+            row.getCell(4).value = item.don_vi_tinh;
+            row.getCell(5).value = item.tong_de_xuat || item.so_luong || 0;
+            row.getCell(6).value = '';
+
+            // Styles
+            for (let i = 1; i <= 6; i++) {
+                const cell = row.getCell(i);
+                cell.font = { name: 'Times New Roman', size: 11 };
+                cell.border = {
+                    top: { style: 'thin' },
+                    left: { style: 'thin' },
+                    bottom: { style: 'thin' },
+                    right: { style: 'thin' }
+                };
+                if (i === 1 || i >= 4) {
+                    cell.alignment = { horizontal: 'center', vertical: 'middle' };
+                }
+            }
+            currentRow++;
+        });
+
+        // --- Footer ---
+        currentRow += 2;
+        sheet.mergeCells(currentRow, 4, currentRow, 6);
+        const today = new Date();
+        sheet.getCell(currentRow, 4).value = `Bình Dương, ngày ${today.getDate()} tháng ${today.getMonth() + 1} năm ${today.getFullYear()}`;
+        sheet.getCell(currentRow, 4).font = { name: 'Times New Roman', size: 11, italic: true };
+        sheet.getCell(currentRow, 4).alignment = { horizontal: 'center' };
+
+        currentRow += 1;
+        sheet.getCell(currentRow, 2).value = 'Ban giám hiệu';
+        sheet.getCell(currentRow, 2).font = { name: 'Times New Roman', size: 11, bold: true };
+        sheet.getCell(currentRow, 2).alignment = { horizontal: 'center' };
+
+        sheet.mergeCells(currentRow, 4, currentRow, 6);
+        sheet.getCell(currentRow, 4).value = `Khoa ${ten_nganh}`;
+        sheet.getCell(currentRow, 4).font = { name: 'Times New Roman', size: 11, bold: true };
+        sheet.getCell(currentRow, 4).alignment = { horizontal: 'center' };
+    });
+
+    // Output
+    const buffer = await workbook.xlsx.writeBuffer();
+    saveAs(new Blob([buffer]), fileName);
+};

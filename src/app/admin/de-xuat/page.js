@@ -1,7 +1,8 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { FileText, Eye, Check, X, Clock, CheckCircle, XCircle, AlertCircle, RefreshCw, Users, Package, ChevronRight, List, ChevronDown, Plus, Minus, Send, BookOpen, Search, Printer, Edit2 } from 'lucide-react';
+import { FileText, Eye, Check, X, Clock, CheckCircle, XCircle, AlertCircle, RefreshCw, Users, Package, ChevronRight, List, ChevronDown, Plus, Minus, Send, BookOpen, Search, Printer, Edit2, Download } from 'lucide-react';
 import { useToast } from '@/components/Toast';
+import { exportExcelTheoNganh, exportExcelMultiNganh } from '@/lib/exportExcel';
 
 export default function DeXuatAdminPage() {
     const [activeTab, setActiveTab] = useState('overview'); // overview, materials, list
@@ -46,6 +47,28 @@ export default function DeXuatAdminPage() {
         setDetailData(data);
         setSelectedDx(dx);
         setDetailViewMode('material');
+    };
+
+    const handleExportAllNganh = async () => {
+        if (!stats || !stats.nganhStats) return;
+        const kiInfo = kiHocs.find(k => k.id.toString() === selectedKi);
+
+        try {
+            await exportExcelMultiNganh(stats.nganhStats, kiInfo, `Tong_Hop_Vat_Tu_Ki_${selectedKi}.xlsx`);
+            addToast('Đã xuất file tổng hợp (nhiều Sheet)', 'success');
+        } catch (error) {
+            addToast('Lỗi khi xuất file: ' + error.message, 'error');
+        }
+    };
+
+    const handleExportSingleNganh = async (nganh) => {
+        const kiInfo = kiHocs.find(k => k.id.toString() === selectedKi);
+        try {
+            await exportExcelTheoNganh(nganh, kiInfo, `Tong_Hop_Vat_Tu_${nganh.ten_nganh.replace(/\s+/g, '_')}.xlsx`);
+            addToast(`Đã xuất file cho ngành ${nganh.ten_nganh}`, 'success');
+        } catch (error) {
+            addToast('Lỗi khi xuất file: ' + error.message, 'error');
+        }
     };
 
 
@@ -197,6 +220,11 @@ export default function DeXuatAdminPage() {
             {/* Tab 2: Materials Aggregation */}
             {activeTab === 'materials' && (
                 <div className="tab-content fade-in">
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 20 }}>
+                        <button className="btn btn-primary" onClick={handleExportAllNganh} disabled={!stats || stats.nganhStats.length === 0}>
+                            <Download size={18} /> Xuất tất cả các ngành
+                        </button>
+                    </div>
                     {stats && stats.nganhStats.length > 0 ? (
                         <>
                             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))', gap: 20 }}>
@@ -208,6 +236,9 @@ export default function DeXuatAdminPage() {
                                                     <h3 style={{ fontSize: 18, fontWeight: 700 }}>{nganh.ten_nganh}</h3>
                                                     <p style={{ fontSize: 13, color: 'var(--text-muted)' }}>{nganh.materialList.length} vật tư đề xuất</p>
                                                 </div>
+                                                <button className="btn-icon btn-ghost btn-primary" onClick={() => handleExportSingleNganh(nganh)} title="Xuất Excel ngành này">
+                                                    <Download size={18} />
+                                                </button>
                                             </div>
                                         </div>
                                         <div className="card-body" style={{ flex: 1, maxHeight: 400, overflowY: 'auto' }}>
