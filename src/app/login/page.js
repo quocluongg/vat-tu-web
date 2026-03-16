@@ -99,9 +99,7 @@ export default function LoginPage() {
                         </button>
                     </form>
 
-                    <p style={{ textAlign: 'center', fontSize: 13, color: 'var(--text-muted)', marginTop: 24 }}>
-                        Mặc định: admin / admin123
-                    </p>
+
                 </div>
             </div>
         </div>
