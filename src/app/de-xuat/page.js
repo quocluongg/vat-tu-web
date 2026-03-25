@@ -290,19 +290,25 @@ export default function DeXuatPublicPage() {
             return;
         }
         try {
+            // Determine nganh_id from the currently selected filter
+            let nganh_id = null;
+            if (selectedNganhDeXuat && selectedNganhDeXuat !== 'all' && selectedNganhDeXuat !== 'chung') {
+                nganh_id = parseInt(selectedNganhDeXuat);
+            }
             const res = await fetch('/api/vat-tu-tam', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     ...newMaterialData,
                     ki_id: parseInt(selectedKi),
-                    giao_vien_id: parseInt(selectedGv)
+                    giao_vien_id: parseInt(selectedGv),
+                    nganh_id
                 })
             });
             if (res.ok) {
                 const data = await res.json();
                 const newTamId = data.id;
-                const newTamItem = { ...newMaterialData, id: newTamId, is_tam: true };
+                const newTamItem = { ...newMaterialData, id: newTamId, is_tam: true, nganh_id };
 
                 setVatTuTams(prev => [...prev, newTamItem]);
                 setQuantity(activePcIdForNewMaterial, `tam_${newTamId}`, 1);
@@ -582,57 +588,68 @@ export default function DeXuatPublicPage() {
                     })()}
 
                     {/* New Material Modal */}
-                    {showNewMaterialModal && (
-                        <div className="modal-overlay">
-                            <div className="modal">
-                                <div className="modal-header">
-                                    <h2>Đề xuất vật tư ngoài danh mục</h2>
-                                    <button className="btn-icon btn-ghost" onClick={() => setShowNewMaterialModal(false)}><X size={20} /></button>
-                                </div>
-                                <div className="modal-body">
-                                    <div className="form-group">
-                                        <label className="form-label">Tên vật tư <span style={{ color: 'red' }}>*</span></label>
-                                        <input
-                                            type="text"
-                                            className="form-input"
-                                            placeholder="Ví dụ: Cảm biến siêu âm HC-SR04"
-                                            value={newMaterialData.ten_vat_tu}
-                                            onChange={e => setNewMaterialData(prev => ({ ...prev, ten_vat_tu: e.target.value }))}
-                                        />
+                    {showNewMaterialModal && (() => {
+                        const nganhName = selectedNganhDeXuat === 'all' ? 'Tất cả (chưa xác định)'
+                            : selectedNganhDeXuat === 'chung' ? 'Dùng chung'
+                            : nganhs.find(n => n.id.toString() === selectedNganhDeXuat)?.ten_nganh || 'Không rõ';
+                        return (
+                            <div className="modal-overlay">
+                                <div className="modal">
+                                    <div className="modal-header">
+                                        <h2>Đề xuất vật tư ngoài danh mục</h2>
+                                        <button className="btn-icon btn-ghost" onClick={() => setShowNewMaterialModal(false)}><X size={20} /></button>
                                     </div>
-                                    <div className="form-group">
-                                        <label className="form-label">Yêu cầu kỹ thuật / Mã hiệu / Quy cách</label>
-                                        <input
-                                            type="text"
-                                            className="form-input"
-                                            placeholder="Ví dụ: 5V, dải đo 2cm-400cm"
-                                            value={newMaterialData.yeu_cau_ky_thuat}
-                                            onChange={e => setNewMaterialData(prev => ({ ...prev, yeu_cau_ky_thuat: e.target.value }))}
-                                        />
+                                    <div className="modal-body">
+                                        <div className="alert alert-info" style={{ marginBottom: 16, padding: '10px 14px', borderRadius: 10, fontSize: 13 }}>
+                                            <strong>Bộ vật tư ngành:</strong> {nganhName}
+                                            {selectedNganhDeXuat === 'all' && (
+                                                <div style={{ marginTop: 4, fontSize: 12, opacity: 0.8 }}>Vui lòng chọn bộ vật tư ngành cụ thể trước khi thêm để vật tư được phân loại đúng.</div>
+                                            )}
+                                        </div>
+                                        <div className="form-group">
+                                            <label className="form-label">Tên vật tư <span style={{ color: 'red' }}>*</span></label>
+                                            <input
+                                                type="text"
+                                                className="form-input"
+                                                placeholder="Ví dụ: Cảm biến siêu âm HC-SR04"
+                                                value={newMaterialData.ten_vat_tu}
+                                                onChange={e => setNewMaterialData(prev => ({ ...prev, ten_vat_tu: e.target.value }))}
+                                            />
+                                        </div>
+                                        <div className="form-group">
+                                            <label className="form-label">Yêu cầu kỹ thuật / Mã hiệu / Quy cách</label>
+                                            <input
+                                                type="text"
+                                                className="form-input"
+                                                placeholder="Ví dụ: 5V, dải đo 2cm-400cm"
+                                                value={newMaterialData.yeu_cau_ky_thuat}
+                                                onChange={e => setNewMaterialData(prev => ({ ...prev, yeu_cau_ky_thuat: e.target.value }))}
+                                            />
+                                        </div>
+                                        <div className="form-group">
+                                            <label className="form-label">Đơn vị tính <span style={{ color: 'red' }}>*</span></label>
+                                            <input
+                                                type="text"
+                                                className="form-input"
+                                                placeholder="Ví dụ: Cái, Bộ, Mét..."
+                                                value={newMaterialData.don_vi_tinh}
+                                                onChange={e => setNewMaterialData(prev => ({ ...prev, don_vi_tinh: e.target.value }))}
+                                            />
+                                        </div>
+                                        <p style={{ fontSize: 12, color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                                            * Vật tư này sẽ ở trạng thái "Đợi duyệt" cho đến khi quản trị viên xác nhận.
+                                        </p>
                                     </div>
-                                    <div className="form-group">
-                                        <label className="form-label">Đơn vị tính <span style={{ color: 'red' }}>*</span></label>
-                                        <input
-                                            type="text"
-                                            className="form-input"
-                                            placeholder="Ví dụ: Cái, Bộ, Mét..."
-                                            value={newMaterialData.don_vi_tinh}
-                                            onChange={e => setNewMaterialData(prev => ({ ...prev, don_vi_tinh: e.target.value }))}
-                                        />
+                                    <div className="modal-footer">
+                                        <button className="btn btn-secondary" onClick={() => setShowNewMaterialModal(false)}>Hủy</button>
+                                        <button className="btn btn-primary" onClick={handleCreateNewMaterial}>
+                                            <Plus size={18} /> Gửi đề xuất vật tư
+                                        </button>
                                     </div>
-                                    <p style={{ fontSize: 12, color: 'var(--text-muted)', fontStyle: 'italic' }}>
-                                        * Vật tư này sẽ ở trạng thái "Đợi duyệt" cho đến khi quản trị viên xác nhận.
-                                    </p>
-                                </div>
-                                <div className="modal-footer">
-                                    <button className="btn btn-secondary" onClick={() => setShowNewMaterialModal(false)}>Hủy</button>
-                                    <button className="btn btn-primary" onClick={handleCreateNewMaterial}>
-                                        <Plus size={18} /> Gửi đề xuất vật tư
-                                    </button>
                                 </div>
                             </div>
-                        </div>
-                    )}
+                        );
+                    })()}
 
                     {/* Summary & Submit */}
                     {selectedGv && getChiTiet().length > 0 && (

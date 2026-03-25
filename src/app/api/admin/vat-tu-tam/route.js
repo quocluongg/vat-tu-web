@@ -4,7 +4,7 @@ import getDb from '@/lib/db';
 export async function POST(request) {
     try {
         const db = getDb();
-        const { action, id, mergeWithId } = await request.json();
+        const { action, id, mergeWithId, nganh_id } = await request.json();
 
         if (!id) return NextResponse.json({ error: 'Missing ID' }, { status: 400 });
 
@@ -18,11 +18,11 @@ export async function POST(request) {
         const item = tamResult.rows[0];
 
         if (action === 'approve') {
-            // 1. Create new real material in vat_tu
-            // We'll set nganh_id to NULL by default, admin can edit later if needed
+            // 1. Create new real material in vat_tu with nganh_id
+            const resolvedNganhId = nganh_id || item.nganh_id || null;
             const newVtResult = await db.execute({
-                sql: 'INSERT INTO vat_tu (ten_vat_tu, yeu_cau_ky_thuat, don_vi_tinh, ki_id, so_luong_kho) VALUES (?, ?, ?, ?, 0)',
-                args: [item.ten_vat_tu, item.yeu_cau_ky_thuat, item.don_vi_tinh, item.ki_id]
+                sql: 'INSERT INTO vat_tu (ten_vat_tu, yeu_cau_ky_thuat, don_vi_tinh, ki_id, nganh_id, so_luong_kho) VALUES (?, ?, ?, ?, ?, 0)',
+                args: [item.ten_vat_tu, item.yeu_cau_ky_thuat, item.don_vi_tinh, item.ki_id, resolvedNganhId]
             });
             const newVtId = Number(newVtResult.lastInsertRowid);
 
@@ -49,13 +49,22 @@ export async function POST(request) {
                 args: [mergeWithId, id]
             });
 
-            // 2. Mark suggestion as approved (or we could delete it, but let's keep it)
+            // 2. Mark suggestion as approved
             await db.execute({
                 sql: "UPDATE vat_tu_tam SET trang_thai = 'da_duyet' WHERE id = ?",
                 args: [id]
             });
 
             return NextResponse.json({ message: 'Merged successfully' });
+
+        } else if (action === 'reject') {
+            // Mark suggestion as rejected without deleting
+            await db.execute({
+                sql: "UPDATE vat_tu_tam SET trang_thai = 'tu_choi' WHERE id = ?",
+                args: [id]
+            });
+
+            return NextResponse.json({ message: 'Rejected successfully' });
         }
 
         return NextResponse.json({ error: 'Invalid action' }, { status: 400 });

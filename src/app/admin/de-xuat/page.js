@@ -1,8 +1,69 @@
 'use client';
-import { useState, useEffect } from 'react';
-import { FileText, Eye, Check, X, Clock, CheckCircle, XCircle, AlertCircle, RefreshCw, Users, Package, ChevronRight, List, ChevronDown, Plus, Minus, Send, BookOpen, Search, Printer, Edit2, Download } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { FileText, Eye, Check, X, Clock, CheckCircle, XCircle, AlertCircle, RefreshCw, Users, Package, ChevronRight, List, ChevronDown, Plus, Minus, Send, BookOpen, Search, Printer, Edit2, Download, Ban, Zap } from 'lucide-react';
 import { useToast } from '@/components/Toast';
 import { exportExcelTheoNganh, exportExcelMultiNganh } from '@/lib/exportExcel';
+
+// Duplicate detection: returns array of similar items (from vatTus or other vatTuTams)
+function findSimilar(item, allVatTus, vatTuTams) {
+    const normalize = str => (str || '').toLowerCase().trim();
+    const words = normalize(item.ten_vat_tu).split(/[\s,\/\-]+/).filter(w => w.length > 2);
+    if (words.length === 0) return [];
+
+    const score = (name) => {
+        const n = normalize(name);
+        // Exact match
+        if (n === normalize(item.ten_vat_tu)) return 100;
+        // Count overlapping words
+        const overlap = words.filter(w => n.includes(w)).length;
+        return Math.round((overlap / words.length) * 100);
+    };
+
+    const results = [];
+    allVatTus.forEach(vt => {
+        const s = score(vt.ten_vat_tu);
+        if (s >= 60) results.push({ type: 'kho', name: vt.ten_vat_tu, spec: vt.yeu_cau_ky_thuat, dvt: vt.don_vi_tinh, score: s });
+    });
+    vatTuTams.filter(vt => vt.id !== item.id).forEach(vt => {
+        const s = score(vt.ten_vat_tu);
+        if (s >= 60) results.push({ type: 'dx', name: vt.ten_vat_tu, spec: vt.yeu_cau_ky_thuat, dvt: vt.don_vi_tinh, score: s, gv: vt.ten_gv });
+    });
+    return results.sort((a, b) => b.score - a.score).slice(0, 5);
+}
+
+// Floating popover shown when clicking the duplicate badge
+function DupPopover({ items, onClose }) {
+    const ref = useRef(null);
+    useEffect(() => {
+        const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) onClose(); };
+        setTimeout(() => document.addEventListener('mousedown', handler), 0);
+        return () => document.removeEventListener('mousedown', handler);
+    }, [onClose]);
+    return (
+        <div ref={ref} style={{
+            position: 'absolute', top: '100%', left: 0, zIndex: 200, minWidth: 320, maxWidth: 420,
+            background: 'var(--bg-card)', border: '1px solid var(--border-color)',
+            borderRadius: 12, boxShadow: 'var(--shadow-lg)', padding: 12, marginTop: 4,
+        }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+                <Zap size={12} style={{ color: '#f59e0b' }} /> GỢI Ý CÓ THỂ TRÙNG
+            </div>
+            {items.map((it, i) => (
+                <div key={i} style={{ padding: '6px 8px', borderRadius: 8, background: it.type === 'kho' ? 'rgba(16,185,129,0.06)' : 'rgba(99,102,241,0.06)', marginBottom: 4, fontSize: 13 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ fontWeight: 600 }}>{it.name}</span>
+                        <span style={{ fontSize: 11, padding: '1px 6px', borderRadius: 4, background: it.type === 'kho' ? 'rgba(16,185,129,0.15)' : 'rgba(99,102,241,0.15)', color: it.type === 'kho' ? '#10b981' : '#818cf8' }}>
+                            {it.type === 'kho' ? 'Trong kho' : 'Đề xuất khác'}
+                        </span>
+                    </div>
+                    <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
+                        {it.spec || '—'} • {it.dvt}{it.gv ? ` • GV: ${it.gv}` : ''}
+                    </div>
+                </div>
+            ))}
+        </div>
+    );
+}
 
 export default function DeXuatAdminPage() {
     const [activeTab, setActiveTab] = useState('overview'); // overview, materials, list, suggestions
@@ -16,7 +77,11 @@ export default function DeXuatAdminPage() {
     const [stats, setStats] = useState(null);
     const [vatTuTams, setVatTuTams] = useState([]);
     const [allVatTus, setAllVatTus] = useState([]);
-    const [approvalModal, setApprovalModal] = useState({ show: false, item: null, type: 'new', mergeWithId: '' });
+    const [nganhs, setNganhs] = useState([]);
+    const [suggestSearch, setSuggestSearch] = useState('');
+    const [suggestFilter, setSuggestFilter] = useState('all'); // all, cho_duyet, da_duyet, tu_choi
+    const [openDupId, setOpenDupId] = useState(null); // which row's dup popover is open
+    const [approvalModal, setApprovalModal] = useState({ show: false, item: null, type: 'new', mergeWithId: '', nganh_id: '' });
     const addToast = useToast();
 
     const fetchKiHoc = async () => {
@@ -25,6 +90,12 @@ export default function DeXuatAdminPage() {
         setKiHocs(data);
         if (data.length > 0) setSelectedKi(data[0].id.toString());
         setLoading(false);
+    };
+
+    const fetchNganhs = async () => {
+        const res = await fetch('/api/nganh');
+        const data = await res.json();
+        setNganhs(data);
     };
 
     const fetchDeXuat = async () => {
@@ -54,7 +125,7 @@ export default function DeXuatAdminPage() {
         setAllVatTus(data);
     };
 
-    useEffect(() => { fetchKiHoc(); }, []);
+    useEffect(() => { fetchKiHoc(); fetchNganhs(); }, []);
     useEffect(() => { 
         if (selectedKi) {
             fetchDeXuat();
@@ -71,16 +142,17 @@ export default function DeXuatAdminPage() {
         setDetailViewMode('material');
     };
 
-    const handleActionVatTuTam = async (action, item, mergeWithId = null) => {
+    const handleActionVatTuTam = async (action, item, mergeWithId = null, nganh_id = null) => {
         try {
             const res = await fetch(`/api/admin/vat-tu-tam`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ action, id: item.id, mergeWithId })
+                body: JSON.stringify({ action, id: item.id, mergeWithId, nganh_id })
             });
             if (res.ok) {
-                addToast(action === 'approve' ? 'Đã thêm vật tư mới vào kho' : 'Đã gộp vật tư', 'success');
-                setApprovalModal({ show: false, item: null, type: 'new', mergeWithId: '' });
+                const msgMap = { approve: 'Đã thêm vật tư mới vào kho', merge: 'Đã gộp vật tư', reject: 'Đã không duyệt vật tư' };
+                addToast(msgMap[action] || 'Thành công', action === 'reject' ? 'warning' : 'success');
+                setApprovalModal({ show: false, item: null, type: 'new', mergeWithId: '', nganh_id: '' });
                 fetchVatTuTam();
                 fetchAllVatTus();
                 fetchStats();
@@ -379,68 +451,145 @@ export default function DeXuatAdminPage() {
             )}
 
             {/* Tab 4: Suggested Materials */}
-            {activeTab === 'suggestions' && (
-                <div className="tab-content fade-in">
-                    <div className="table-container">
-                        <table className="data-table">
-                            <thead>
-                                <tr>
-                                    <th>STT</th>
-                                    <th>Giảng viên đề xuất</th>
-                                    <th>Tên vật tư đề xuất</th>
-                                    <th>Quy cách / Kỹ thuật</th>
-                                    <th>ĐVT</th>
-                                    <th>Trạng thái</th>
-                                    <th style={{ textAlign: 'right' }}>Thao tác</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {vatTuTams.map((v, idx) => (
-                                    <tr key={v.id}>
-                                        <td>{idx + 1}</td>
-                                        <td>{v.ten_gv}</td>
-                                        <td style={{ fontWeight: 600 }}>{v.ten_vat_tu}</td>
-                                        <td style={{ fontSize: 13, color: 'var(--text-secondary)' }}>{v.yeu_cau_ky_thuat || '—'}</td>
-                                        <td><span className="badge badge-info">{v.don_vi_tinh}</span></td>
-                                        <td>
-                                            {(!v.trang_thai || v.trang_thai === 'cho_duyet') ? (
-                                                <span className="badge" style={{ background: 'rgba(245,158,11,0.1)', color: '#d97706' }}>Đợi duyệt</span>
-                                            ) : v.trang_thai === 'da_duyet' ? (
-                                                <span className="badge badge-success">Đã duyệt</span>
-                                            ) : (
-                                                <span className="badge badge-danger">Từ chối</span>
-                                            )}
-                                        </td>
-                                        <td style={{ textAlign: 'right' }}>
-                                            {(!v.trang_thai || v.trang_thai === 'cho_duyet') && (
-                                                <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-                                                    <button 
-                                                        className="btn btn-sm btn-primary" 
-                                                        onClick={() => setApprovalModal({ show: true, item: v, type: 'new', mergeWithId: '' })}
-                                                    >
-                                                        <Check size={14} /> Duyệt mới
-                                                    </button>
-                                                    <button 
-                                                        className="btn btn-sm btn-secondary"
-                                                        onClick={() => setApprovalModal({ show: true, item: v, type: 'merge', mergeWithId: '' })}
-                                                    >
-                                                        <RefreshCw size={14} /> Gộp vào kho
-                                                    </button>
-                                                </div>
-                                            )}
-                                        </td>
-                                    </tr>
-                                ))}
-                                {vatTuTams.length === 0 && (
-                                    <tr>
-                                        <td colSpan="7" style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)' }}>Chưa có vật tư đề xuất mới nào</td>
-                                    </tr>
+            {activeTab === 'suggestions' && (() => {
+                // Apply search + status filter
+                const filtered = vatTuTams.filter(v => {
+                    const q = suggestSearch.toLowerCase();
+                    const nameMatch = !q || v.ten_vat_tu.toLowerCase().includes(q) || (v.ten_gv || '').toLowerCase().includes(q) || (v.yeu_cau_ky_thuat || '').toLowerCase().includes(q);
+                    const statusMatch = suggestFilter === 'all' || v.trang_thai === suggestFilter || (!v.trang_thai && suggestFilter === 'cho_duyet');
+                    return nameMatch && statusMatch;
+                });
+                const pendingCount = vatTuTams.filter(v => !v.trang_thai || v.trang_thai === 'cho_duyet').length;
+                return (
+                    <div className="tab-content fade-in">
+                        {/* Filter bar */}
+                        <div style={{ display: 'flex', gap: 12, marginBottom: 16, alignItems: 'center', flexWrap: 'wrap' }}>
+                            <div style={{ position: 'relative', flex: '1 1 220px', minWidth: 180 }}>
+                                <Search size={15} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', pointerEvents: 'none' }} />
+                                <input
+                                    type="text"
+                                    className="form-input"
+                                    style={{ paddingLeft: 32, height: 36, fontSize: 13 }}
+                                    placeholder="Tìm theo tên, giảng viên, quy cách..."
+                                    value={suggestSearch}
+                                    onChange={e => setSuggestSearch(e.target.value)}
+                                />
+                                {suggestSearch && (
+                                    <button style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: 2 }} onClick={() => setSuggestSearch('')}>
+                                        <X size={14} />
+                                    </button>
                                 )}
-                            </tbody>
-                        </table>
+                            </div>
+                            <select className="form-select" style={{ height: 36, fontSize: 13, width: 'auto', minWidth: 150 }} value={suggestFilter} onChange={e => setSuggestFilter(e.target.value)}>
+                                <option value="all">Tất cả trạng thái ({vatTuTams.length})</option>
+                                <option value="cho_duyet">Đợi duyệt ({pendingCount})</option>
+                                <option value="da_duyet">Đã duyệt ({vatTuTams.filter(v => v.trang_thai === 'da_duyet').length})</option>
+                                <option value="tu_choi">Từ chối ({vatTuTams.filter(v => v.trang_thai === 'tu_choi').length})</option>
+                            </select>
+                            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginLeft: 'auto' }}>
+                                Hiển thị {filtered.length}/{vatTuTams.length}
+                            </div>
+                        </div>
+
+                        <div className="table-container">
+                            <table className="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>STT</th>
+                                        <th>Giảng viên đề xuất</th>
+                                        <th>Tên vật tư đề xuất</th>
+                                        <th>Quy cách / Kỹ thuật</th>
+                                        <th>ĐVT</th>
+                                        <th>Ngành</th>
+                                        <th>Trạng thái</th>
+                                        <th style={{ textAlign: 'right' }}>Thao tác</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {filtered.map((v, idx) => {
+                                        const dupList = findSimilar(v, allVatTus, vatTuTams);
+                                        const hasDup = dupList.length > 0;
+                                        const isDupOpen = openDupId === v.id;
+                                        return (
+                                            <tr key={v.id}>
+                                                <td>{idx + 1}</td>
+                                                <td style={{ fontSize: 13 }}>{v.ten_gv}</td>
+                                                <td style={{ fontWeight: 600 }}>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, position: 'relative' }}>
+                                                        {v.ten_vat_tu}
+                                                        {hasDup && (
+                                                            <>
+                                                                <button
+                                                                    onClick={() => setOpenDupId(isDupOpen ? null : v.id)}
+                                                                    style={{ background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.35)', borderRadius: 6, padding: '1px 6px', fontSize: 11, color: '#d97706', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 3, flexShrink: 0 }}
+                                                                    title="Có thể trùng với vật tư khác"
+                                                                >
+                                                                    <AlertCircle size={11} /> {dupList.length} trùng
+                                                                </button>
+                                                                {isDupOpen && <DupPopover items={dupList} onClose={() => setOpenDupId(null)} />}
+                                                            </>
+                                                        )}
+                                                    </div>
+                                                </td>
+                                                <td style={{ fontSize: 13, color: 'var(--text-secondary)' }}>{v.yeu_cau_ky_thuat || '—'}</td>
+                                                <td><span className="badge badge-info">{v.don_vi_tinh}</span></td>
+                                                <td>
+                                                    {v.ten_nganh
+                                                        ? <span className="badge badge-primary" style={{ fontSize: 11 }}>{v.ten_nganh}</span>
+                                                        : <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Dùng chung</span>
+                                                    }
+                                                </td>
+                                                <td>
+                                                    {(!v.trang_thai || v.trang_thai === 'cho_duyet') ? (
+                                                        <span className="badge" style={{ background: 'rgba(245,158,11,0.1)', color: '#d97706' }}>Đợi duyệt</span>
+                                                    ) : v.trang_thai === 'da_duyet' ? (
+                                                        <span className="badge badge-success">Đã duyệt</span>
+                                                    ) : (
+                                                        <span className="badge badge-danger">Từ chối</span>
+                                                    )}
+                                                </td>
+                                                <td style={{ textAlign: 'right' }}>
+                                                    {(!v.trang_thai || v.trang_thai === 'cho_duyet') && (
+                                                        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                                                            <button 
+                                                                className="btn btn-sm btn-primary" 
+                                                                onClick={() => setApprovalModal({ show: true, item: v, type: 'new', mergeWithId: '', nganh_id: v.nganh_id?.toString() || '' })}
+                                                            >
+                                                                <Check size={14} /> Duyệt mới
+                                                            </button>
+                                                            <button 
+                                                                className="btn btn-sm btn-secondary"
+                                                                onClick={() => setApprovalModal({ show: true, item: v, type: 'merge', mergeWithId: '', nganh_id: '' })}
+                                                            >
+                                                                <RefreshCw size={14} /> Gộp vào kho
+                                                            </button>
+                                                            <button 
+                                                                className="btn btn-sm"
+                                                                style={{ background: 'rgba(239,68,68,0.1)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.3)' }}
+                                                                onClick={() => handleActionVatTuTam('reject', v)}
+                                                                title="Không duyệt vật tư này"
+                                                            >
+                                                                <Ban size={14} /> Không duyệt
+                                                            </button>
+                                                        </div>
+                                                    )}
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+                                    {filtered.length === 0 && (
+                                        <tr>
+                                            <td colSpan="8" style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)' }}>
+                                                {suggestSearch || suggestFilter !== 'all' ? 'Không tìm thấy kết quả phù hợp' : 'Chưa có vật tư đề xuất mới nào'}
+                                            </td>
+                                        </tr>
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
-                </div>
-            )}
+                );
+            })()}
 
             {/* Detail Modal */}
             {selectedDx && detailData && (
@@ -602,12 +751,12 @@ export default function DeXuatAdminPage() {
             {/* Approval / Merge Modal */}
             {approvalModal.show && (
                 <div className="modal-overlay" style={{ zIndex: 1100 }}>
-                    <div className="modal" style={{ maxWidth: 500 }}>
+                    <div className="modal" style={{ maxWidth: 520 }}>
                         <div className="modal-header">
                             <h2 style={{ fontSize: 18, fontWeight: 700 }}>
                                 {approvalModal.type === 'new' ? 'Duyệt thêm vật tư mới' : 'Gộp vào vật tư hiện có'}
                             </h2>
-                            <button className="btn-icon btn-ghost" onClick={() => setApprovalModal({ show: false, item: null, type: 'new', mergeWithId: '' })}>✕</button>
+                            <button className="btn-icon btn-ghost" onClick={() => setApprovalModal({ show: false, item: null, type: 'new', mergeWithId: '', nganh_id: '' })}>✕</button>
                         </div>
                         <div className="modal-body" style={{ padding: 24 }}>
                             <div className="alert alert-info mb-4" style={{ borderRadius: 12 }}>
@@ -642,17 +791,42 @@ export default function DeXuatAdminPage() {
                             )}
 
                             {approvalModal.type === 'new' && (
-                                <p style={{ fontSize: 14, lineHeight: 1.6 }}>
-                                    Bạn có chắc chắn muốn thêm vật tư này vào danh mục chính thức của học kỳ này không? 
-                                    Sau khi duyệt, giảng viên khác có thể nhìn thấy và chọn vật tư này.
-                                </p>
+                                <>
+                                    <div className="form-group">
+                                        <label className="form-label">Ngành (bộ vật tư):</label>
+                                        <select
+                                            className="form-select"
+                                            value={approvalModal.nganh_id}
+                                            onChange={e => setApprovalModal(prev => ({ ...prev, nganh_id: e.target.value }))}
+                                            style={{ width: '100%' }}
+                                        >
+                                            <option value="">— Dùng chung (không thuộc ngành cụ thể) —</option>
+                                            {nganhs.map(n => (
+                                                <option key={n.id} value={n.id.toString()}>{n.ten_nganh}</option>
+                                            ))}
+                                        </select>
+                                        <p style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 8 }}>
+                                            <AlertCircle size={12} style={{ display: 'inline', marginRight: 4 }} />
+                                            Vật tư sẽ được thêm vào bộ vật tư của ngành này khi duyệt.
+                                        </p>
+                                    </div>
+                                    <p style={{ fontSize: 14, lineHeight: 1.6 }}>
+                                        Bạn có chắc chắn muốn thêm vật tư này vào danh mục chính thức không?
+                                        Sau khi duyệt, giảng viên khác có thể nhìn thấy và chọn vật tư này.
+                                    </p>
+                                </>
                             )}
                         </div>
                         <div className="modal-footer" style={{ padding: '16px 24px', background: 'rgba(0,0,0,0.02)' }}>
-                            <button className="btn btn-secondary" onClick={() => setApprovalModal({ show: false, item: null, type: 'new', mergeWithId: '' })}>Hủy</button>
+                            <button className="btn btn-secondary" onClick={() => setApprovalModal({ show: false, item: null, type: 'new', mergeWithId: '', nganh_id: '' })}>Hủy</button>
                             <button 
                                 className="btn btn-primary" 
-                                onClick={() => handleActionVatTuTam(approvalModal.type === 'new' ? 'approve' : 'merge', approvalModal.item, approvalModal.mergeWithId)}
+                                onClick={() => handleActionVatTuTam(
+                                    approvalModal.type === 'new' ? 'approve' : 'merge',
+                                    approvalModal.item,
+                                    approvalModal.mergeWithId,
+                                    approvalModal.nganh_id ? parseInt(approvalModal.nganh_id) : null
+                                )}
                                 disabled={approvalModal.type === 'merge' && !approvalModal.mergeWithId}
                                 style={{ padding: '8px 24px' }}
                             >
