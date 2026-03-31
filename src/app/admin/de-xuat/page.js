@@ -187,6 +187,131 @@ export default function DeXuatAdminPage() {
         }
     };
 
+    // Print proposal as formal document (opens new window like phiếu xuất)
+    const printDeXuatPhieu = () => {
+        if (!detailData || !detailData.chi_tiet) return;
+        const grouped = getGroupedBySubject();
+        if (grouped.length === 0) return;
+
+        const allForms = grouped.map(subject =>
+            subject.classes.map(cls => {
+                const rows = cls.items.map((ct, i) => `
+                    <tr>
+                        <td style="text-align:center">${i + 1}</td>
+                        <td>${ct.ten_vat_tu}</td>
+                        <td>${ct.yeu_cau_ky_thuat || ''}</td>
+                        <td style="text-align:center">${ct.don_vi_tinh}</td>
+                        <td style="text-align:center">${ct.so_luong}</td>
+                        <td></td>
+                    </tr>
+                `).join('');
+
+                const emptyRows = Array.from({ length: Math.max(0, 8 - cls.items.length) }).map(() => `
+                    <tr>
+                        <td style="color:transparent">-</td>
+                        <td></td>
+                        <td></td>
+                        <td></td>
+                        <td></td>
+                        <td></td>
+                    </tr>
+                `).join('');
+
+                return `
+                    <div style="padding: 10px; margin-bottom: 20px; page-break-inside: avoid;">
+                        <div style="text-align: center; margin-bottom: 15px;">
+                            <p style="font-size: 11pt; text-transform: uppercase;">UBND THÀNH PHỐ HỒ CHÍ MINH</p>
+                            <p style="font-size: 11pt; font-weight: bold; text-transform: uppercase;">TRƯỜNG CAO ĐẲNG NGHỀ VIỆT NAM – SINGAPORE</p>
+                            <p>***************************************</p>
+                            <h2 style="font-size: 16pt; font-weight: bold; margin: 15px 0; text-transform: uppercase;">Phiếu đề xuất vật tư cho đào tạo</h2>
+                        </div>
+
+                        <table style="width: 100%; margin-bottom: 10px; border-collapse: collapse;">
+                            <tr>
+                                <td style="width: 60%; vertical-align: top; padding: 5px; border: none;">
+                                    <p>Tên người đề nghị: <span style="border-bottom: 1px dotted #000; display: inline-block; min-width: 250px;">${detailData.ten_gv}</span></p>
+                                    <p style="margin-top: 5px;">Chức vụ: <span style="border-bottom: 1px dotted #000; display: inline-block; min-width: 320px;">Giảng viên</span></p>
+                                    <p style="margin-top: 5px;">Phòng (Khoa): <span style="border-bottom: 1px dotted #000; display: inline-block; min-width: 285px;">............................................</span></p>
+                                </td>
+                                <td style="width: 40%; vertical-align: top; padding: 5px; border: none;">
+                                    <p>Lớp: <span style="border-bottom: 1px dotted #000; display: inline-block; min-width: 200px;">${cls.name}</span></p>
+                                    <p style="margin-top: 5px;">Sĩ số: <span style="border-bottom: 1px dotted #000; display: inline-block; min-width: 195px;">${cls.si_so}</span></p>
+                                    <p style="margin-top: 5px;">Môn: <span style="border-bottom: 1px dotted #000; display: inline-block; min-width: 198px;">${subject.name}</span></p>
+                                </td>
+                            </tr>
+                        </table>
+
+                        <table style="width: 100%; border-collapse: collapse; margin-bottom: 15px;">
+                            <thead>
+                                <tr style="background: #f8f9fa;">
+                                    <th style="border: 1px solid #000; padding: 5px; width: 40px; text-align: center;">TT</th>
+                                    <th style="border: 1px solid #000; padding: 5px; text-align: center;">Tên vật tư</th>
+                                    <th style="border: 1px solid #000; padding: 5px; text-align: center; width: 120px;">Quy cách / YCKT</th>
+                                    <th style="border: 1px solid #000; padding: 5px; width: 60px; text-align: center;">ĐVT</th>
+                                    <th style="border: 1px solid #000; padding: 5px; width: 80px; text-align: center;">Số lượng</th>
+                                    <th style="border: 1px solid #000; padding: 5px; text-align: center; width: 150px;">Ghi chú</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${rows}
+                                ${emptyRows}
+                            </tbody>
+                        </table>
+
+                        <div style="text-align: right; font-style: italic; margin-bottom: 40px;">
+                            Bình Dương, Ngày ........ tháng ........ năm ............
+                        </div>
+
+                        <table style="width: 100%; border-collapse: collapse; text-align: center;">
+                            <tr>
+                                <td style="width: 33.33%; padding: 10px; height: 120px; vertical-align: top; border: none;">
+                                    <p style="font-weight: bold;">Hiệu trưởng</p>
+                                </td>
+                                <td style="width: 33.33%; padding: 10px; height: 120px; vertical-align: top; border: none;">
+                                    <p style="font-weight: bold;">Trưởng khoa</p>
+                                </td>
+                                <td style="width: 33.33%; padding: 10px; height: 120px; vertical-align: top; position: relative; border: none;">
+                                    <p style="font-weight: bold;">Người đề nghị</p>
+                                    <p style="position: absolute; bottom: 10px; left: 0; right: 0; font-weight: bold;">${detailData.ten_gv}</p>
+                                </td>
+                            </tr>
+                        </table>
+                    </div>
+                `;
+            }).join('')
+        ).join('');
+
+        const html = `<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <title>Phiếu Đề Xuất Vật Tư - ${detailData.ten_gv}</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Times New Roman', serif; font-size: 11pt; color: #000; padding: 15mm; }
+        table { border-collapse: collapse; }
+        th, td { border: 1px solid #000; padding: 4px 8px; }
+        h2 { margin-top: 0; }
+        p { margin: 0; }
+        @media print {
+            body { padding: 5mm; }
+            .no-print { display: none; }
+        }
+    </style>
+</head>
+<body>
+    ${allForms}
+</body>
+</html>`;
+
+        const printWindow = window.open('', '_blank');
+        printWindow.document.write(html);
+        printWindow.document.close();
+        printWindow.onload = () => {
+            printWindow.print();
+        };
+    };
+
     if (loading) return <div className="loading-overlay"><div className="spinner" /></div>;
 
     const kiNameObj = kiHocs.find(k => k.id.toString() === selectedKi);
@@ -613,7 +738,7 @@ export default function DeXuatAdminPage() {
                                     )}
                                 </div>
                             </div>
-                            <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+                             <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
                                 <div style={{ display: 'flex', background: 'var(--bg-glass)', padding: 4, borderRadius: 10, border: '1px solid var(--border-color)', boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.05)' }}>
                                     <button
                                         className={`btn btn-sm ${detailViewMode === 'material' ? 'btn-primary' : 'btn-ghost'}`}
@@ -630,6 +755,13 @@ export default function DeXuatAdminPage() {
                                         <List size={14} style={{ marginRight: 6 }} /> Theo môn học
                                     </button>
                                 </div>
+                                <button
+                                    className="btn btn-sm btn-primary"
+                                    style={{ fontSize: 12, padding: '6px 16px', borderRadius: 8 }}
+                                    onClick={printDeXuatPhieu}
+                                >
+                                    <Printer size={14} style={{ marginRight: 6 }} /> In phiếu đề xuất
+                                </button>
                                 <button className="btn-icon btn-ghost" onClick={() => { setSelectedDx(null); setDetailData(null); }} style={{ borderRadius: '50%' }}>✕</button>
                             </div>
                         </div>
@@ -859,6 +991,8 @@ export default function DeXuatAdminPage() {
                     background: transparent;
                 }
             `}</style>
+
+
         </div>
     );
 }

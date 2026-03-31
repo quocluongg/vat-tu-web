@@ -1769,54 +1769,52 @@ textarea {
   }
 }
 
+.print-only {
+  display: none;
+}
+
 /* ===== Print Styles ===== */
 @media print {
   @page {
-    margin: 1.5cm;
-    size: auto;
+    margin: 10mm;
+    size: A4;
   }
 
-  body {
-    background: white;
-    color: black;
-    font-size: 12pt;
-    margin: 0;
-    padding: 0;
+  /* Hide everything by default */
+  body * {
+    visibility: hidden;
   }
 
-  .no-print,
-  .sidebar,
-  .page-header,
-  .public-header,
-  .card-header,
-  .btn,
-  .form-select,
-  .form-input,
-  .material-qty button {
-    display: none !important;
-  }
-
-  .main-content,
-  .public-container {
-    padding: 0 !important;
-    margin: 0 !important;
-    max-width: 100% !important;
-    background: white !important;
-    box-shadow: none !important;
-  }
-
-  .card {
-    border: none !important;
-    box-shadow: none !important;
-    margin: 0 !important;
-    background: transparent !important;
-  }
-
-  .card-body {
-    padding: 0 !important;
+  /* Show only the print-only container and its children */
+  .print-only,
+  .print-only * {
+    visibility: visible;
   }
 
   .print-only {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
     display: block !important;
+    background: white !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  /* Force background colors/images for tables */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Hide specific UI elements that might still linger */
+  .no-print,
+  .sidebar,
+  .modal-overlay,
+  .admin-layout,
+  footer,
+  header {
+    display: none !important;
   }
 }
