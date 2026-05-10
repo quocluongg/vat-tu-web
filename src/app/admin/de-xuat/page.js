@@ -1,6 +1,6 @@
 'use client';
 import { useState, useEffect, useRef } from 'react';
-import { FileText, Eye, Check, X, Clock, CheckCircle, XCircle, AlertCircle, RefreshCw, Users, Package, ChevronRight, List, ChevronDown, Plus, Minus, Send, BookOpen, Search, Printer, Edit2, Download, Ban, Zap } from 'lucide-react';
+import { FileText, Eye, Check, X, Clock, CheckCircle, XCircle, AlertCircle, RefreshCw, Users, Package, ChevronRight, List, ChevronDown, Plus, Minus, Send, BookOpen, Search, Printer, Edit2, Download, Ban, Zap, ArrowLeftRight, Trash2 } from 'lucide-react';
 import { useToast } from '@/components/Toast';
 import { exportExcelTheoNganh, exportExcelMultiNganh } from '@/lib/exportExcel';
 
@@ -65,6 +65,20 @@ function DupPopover({ items, onClose }) {
     );
 }
 
+// Score similarity between a query and a vat_tu name (0-100)
+function scoreSimilarity(query, name) {
+    const normalize = str => (str || '').toLowerCase().trim();
+    const q = normalize(query);
+    const n = normalize(name);
+    if (!q || !n) return 0;
+    if (n === q) return 100;
+    if (n.includes(q) || q.includes(n)) return 90;
+    const words = q.split(/[\s,\/\-]+/).filter(w => w.length > 1);
+    if (words.length === 0) return 0;
+    const overlap = words.filter(w => n.includes(w)).length;
+    return Math.round((overlap / words.length) * 80);
+}
+
 export default function DeXuatAdminPage() {
     const [activeTab, setActiveTab] = useState('overview'); // overview, materials, list, suggestions
     const [deXuats, setDeXuats] = useState([]);
@@ -73,7 +87,7 @@ export default function DeXuatAdminPage() {
     const [loading, setLoading] = useState(true);
     const [selectedDx, setSelectedDx] = useState(null);
     const [detailData, setDetailData] = useState(null);
-    const [detailViewMode, setDetailViewMode] = useState('material'); // material, subject
+    const [detailViewMode, setDetailViewMode] = useState('subject'); // material, subject
     const [stats, setStats] = useState(null);
     const [vatTuTams, setVatTuTams] = useState([]);
     const [allVatTus, setAllVatTus] = useState([]);
@@ -82,6 +96,9 @@ export default function DeXuatAdminPage() {
     const [suggestFilter, setSuggestFilter] = useState('all'); // all, cho_duyet, da_duyet, tu_choi
     const [openDupId, setOpenDupId] = useState(null); // which row's dup popover is open
     const [approvalModal, setApprovalModal] = useState({ show: false, item: null, type: 'new', mergeWithId: '', nganh_id: '' });
+    // Modal để đổi vật tư trong dòng chi tiết đề xuất
+    const [changeVtModal, setChangeVtModal] = useState({ show: false, row: null, search: '', selectedId: '' });
+    const [changeVtSaving, setChangeVtSaving] = useState(false);
     const addToast = useToast();
 
     const fetchKiHoc = async () => {
@@ -126,12 +143,12 @@ export default function DeXuatAdminPage() {
     };
 
     useEffect(() => { fetchKiHoc(); fetchNganhs(); }, []);
-    useEffect(() => { 
+    useEffect(() => {
         if (selectedKi) {
             fetchDeXuat();
             fetchVatTuTam();
             fetchAllVatTus();
-        } 
+        }
     }, [selectedKi]);
 
     const viewDetail = async (dx) => {
@@ -140,6 +157,102 @@ export default function DeXuatAdminPage() {
         setDetailData(data);
         setSelectedDx(dx);
         setDetailViewMode('material');
+    };
+
+    // Đổi vật tư một dòng trong đề xuất
+    const handleChangeVatTu = async () => {
+        if (!changeVtModal.row || !changeVtModal.selectedId) return;
+        setChangeVtSaving(true);
+        try {
+            const res = await fetch('/api/de-xuat-chi-tiet', {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    id: changeVtModal.row.id,
+                    vat_tu_id: parseInt(changeVtModal.selectedId)
+                })
+            });
+            const data = await res.json();
+            if (res.ok) {
+                addToast(data.message || 'Đã cập nhật vật tư', 'success');
+                setChangeVtModal({ show: false, row: null, search: '', selectedId: '' });
+                // Reload detail để cập nhật lại danh sách
+                if (selectedDx) {
+                    const res2 = await fetch(`/api/de-xuat?id=${selectedDx.id}`);
+                    const d2 = await res2.json();
+                    setDetailData(d2);
+                }
+                fetchStats();
+            } else {
+                addToast(data.error || 'Có lỗi xảy ra', 'error');
+            }
+        } catch (err) {
+            addToast('Lỗi: ' + err.message, 'error');
+        }
+        setChangeVtSaving(false);
+    };
+
+    // Xóa 1 dòng chi tiết khỏi đề xuất
+    const handleDeleteChiTiet = async (chiTietId, tenVatTu) => {
+        if (!confirm(`Xóa vật tư "${tenVatTu}" khỏi đề xuất này?`)) return;
+        try {
+            const res = await fetch(`/api/de-xuat-chi-tiet?id=${chiTietId}`, { method: 'DELETE' });
+            const data = await res.json();
+            if (res.ok) {
+                addToast(data.message || 'Đã xóa vật tư khỏi đề xuất', 'success');
+                // Reload detail
+                if (selectedDx) {
+                    const res2 = await fetch(`/api/de-xuat?id=${selectedDx.id}`);
+                    const d2 = await res2.json();
+                    setDetailData(d2);
+                }
+                fetchDeXuat();
+                fetchStats();
+            } else {
+                addToast(data.error || 'Có lỗi xảy ra', 'error');
+            }
+        } catch (err) {
+            addToast('Lỗi: ' + err.message, 'error');
+        }
+    };
+
+    // Xóa nhiều dòng chi tiết (batch) theo vật tư aggregated
+    const handleDeleteAggregatedChiTiet = async (material) => {
+        // Tìm tất cả dòng chi tiết có cùng vật tư
+        if (!detailData || !detailData.chi_tiet) return;
+        const matchingIds = detailData.chi_tiet
+            .filter(ct => {
+                if (material.vat_tu_id) return ct.vat_tu_id === material.vat_tu_id;
+                if (material.vat_tu_tam_id) return ct.vat_tu_tam_id === material.vat_tu_tam_id;
+                return false;
+            })
+            .map(ct => ct.id);
+
+        if (matchingIds.length === 0) return;
+        if (!confirm(`Xóa tất cả ${matchingIds.length} dòng vật tư "${material.ten_vat_tu}" khỏi đề xuất?`)) return;
+
+        try {
+            const res = await fetch('/api/de-xuat-chi-tiet', {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ids: matchingIds })
+            });
+            const data = await res.json();
+            if (res.ok) {
+                addToast(data.message || 'Đã xóa vật tư khỏi đề xuất', 'success');
+                if (selectedDx) {
+                    const res2 = await fetch(`/api/de-xuat?id=${selectedDx.id}`);
+                    const d2 = await res2.json();
+                    setDetailData(d2);
+                }
+                fetchDeXuat();
+                fetchStats();
+            } else {
+                addToast(data.error || 'Có lỗi xảy ra', 'error');
+            }
+        } catch (err) {
+            addToast('Lỗi: ' + err.message, 'error');
+        }
     };
 
     const handleActionVatTuTam = async (action, item, mergeWithId = null, nganh_id = null) => {
@@ -231,7 +344,7 @@ export default function DeXuatAdminPage() {
                                 <td style="width: 60%; vertical-align: top; padding: 5px; border: none;">
                                     <p>Tên người đề nghị: <span style="border-bottom: 1px dotted #000; display: inline-block; min-width: 250px;">${detailData.ten_gv}</span></p>
                                     <p style="margin-top: 5px;">Chức vụ: <span style="border-bottom: 1px dotted #000; display: inline-block; min-width: 320px;">Giảng viên</span></p>
-                                    <p style="margin-top: 5px;">Phòng (Khoa): <span style="border-bottom: 1px dotted #000; display: inline-block; min-width: 285px;">............................................</span></p>
+                                    <p style="margin-top: 5px;">Phòng (Khoa): <span style="border-bottom: 1px dotted #000; display: inline-block; min-width: 285px;">Điện - Điện tử</span></p>
                                 </td>
                                 <td style="width: 40%; vertical-align: top; padding: 5px; border: none;">
                                     <p>Lớp: <span style="border-bottom: 1px dotted #000; display: inline-block; min-width: 200px;">${cls.name}</span></p>
@@ -246,7 +359,7 @@ export default function DeXuatAdminPage() {
                                 <tr style="background: #f8f9fa;">
                                     <th style="border: 1px solid #000; padding: 5px; width: 40px; text-align: center;">TT</th>
                                     <th style="border: 1px solid #000; padding: 5px; text-align: center;">Tên vật tư</th>
-                                    <th style="border: 1px solid #000; padding: 5px; text-align: center; width: 120px;">Quy cách / YCKT</th>
+                                    <th style="border: 1px solid #000; padding: 5px; text-align: center; width: 120px;">TSKT</th>
                                     <th style="border: 1px solid #000; padding: 5px; width: 60px; text-align: center;">ĐVT</th>
                                     <th style="border: 1px solid #000; padding: 5px; width: 80px; text-align: center;">Số lượng</th>
                                     <th style="border: 1px solid #000; padding: 5px; text-align: center; width: 150px;">Ghi chú</th>
@@ -276,6 +389,9 @@ export default function DeXuatAdminPage() {
                                 </td>
                             </tr>
                         </table>
+                        <div style="text-align: center; font-size: 10pt; font-style: italic; margin-top: 20px; opacity: 0.6;">
+                            Phần mềm quản lý vật tư Khoa Điện - Điện tử
+                        </div>
                     </div>
                 `;
             }).join('')
@@ -497,8 +613,9 @@ export default function DeXuatAdminPage() {
                                                 <thead>
                                                     <tr>
                                                         <th style={{ fontSize: 11 }}>Tên vật tư</th>
-                                                        <th style={{ textAlign: 'right', fontSize: 11 }}>Tổng SL</th>
                                                         <th style={{ textAlign: 'center', fontSize: 11 }}>ĐVT</th>
+                                                        <th style={{ textAlign: 'right', fontSize: 11 }}>SL hiện tại</th>
+                                                        <th style={{ textAlign: 'right', fontSize: 11 }}>Tổng SL</th>
                                                     </tr>
                                                 </thead>
                                                 <tbody>
@@ -508,8 +625,11 @@ export default function DeXuatAdminPage() {
                                                                 <div style={{ fontWeight: 600 }}>{m.ten_vat_tu}</div>
                                                                 <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{m.yeu_cau_ky_thuat || ''}</div>
                                                             </td>
-                                                            <td style={{ textAlign: 'right', fontWeight: 700, color: 'var(--text-accent)' }}>{m.tong_de_xuat}</td>
                                                             <td style={{ textAlign: 'center' }}><span className="badge badge-info" style={{ fontSize: 10 }}>{m.don_vi_tinh}</span></td>
+                                                            <td style={{ textAlign: 'right', fontWeight: 600, color: m.so_luong_kho > 0 ? '#2563eb' : 'var(--text-main)' }}>
+                                                                {m.so_luong_kho || 0}
+                                                            </td>
+                                                            <td style={{ textAlign: 'right', fontWeight: 700, color: 'var(--text-accent)' }}>{m.tong_de_xuat}</td>
                                                         </tr>
                                                     ))}
                                                 </tbody>
@@ -676,19 +796,19 @@ export default function DeXuatAdminPage() {
                                                 <td style={{ textAlign: 'right' }}>
                                                     {(!v.trang_thai || v.trang_thai === 'cho_duyet') && (
                                                         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-                                                            <button 
-                                                                className="btn btn-sm btn-primary" 
+                                                            <button
+                                                                className="btn btn-sm btn-primary"
                                                                 onClick={() => setApprovalModal({ show: true, item: v, type: 'new', mergeWithId: '', nganh_id: v.nganh_id?.toString() || '' })}
                                                             >
                                                                 <Check size={14} /> Duyệt mới
                                                             </button>
-                                                            <button 
+                                                            <button
                                                                 className="btn btn-sm btn-secondary"
                                                                 onClick={() => setApprovalModal({ show: true, item: v, type: 'merge', mergeWithId: '', nganh_id: '' })}
                                                             >
                                                                 <RefreshCw size={14} /> Gộp vào kho
                                                             </button>
-                                                            <button 
+                                                            <button
                                                                 className="btn btn-sm"
                                                                 style={{ background: 'rgba(239,68,68,0.1)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.3)' }}
                                                                 onClick={() => handleActionVatTuTam('reject', v)}
@@ -738,7 +858,7 @@ export default function DeXuatAdminPage() {
                                     )}
                                 </div>
                             </div>
-                             <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+                            <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
                                 <div style={{ display: 'flex', background: 'var(--bg-glass)', padding: 4, borderRadius: 10, border: '1px solid var(--border-color)', boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.05)' }}>
                                     <button
                                         className={`btn btn-sm ${detailViewMode === 'material' ? 'btn-primary' : 'btn-ghost'}`}
@@ -769,15 +889,17 @@ export default function DeXuatAdminPage() {
                             {detailData.chi_tiet && detailData.chi_tiet.length > 0 ? (
                                 <div style={{ padding: '24px 32px' }}>
                                     {detailViewMode === 'material' ? (
-                                        <div className="table-container" style={{ border: '1px solid var(--border-color)', borderRadius: 12, overflow: 'hidden', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)' }}>
-                                            <table className="data-table">
-                                                <thead style={{ background: 'var(--bg-card)' }}>
+                                        <div className="table-container" style={{ border: '1px solid var(--border-color)', borderRadius: 12, overflowX: 'auto', overflowY: 'auto', maxHeight: '60vh', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)' }}>
+                                            <table className="data-table" style={{ minWidth: 800 }}>
+                                                <thead style={{ background: 'var(--bg-card)', position: 'sticky', top: 0, zIndex: 10, boxShadow: '0 1px 0 var(--border-color)' }}>
                                                     <tr>
                                                         <th style={{ padding: '16px 20px', width: 60 }}>STT</th>
-                                                        <th style={{ padding: '16px 20px' }}>Tên vật tư / Quy cách</th>
-                                                        <th style={{ padding: '16px 20px' }}>Sử dụng cho</th>
+                                                        <th style={{ padding: '16px 20px', minWidth: 200 }}>Tên vật tư / Quy cách</th>
+                                                        <th style={{ padding: '16px 20px', minWidth: 150 }}>Sử dụng cho</th>
                                                         <th style={{ padding: '16px 20px', textAlign: 'center', width: 100 }}>ĐVT</th>
-                                                        <th style={{ padding: '16px 20px', textAlign: 'right', width: 120 }}>Số lượng</th>
+                                                        <th style={{ padding: '16px 20px', textAlign: 'right', width: 100 }}>SL hiện tại</th>
+                                                        <th style={{ padding: '16px 20px', textAlign: 'right', width: 100 }}>Số lượng</th>
+                                                        <th style={{ padding: '16px 20px', textAlign: 'center', width: 110 }}>Thao tác</th>
                                                     </tr>
                                                 </thead>
                                                 <tbody>
@@ -803,8 +925,33 @@ export default function DeXuatAdminPage() {
                                                             <td style={{ padding: '12px 20px', textAlign: 'center' }}>
                                                                 <span className="badge badge-info" style={{ minWidth: 50, fontWeight: 600 }}>{m.don_vi_tinh}</span>
                                                             </td>
+                                                            <td style={{ padding: '12px 20px', textAlign: 'right', fontWeight: 600, color: m.so_luong_kho > 0 ? '#2563eb' : 'var(--text-main)' }}>
+                                                                {m.so_luong_kho || 0}
+                                                            </td>
                                                             <td style={{ padding: '12px 20px', textAlign: 'right' }}>
                                                                 <div style={{ fontWeight: 800, color: 'var(--text-accent)', fontSize: 17 }}>{m.tong_so_luong}</div>
+                                                            </td>
+                                                            <td style={{ padding: '12px 16px', textAlign: 'center' }}>
+                                                                <div style={{ display: 'flex', gap: 6, justifyContent: 'center' }}>
+                                                                    <button
+                                                                        title="Thay đổi vật tư này sang vật tư trong kho"
+                                                                        onClick={() => setChangeVtModal({ show: true, row: m, search: m.ten_vat_tu, selectedId: m.vat_tu_id?.toString() || '' })}
+                                                                        style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 12px', fontSize: 12, fontWeight: 600, borderRadius: 8, border: '1px solid rgba(14,165,233,0.35)', background: 'rgba(14,165,233,0.07)', color: 'var(--text-accent)', cursor: 'pointer', whiteSpace: 'nowrap', transition: 'all 0.15s' }}
+                                                                        onMouseEnter={e => { e.currentTarget.style.background = 'rgba(14,165,233,0.15)'; }}
+                                                                        onMouseLeave={e => { e.currentTarget.style.background = 'rgba(14,165,233,0.07)'; }}
+                                                                    >
+                                                                        <ArrowLeftRight size={13} /> Đổi VT
+                                                                    </button>
+                                                                    <button
+                                                                        title="Xóa vật tư này khỏi đề xuất"
+                                                                        onClick={() => handleDeleteAggregatedChiTiet(m)}
+                                                                        style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 12px', fontSize: 12, fontWeight: 600, borderRadius: 8, border: '1px solid rgba(239,68,68,0.35)', background: 'rgba(239,68,68,0.07)', color: '#f87171', cursor: 'pointer', whiteSpace: 'nowrap', transition: 'all 0.15s' }}
+                                                                        onMouseEnter={e => { e.currentTarget.style.background = 'rgba(239,68,68,0.15)'; }}
+                                                                        onMouseLeave={e => { e.currentTarget.style.background = 'rgba(239,68,68,0.07)'; }}
+                                                                    >
+                                                                        <Trash2 size={13} /> Xóa
+                                                                    </button>
+                                                                </div>
                                                             </td>
                                                         </tr>
                                                     ))}
@@ -832,15 +979,17 @@ export default function DeXuatAdminPage() {
                                                                     <span style={{ fontWeight: 600, fontSize: 14 }}>Lớp: {cls.name}</span>
                                                                     <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>(Sĩ số: {cls.si_so})</span>
                                                                 </div>
-                                                                <div style={{ overflow: 'hidden', border: '1px solid var(--border-color)', borderRadius: 10 }}>
-                                                                    <table className="data-table" style={{ margin: 0 }}>
-                                                                        <thead style={{ background: 'rgba(0,0,0,0.01)' }}>
+                                                                <div style={{ overflowX: 'auto', overflowY: 'auto', maxHeight: '350px', border: '1px solid var(--border-color)', borderRadius: 10 }}>
+                                                                    <table className="data-table" style={{ margin: 0, minWidth: 700 }}>
+                                                                        <thead style={{ background: 'var(--bg-card)', position: 'sticky', top: 0, zIndex: 10, boxShadow: '0 1px 0 var(--border-color)' }}>
                                                                             <tr>
                                                                                 <th style={{ width: 50, fontSize: 11, padding: '10px 16px' }}>#</th>
-                                                                                <th style={{ fontSize: 11, padding: '10px 16px' }}>Tên vật tư</th>
-                                                                                <th style={{ fontSize: 11, padding: '10px 16px' }}>Quy cách / Yêu cầu</th>
+                                                                                <th style={{ fontSize: 11, padding: '10px 16px', minWidth: 150 }}>Tên vật tư</th>
+                                                                                <th style={{ fontSize: 11, padding: '10px 16px', minWidth: 120 }}>Quy cách / Yêu cầu</th>
                                                                                 <th style={{ width: 80, textAlign: 'center', fontSize: 11, padding: '10px 16px' }}>ĐVT</th>
-                                                                                <th style={{ width: 100, textAlign: 'right', fontSize: 11, padding: '10px 16px' }}>Số lượng</th>
+                                                                                <th style={{ width: 90, textAlign: 'right', fontSize: 11, padding: '10px 16px' }}>SL hiện tại</th>
+                                                                                <th style={{ width: 90, textAlign: 'right', fontSize: 11, padding: '10px 16px' }}>Số lượng</th>
+                                                                                <th style={{ width: 110, textAlign: 'center', fontSize: 11, padding: '10px 16px' }}>Thao tác</th>
                                                                             </tr>
                                                                         </thead>
                                                                         <tbody>
@@ -852,7 +1001,32 @@ export default function DeXuatAdminPage() {
                                                                                     <td style={{ textAlign: 'center', padding: '8px 16px' }}>
                                                                                         <span className="badge" style={{ fontSize: 10, background: 'rgba(0,0,0,0.04)' }}>{item.don_vi_tinh}</span>
                                                                                     </td>
+                                                                                    <td style={{ textAlign: 'right', padding: '8px 16px', fontWeight: 600, color: item.so_luong_kho > 0 ? '#2563eb' : 'var(--text-main)' }}>
+                                                                                        {item.so_luong_kho || 0}
+                                                                                    </td>
                                                                                     <td style={{ textAlign: 'right', padding: '8px 16px', fontWeight: 700, color: 'var(--text-main)' }}>{item.so_luong}</td>
+                                                                                    <td style={{ textAlign: 'center', padding: '8px 12px' }}>
+                                                                                        <div style={{ display: 'flex', gap: 4, justifyContent: 'center' }}>
+                                                                                            <button
+                                                                                                title="Đổi vật tư"
+                                                                                                onClick={() => setChangeVtModal({ show: true, row: item, search: item.ten_vat_tu, selectedId: item.vat_tu_id?.toString() || '' })}
+                                                                                                style={{ display: 'inline-flex', alignItems: 'center', gap: 3, padding: '3px 8px', fontSize: 11, fontWeight: 600, borderRadius: 6, border: '1px solid rgba(14,165,233,0.3)', background: 'rgba(14,165,233,0.06)', color: 'var(--text-accent)', cursor: 'pointer', whiteSpace: 'nowrap', transition: 'all 0.15s' }}
+                                                                                                onMouseEnter={e => { e.currentTarget.style.background = 'rgba(14,165,233,0.15)'; }}
+                                                                                                onMouseLeave={e => { e.currentTarget.style.background = 'rgba(14,165,233,0.06)'; }}
+                                                                                            >
+                                                                                                <ArrowLeftRight size={11} /> Đổi
+                                                                                            </button>
+                                                                                            <button
+                                                                                                title="Xóa vật tư này"
+                                                                                                onClick={() => handleDeleteChiTiet(item.id, item.ten_vat_tu)}
+                                                                                                style={{ display: 'inline-flex', alignItems: 'center', gap: 3, padding: '3px 8px', fontSize: 11, fontWeight: 600, borderRadius: 6, border: '1px solid rgba(239,68,68,0.3)', background: 'rgba(239,68,68,0.06)', color: '#f87171', cursor: 'pointer', whiteSpace: 'nowrap', transition: 'all 0.15s' }}
+                                                                                                onMouseEnter={e => { e.currentTarget.style.background = 'rgba(239,68,68,0.15)'; }}
+                                                                                                onMouseLeave={e => { e.currentTarget.style.background = 'rgba(239,68,68,0.06)'; }}
+                                                                                            >
+                                                                                                <Trash2 size={11} /> Xóa
+                                                                                            </button>
+                                                                                        </div>
+                                                                                    </td>
                                                                                 </tr>
                                                                             ))}
                                                                         </tbody>
@@ -880,6 +1054,142 @@ export default function DeXuatAdminPage() {
                 </div>
             )}
 
+            {/* Modal Thay đổi vật tư */}
+            {changeVtModal.show && (() => {
+                // Tính điểm tương đồng cho mọi vật tư trong kho
+                const scored = allVatTus
+                    .map(vt => ({
+                        ...vt,
+                        score: scoreSimilarity(changeVtModal.search, vt.ten_vat_tu)
+                    }))
+                    .sort((a, b) => b.score - a.score);
+
+                // Lọc theo text search (nếu có nhập thêm)
+                const searchQ = changeVtModal.search.toLowerCase().trim();
+                const suggestions = searchQ
+                    ? scored.filter(vt =>
+                        vt.ten_vat_tu.toLowerCase().includes(searchQ) ||
+                        (vt.yeu_cau_ky_thuat || '').toLowerCase().includes(searchQ)
+                    )
+                    : scored.slice(0, 20);
+
+                const selectedVt = allVatTus.find(vt => vt.id.toString() === changeVtModal.selectedId);
+
+                return (
+                    <div className="modal-overlay" style={{ zIndex: 1200 }} onClick={() => setChangeVtModal({ show: false, row: null, search: '', selectedId: '' })}>
+                        <div className="modal" style={{ maxWidth: 580, maxHeight: '90vh', display: 'flex', flexDirection: 'column' }} onClick={e => e.stopPropagation()}>
+                            <div className="modal-header" style={{ padding: '20px 24px' }}>
+                                <div>
+                                    <h2 style={{ fontSize: 18, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8 }}>
+                                        <ArrowLeftRight size={18} className="text-accent" /> Thay đổi vật tư
+                                    </h2>
+                                    <p style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>
+                                        Đang đổi: <strong style={{ color: 'var(--text-primary)' }}>{changeVtModal.row?.ten_vat_tu}</strong>
+                                    </p>
+                                </div>
+                                <button className="btn-icon btn-ghost" onClick={() => setChangeVtModal({ show: false, row: null, search: '', selectedId: '' })}>✕</button>
+                            </div>
+
+                            <div className="modal-body" style={{ padding: '0 24px 16px', overflowY: 'auto', flex: 1 }}>
+                                {/* Search box */}
+                                <div style={{ position: 'relative', marginBottom: 16 }}>
+                                    <Search size={15} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', pointerEvents: 'none' }} />
+                                    <input
+                                        className="form-input"
+                                        style={{ paddingLeft: 36, fontSize: 14 }}
+                                        placeholder="Tìm vật tư trong kho..."
+                                        value={changeVtModal.search}
+                                        autoFocus
+                                        onChange={e => setChangeVtModal(prev => ({ ...prev, search: e.target.value, selectedId: '' }))}
+                                    />
+                                    {changeVtModal.search && (
+                                        <button
+                                            style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: 2 }}
+                                            onClick={() => setChangeVtModal(prev => ({ ...prev, search: '', selectedId: '' }))}
+                                        >
+                                            <X size={14} />
+                                        </button>
+                                    )}
+                                </div>
+
+                                {/* Selected preview */}
+                                {selectedVt && (
+                                    <div style={{ padding: '10px 14px', marginBottom: 12, borderRadius: 10, background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.25)', display: 'flex', alignItems: 'center', gap: 12 }}>
+                                        <CheckCircle size={16} style={{ color: '#10b981', flexShrink: 0 }} />
+                                        <div style={{ flex: 1, minWidth: 0 }}>
+                                            <div style={{ fontWeight: 700, fontSize: 14, color: '#10b981' }}>{selectedVt.ten_vat_tu}</div>
+                                            <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{selectedVt.yeu_cau_ky_thuat || '—'} • {selectedVt.don_vi_tinh}</div>
+                                        </div>
+                                        <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>Đã chọn</span>
+                                    </div>
+                                )}
+
+                                {/* Suggestions list */}
+                                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 8, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                    {changeVtModal.search ? `${suggestions.length} kết quả` : 'Gợi ý theo tên tương đồng'}
+                                </div>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 340, overflowY: 'auto' }}>
+                                    {suggestions.length === 0 ? (
+                                        <div style={{ textAlign: 'center', padding: '24px 0', color: 'var(--text-muted)', fontSize: 13 }}>
+                                            Không tìm thấy vật tư phù hợp
+                                        </div>
+                                    ) : suggestions.map(vt => {
+                                        const isSelected = changeVtModal.selectedId === vt.id.toString();
+                                        const isCurrent = changeVtModal.row?.vat_tu_id === vt.id;
+                                        return (
+                                            <div
+                                                key={vt.id}
+                                                onClick={() => setChangeVtModal(prev => ({ ...prev, selectedId: vt.id.toString() }))}
+                                                style={{
+                                                    padding: '10px 14px', borderRadius: 10, cursor: 'pointer', transition: 'all 0.15s',
+                                                    border: isSelected ? '1.5px solid rgba(14,165,233,0.6)' : '1px solid var(--border-color)',
+                                                    background: isSelected ? 'rgba(14,165,233,0.08)' : isCurrent ? 'rgba(99,102,241,0.05)' : 'var(--bg-glass)',
+                                                    display: 'flex', alignItems: 'center', gap: 12
+                                                }}
+                                            >
+                                                {/* Score bar */}
+                                                <div style={{ width: 36, flexShrink: 0, textAlign: 'center' }}>
+                                                    {vt.score >= 80 ? (
+                                                        <span style={{ fontSize: 10, padding: '2px 5px', borderRadius: 4, background: 'rgba(16,185,129,0.12)', color: '#10b981', fontWeight: 700 }}>Cao</span>
+                                                    ) : vt.score >= 40 ? (
+                                                        <span style={{ fontSize: 10, padding: '2px 5px', borderRadius: 4, background: 'rgba(245,158,11,0.12)', color: '#d97706', fontWeight: 700 }}>TB</span>
+                                                    ) : (
+                                                        <span style={{ fontSize: 10, padding: '2px 5px', borderRadius: 4, background: 'rgba(0,0,0,0.05)', color: 'var(--text-muted)', fontWeight: 600 }}>—</span>
+                                                    )}
+                                                </div>
+                                                <div style={{ flex: 1, minWidth: 0 }}>
+                                                    <div style={{ fontWeight: 600, fontSize: 13, color: isSelected ? 'var(--text-accent)' : 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                                                        {vt.ten_vat_tu}
+                                                        {isCurrent && <span style={{ fontSize: 10, padding: '1px 5px', borderRadius: 4, background: 'rgba(99,102,241,0.12)', color: '#818cf8' }}>Hiện tại</span>}
+                                                    </div>
+                                                    <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
+                                                        {vt.yeu_cau_ky_thuat || '—'} &bull; <span style={{ color: 'var(--text-accent)', fontWeight: 600 }}>{vt.don_vi_tinh}</span>
+                                                        {vt.so_luong_kho !== undefined && <span style={{ marginLeft: 8, color: vt.so_luong_kho > 0 ? '#34d399' : '#f87171' }}>Kho: {vt.so_luong_kho}</span>}
+                                                    </div>
+                                                </div>
+                                                {isSelected && <Check size={16} style={{ color: 'var(--text-accent)', flexShrink: 0 }} />}
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+
+                            <div className="modal-footer" style={{ padding: '16px 24px', borderTop: '1px solid var(--border-color)', display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
+                                <button className="btn btn-secondary" onClick={() => setChangeVtModal({ show: false, row: null, search: '', selectedId: '' })}>Hủy</button>
+                                <button
+                                    className="btn btn-primary"
+                                    disabled={!changeVtModal.selectedId || changeVtSaving}
+                                    onClick={handleChangeVatTu}
+                                    style={{ minWidth: 120 }}
+                                >
+                                    {changeVtSaving ? <div className="spinner" style={{ width: 16, height: 16 }} /> : <><Check size={15} /> Xác nhận đổi</>}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                );
+            })()}
+
             {/* Approval / Merge Modal */}
             {approvalModal.show && (
                 <div className="modal-overlay" style={{ zIndex: 1100 }}>
@@ -902,8 +1212,8 @@ export default function DeXuatAdminPage() {
                             {approvalModal.type === 'merge' && (
                                 <div className="form-group">
                                     <label className="form-label">Chọn vật tư trong kho để gộp vào:</label>
-                                    <select 
-                                        className="form-select" 
+                                    <select
+                                        className="form-select"
                                         value={approvalModal.mergeWithId}
                                         onChange={e => setApprovalModal(prev => ({ ...prev, mergeWithId: e.target.value }))}
                                         style={{ width: '100%' }}
@@ -951,8 +1261,8 @@ export default function DeXuatAdminPage() {
                         </div>
                         <div className="modal-footer" style={{ padding: '16px 24px', background: 'rgba(0,0,0,0.02)' }}>
                             <button className="btn btn-secondary" onClick={() => setApprovalModal({ show: false, item: null, type: 'new', mergeWithId: '', nganh_id: '' })}>Hủy</button>
-                            <button 
-                                className="btn btn-primary" 
+                            <button
+                                className="btn btn-primary"
                                 onClick={() => handleActionVatTuTam(
                                     approvalModal.type === 'new' ? 'approve' : 'merge',
                                     approvalModal.item,

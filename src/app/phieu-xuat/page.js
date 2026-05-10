@@ -261,6 +261,9 @@ export default function PhieuXuatPublicPage() {
                         </td>
                     </tr>
                 </table>
+                <div style="text-align: center; font-size: 10pt; font-style: italic; margin-top: 20px; opacity: 0.6;">
+                    Phần mềm quản lý vật tư Khoa Điện - Điện tử
+                </div>
             </div>
         `;
 

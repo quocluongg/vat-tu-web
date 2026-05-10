@@ -29,8 +29,12 @@ const menuItems = [
     {
         section: 'Nghiệp vụ',
         items: [
-            { href: '/admin/de-xuat', label: 'Đề xuất dự trù', icon: FileText },
-            { href: '/admin/phieu-xuat', label: 'Phiếu xuất', icon: FileOutput },
+            {
+                href: '/admin/de-xuat', label: 'Phiếu dự trù vật tư', icon: FileText
+            },
+            {
+                href: '/admin/phieu-xuat', label: 'Phiếu đề xuất vật tư', icon: FileOutput
+            },
         ]
     }
 ];

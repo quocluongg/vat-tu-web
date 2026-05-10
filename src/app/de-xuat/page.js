@@ -817,6 +817,10 @@ const PrintLayout = ({ kiInfo, selectedGv, giaoViens, phanCongs, vatTus, vatTuTa
                                 </tr>
                             </tbody>
                         </table>
+                        
+                        <div style={{ textAlign: 'center', fontSize: '10pt', fontStyle: 'italic', marginTop: '20px', opacity: 0.6 }}>
+                            Phần mềm quản lý vật tư Khoa Điện - Điện tử
+                        </div>
 
                         {/* Cut line */}
                     </div>
