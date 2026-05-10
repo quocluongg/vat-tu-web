@@ -42,14 +42,25 @@ export default function PhieuXuatAdminPage() {
     };
 
     const updateStatus = async (id, trang_thai) => {
-        await fetch('/api/phieu-xuat', {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ id, trang_thai }),
-        });
-        addToast(`Cập nhật: ${statusConfig[trang_thai].label}`);
-        fetchData();
-        setDetail(null);
+        try {
+            const res = await fetch('/api/phieu-xuat', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id, trang_thai }),
+            });
+            
+            if (!res.ok) {
+                const errorData = await res.json();
+                addToast(errorData.error || 'Lỗi hệ thống', 'error');
+                return;
+            }
+
+            addToast(`Cập nhật: ${statusConfig[trang_thai].label}`, 'success');
+            fetchData();
+            setDetail(null);
+        } catch (err) {
+            addToast('Lỗi kết nối đến máy chủ', 'error');
+        }
     };
 
     if (loading) return <div className="loading-overlay"><div className="spinner" /></div>;

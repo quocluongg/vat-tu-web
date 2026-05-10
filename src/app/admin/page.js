@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import {
     LayoutDashboard, Users, BookOpen, Boxes, FileText, ShoppingCart,
     FileOutput, Calendar, TrendingUp, Clock, PlusCircle, ArrowRight,
-    Activity, CheckCircle2, AlertCircle, BarChart3
+    Activity, CheckCircle2, AlertCircle, BarChart3, Scale
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -67,6 +67,9 @@ export default function DashboardPage() {
                 </Link>
                 <Link href="/admin/phieu-xuat" className="btn btn-secondary btn-sm" style={{ borderRadius: 'var(--radius-full)' }}>
                     <FileOutput size={16} className="text-warning" /> Phiếu ghi nhận
+                </Link>
+                <Link href="/admin/phan-phat" className="btn btn-secondary btn-sm" style={{ borderRadius: 'var(--radius-full)' }}>
+                    <Scale size={16} className="text-primary" /> Giám sát cấp phát
                 </Link>
             </div>
 

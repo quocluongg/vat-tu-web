@@ -1,6 +1,61 @@
 import { NextResponse } from 'next/server';
 import getDb from '@/lib/db';
 
+// The Final Hybrid Distribution Engine
+// Phase 1: Guarantee 1 unit floor (prioritizing small demands)
+// Phase 2: Proportional split (Hamilton Method) for the rest, matching normal logic
+function distributeFairly(supply, demandsArray) {
+    let items = demandsArray.map((it, i) => ({ ...it, index: i, got: 0 }));
+    let remaining = supply;
+    
+    // PHASE 1: Guarantee 1 unit minimum to satisfy basic need for everyone
+    let sortedForBaseline = [...items].sort((a, b) => a.demand - b.demand || a.index - b.index);
+    for (let i = 0; i < sortedForBaseline.length; i++) {
+        if (remaining > 0 && sortedForBaseline[i].demand > 0) {
+            sortedForBaseline[i].got += 1;
+            remaining -= 1;
+        }
+    }
+    
+    if (remaining <= 0) return items;
+    
+    // PHASE 2: Distribute the rest proportionally according to the user's demand size
+    let remainingDemands = items.map(it => Math.max(0, it.demand - it.got));
+    let totalRemainingDemand = remainingDemands.reduce((a, b) => a + b, 0);
+    
+    if (totalRemainingDemand > 0) {
+        // Cap distribution at total needed
+        let toDistribute = Math.min(remaining, totalRemainingDemand);
+        
+        let shares = items.map((it, i) => {
+            let exact = (remainingDemands[i] / totalRemainingDemand) * toDistribute;
+            let floor = Math.floor(exact);
+            return { index: i, exact, floor, fraction: exact - floor };
+        });
+        
+        // Step A: Distribute safe whole numbers
+        shares.forEach(sh => {
+            items[sh.index].got += sh.floor;
+            toDistribute -= sh.floor;
+        });
+        
+        // Step B: Hamilton Largest Remainder for the trailing integers
+        if (toDistribute > 0) {
+            let sortedByFraction = shares
+                .filter(sh => items[sh.index].got < items[sh.index].demand)
+                .sort((a, b) => b.fraction - a.fraction || a.index - b.index);
+            
+            for (let j = 0; j < Math.round(toDistribute); j++) {
+                if (j < sortedByFraction.length) {
+                    items[sortedByFraction[j].index].got += 1;
+                }
+            }
+        }
+    }
+    
+    return items;
+}
+
 export async function GET(request) {
     try {
         const db = getDb();
@@ -44,7 +99,7 @@ export async function GET(request) {
         const summary = searchParams.get('summary');
         const mon_hoc_id = searchParams.get('mon_hoc_id');
         if (summary === 'true' && giao_vien_id && ki_id && mon_hoc_id) {
-            // 1. Get total exported by THIS teacher for this subject in this semester
+            // 1. Get total exported by THIS teacher for this SPECIFIC subject in this semester (for UI local row limits)
             const exportedResult = await db.execute({
                 sql: `
                     SELECT pxct.vat_tu_id, SUM(pxct.so_luong) as da_xuat
@@ -56,6 +111,22 @@ export async function GET(request) {
                 `,
                 args: [parseInt(giao_vien_id), parseInt(ki_id), parseInt(mon_hoc_id)]
             });
+
+            // 1.1 Get total GLOBAL exported by THIS teacher across ALL subjects in this semester (for Teacher-wide Fair Quota logic)
+            const exportedGlobalResult = await db.execute({
+                sql: `
+                    SELECT pxct.vat_tu_id, SUM(pxct.so_luong) as da_xuat_global
+                    FROM phieu_xuat_chi_tiet pxct
+                    JOIN phieu_xuat px ON pxct.phieu_xuat_id = px.id
+                    WHERE px.giao_vien_id = ? AND px.ki_id = ?
+                      AND px.trang_thai != 'tu_choi'
+                    GROUP BY pxct.vat_tu_id
+                `,
+                args: [parseInt(giao_vien_id), parseInt(ki_id)]
+            });
+            
+            const globalUsedMap = {};
+            exportedGlobalResult.rows.forEach(g => { globalUsedMap[g.vat_tu_id] = g.da_xuat_global; });
 
             // 2. Get total stats for ALL materials (inventory, global proposals, and GLOBAL export history)
             const statsResult = await db.execute({
@@ -70,7 +141,13 @@ export async function GET(request) {
                                FROM phieu_xuat_chi_tiet pxct
                                JOIN phieu_xuat px ON pxct.phieu_xuat_id = px.id
                                WHERE pxct.vat_tu_id = vt.id AND px.trang_thai = 'da_xuat'
-                           ), 0) as total_da_xuat_all
+                           ), 0) as total_da_xuat_all,
+                           COALESCE((
+                               SELECT SUM(pxct.so_luong)
+                               FROM phieu_xuat_chi_tiet pxct
+                               JOIN phieu_xuat px ON pxct.phieu_xuat_id = px.id
+                               WHERE pxct.vat_tu_id = vt.id AND px.trang_thai IN ('cho_duyet', 'da_ky')
+                           ), 0) as total_pending_all
                     FROM vat_tu vt
                     LEFT JOIN de_xuat_chi_tiet dxct ON vt.id = dxct.vat_tu_id
                     LEFT JOIN de_xuat dx ON dxct.de_xuat_id = dx.id AND dx.ki_id = vt.ki_id
@@ -80,13 +157,54 @@ export async function GET(request) {
                 args: [parseInt(ki_id)]
             });
 
+            // 3. Get all demands AGGREGATED AT TEACHER LEVEL for exact fair bidding entity alignment
+            const demandsResult = await db.execute({
+                sql: `
+                    SELECT dxct.vat_tu_id, dx.giao_vien_id, SUM(dxct.so_luong) as demand
+                    FROM de_xuat_chi_tiet dxct
+                    JOIN de_xuat dx ON dxct.de_xuat_id = dx.id
+                    WHERE dx.ki_id = ? AND dx.trang_thai IN ('da_nop', 'duyet', 'dang_lam')
+                    GROUP BY dxct.vat_tu_id, dx.giao_vien_id
+                `,
+                args: [parseInt(ki_id)]
+            });
+
             const summaryMap = {};
+            
+            // Pre-group demands per material
+            const demandsByMaterial = {};
+            demandsResult.rows.forEach(r => {
+                if (!demandsByMaterial[r.vat_tu_id]) demandsByMaterial[r.vat_tu_id] = [];
+                demandsByMaterial[r.vat_tu_id].push({
+                    gv_id: r.giao_vien_id,
+                    demand: r.demand
+                });
+            });
+
             statsResult.rows.forEach(r => {
-                // total_supply = Current Inventory + What has already been depleted from it
+                const totalSupply = r.so_luong_kho + r.total_da_xuat_all;
+                const materialDemands = demandsByMaterial[r.vat_tu_id] || [];
+                
+                // Compute fair distribution outcomes at the Teacher Entity level
+                const allocatedResults = distributeFairly(totalSupply, materialDemands);
+                
+                // Find outcome specifically for CURRENT teacher context
+                const myAllocation = allocatedResults.find(item => 
+                    item.gv_id === parseInt(giao_vien_id)
+                );
+
+                const globalAlreadyUsed = globalUsedMap[r.vat_tu_id] || 0;
+                const teacherFairTotal = myAllocation ? myAllocation.got : 0;
+
                 summaryMap[r.vat_tu_id] = {
-                    da_xuat: 0,
-                    total_supply: r.so_luong_kho + r.total_da_xuat_all,
-                    total_proposed: r.total_proposed
+                    da_xuat: 0, // Placeholder to be populated from exportedResult
+                    total_supply: totalSupply,
+                    total_proposed: r.total_proposed,
+                    so_luong_kho: r.so_luong_kho,
+                    so_luong_free: Math.max(0, r.so_luong_kho - r.total_pending_all),
+                    // Return the dynamically remaining global pool share specifically accessible to this user!
+                    fair_practical_total: teacherFairTotal, 
+                    teacher_global_used: globalAlreadyUsed
                 };
             });
 
@@ -279,6 +397,24 @@ export async function POST(request) {
             exportedMap[e.vat_tu_id] = e.da_xuat;
         });
 
+        // 3.1. Get GLOBAL exports across ALL subjects for this teacher to properly decrement from global fair limit
+        const globalExportsResult = await db.execute({
+            sql: `
+                SELECT pxct.vat_tu_id, SUM(pxct.so_luong) as da_xuat_global
+                FROM phieu_xuat_chi_tiet pxct
+                JOIN phieu_xuat px ON pxct.phieu_xuat_id = px.id
+                WHERE px.giao_vien_id = ? AND px.ki_id = ?
+                  AND px.trang_thai != 'tu_choi'
+                GROUP BY pxct.vat_tu_id
+            `,
+            args: [giao_vien_id, ki_id]
+        });
+
+        const globalExportedMap = {};
+        globalExportsResult.rows.forEach(e => {
+            globalExportedMap[e.vat_tu_id] = e.da_xuat_global;
+        });
+
         // 4. Get global stats for materials in this request (inventory & total proposed across ALL teachers)
         const globalStatsResult = await db.execute({
             sql: `
@@ -292,7 +428,13 @@ export async function POST(request) {
                                FROM phieu_xuat_chi_tiet pxct
                                JOIN phieu_xuat px ON pxct.phieu_xuat_id = px.id
                                WHERE pxct.vat_tu_id = vt.id AND px.trang_thai = 'da_xuat'
-                       ), 0) as total_da_xuat_all
+                       ), 0) as total_da_xuat_all,
+                       COALESCE((
+                               SELECT SUM(pxct.so_luong)
+                               FROM phieu_xuat_chi_tiet pxct
+                               JOIN phieu_xuat px ON pxct.phieu_xuat_id = px.id
+                               WHERE pxct.vat_tu_id = vt.id AND px.trang_thai IN ('cho_duyet', 'da_ky')
+                       ), 0) as total_pending_all
                 FROM vat_tu vt
                 LEFT JOIN de_xuat_chi_tiet dxct ON vt.id = dxct.vat_tu_id
                 LEFT JOIN de_xuat dx ON dxct.de_xuat_id = dx.id AND dx.ki_id = vt.ki_id
@@ -306,8 +448,32 @@ export async function POST(request) {
         globalStatsResult.rows.forEach(r => {
             globalStatsMap[r.vat_tu_id] = {
                 total_supply: r.so_luong_kho + r.total_da_xuat_all,
-                total_proposed: r.total_proposed
+                total_proposed: r.total_proposed,
+                so_luong_kho: r.so_luong_kho,
+                so_luong_free: Math.max(0, r.so_luong_kho - r.total_pending_all)
             };
+        });
+
+        // 4.1. Get granular demands AT TEACHER LEVEL for explicit fair-allocation computation
+        const demandsResult = await db.execute({
+            sql: `
+                SELECT dxct.vat_tu_id, dx.giao_vien_id, SUM(dxct.so_luong) as demand
+                FROM de_xuat_chi_tiet dxct
+                JOIN de_xuat dx ON dxct.de_xuat_id = dx.id
+                WHERE dx.ki_id = ? AND dx.trang_thai IN ('da_nop', 'duyet', 'dang_lam')
+                AND dxct.vat_tu_id IN (${chi_tiet.map(() => '?').join(',')})
+                GROUP BY dxct.vat_tu_id, dx.giao_vien_id
+            `,
+            args: [ki_id, ...chi_tiet.map(ct => ct.vat_tu_id)]
+        });
+
+        const demandsByMaterial = {};
+        demandsResult.rows.forEach(r => {
+            if (!demandsByMaterial[r.vat_tu_id]) demandsByMaterial[r.vat_tu_id] = [];
+            demandsByMaterial[r.vat_tu_id].push({
+                gv_id: r.giao_vien_id,
+                demand: r.demand
+            });
         });
 
         // Validate quantities don't exceed proportional limits
@@ -315,27 +481,34 @@ export async function POST(request) {
             const ct = chi_tiet[i];
             const proposedQty = proposalMap[ct.vat_tu_id] || 0;
             const alreadyExported = exportedMap[ct.vat_tu_id] || 0;
-            const remainingQty = Math.max(0, proposedQty - alreadyExported);
             
-            // Calculate practical limit based on total supply ratio (fixed for the semester)
-            const gStats = globalStatsMap[ct.vat_tu_id] || { total_supply: proposedQty, total_proposed: proposedQty };
-            const totalProposed = gStats.total_proposed || proposedQty;
-            const supply = gStats.total_supply || 0;
-            const ratio = (totalProposed > 0 && supply < totalProposed) ? supply / totalProposed : 1;
-            const practicalTotal = Math.floor(proposedQty * ratio);
-            const canXuatThucTe = Math.max(0, practicalTotal - alreadyExported);
-
-            if (ct.so_luong > remainingQty) {
-                const vtInfo = materialValidations.find(v => v.vat_tu_id === ct.vat_tu_id);
-                return NextResponse.json({
-                    error: `Vật tư "${vtInfo?.ten_vat_tu}" vượt quá số lượng cho phép (Đề xuất: ${proposedQty}, Đã xuất: ${alreadyExported}, Còn lại: ${remainingQty})`
-                }, { status: 400 });
-            }
+            // Calculate practical limit using fair waterfill distribution
+            const gStats = globalStatsMap[ct.vat_tu_id] || { total_supply: proposedQty, total_proposed: proposedQty, so_luong_free: 0 };
+            const materialDemands = demandsByMaterial[ct.vat_tu_id] || [];
+            
+            // Compute entire table for this material
+            const fairResults = distributeFairly(gStats.total_supply, materialDemands);
+            
+            // Extract item specific to current Teacher (Global scale)
+            const myResult = fairResults.find(x => x.gv_id === giao_vien_id);
+            const teacherFairTotal = myResult ? myResult.got : 0;
+            
+            // Calculate absolute available slots against WHOLE semester history for this teacher
+            const globalUsed = globalExportedMap[ct.vat_tu_id] || 0;
+            const quotaRemaining = Math.max(0, teacherFairTotal - globalUsed);
+            
+            const canXuatThucTe = Math.min(quotaRemaining, gStats.so_luong_free || 0);
 
             if (ct.so_luong > canXuatThucTe) {
+                const reasons = [];
+                if (ct.so_luong > quotaRemaining) {
+                    reasons.push(`vượt hạn mức phân bổ công bằng CẢ KỲ của bạn (Hạn mức: ${teacherFairTotal}, Đã lấy các môn khác: ${globalUsed}, Khả dụng: ${quotaRemaining})`);
+                } else {
+                    reasons.push(`vượt số lượng vật lý thực tế còn lại trong kho (${gStats.so_luong_free})`);
+                }
                 const vtInfo = materialValidations.find(v => v.vat_tu_id === ct.vat_tu_id);
                 return NextResponse.json({
-                    error: `Vật tư "${vtInfo?.ten_vat_tu}" vượt quá giới hạn thực tế do kho không đủ cho tất cả đề xuất (Tỉ lệ cấp: ${Math.round(ratio * 100)}%, Giới hạn: ${practicalTotal}, Đã xuất: ${alreadyExported}, Có thể xuất: ${canXuatThucTe})`
+                    error: `⚠️ Vật tư "${vtInfo?.ten_vat_tu}" ${reasons.join(' và ')}.`
                 }, { status: 400 });
             }
         }
@@ -429,17 +602,33 @@ export async function PUT(request) {
             if (trang_thai === 'da_ky') {
                 sets.push(' ngay_duyet = CURRENT_TIMESTAMP');
             }
-            // When exported, reduce inventory
+            // When exported, reduce inventory, but CHECK it first!
             if (trang_thai === 'da_xuat') {
                 const detailsResult = await db.execute({
                     sql: `
-          SELECT pxct.vat_tu_id, pxct.so_luong
+          SELECT pxct.vat_tu_id, pxct.so_luong, vt.so_luong_kho, vt.ten_vat_tu
           FROM phieu_xuat_chi_tiet pxct
+          JOIN vat_tu vt ON pxct.vat_tu_id = vt.id
           WHERE pxct.phieu_xuat_id = ?
         `,
                     args: [id]
                 });
 
+                // Step A: Validate all have sufficient stock
+                const errors = [];
+                for (const item of detailsResult.rows) {
+                    if (item.so_luong > item.so_luong_kho) {
+                        errors.push(`Vật tư "${item.ten_vat_tu}" thiếu hàng (Cần: ${item.so_luong}, Kho chỉ có: ${item.so_luong_kho})`);
+                    }
+                }
+
+                if (errors.length > 0) {
+                    return NextResponse.json({
+                        error: 'Không thể hoàn tất xuất kho do thiếu hàng vật lý:\n' + errors.join('\n')
+                    }, { status: 400 });
+                }
+
+                // Step B: Now execute safe updates
                 const updateStmts = detailsResult.rows.map(detail => ({
                     sql: 'UPDATE vat_tu SET so_luong_kho = so_luong_kho - ? WHERE id = ?',
                     args: [detail.so_luong, detail.vat_tu_id]

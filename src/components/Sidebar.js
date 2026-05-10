@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation';
 import { signOut } from 'next-auth/react';
 import {
     Package, LayoutDashboard, Calendar, GraduationCap, Users, BookOpen,
-    Boxes, FileText, ShoppingCart, FileOutput, LogOut, Settings, Menu, X
+    Boxes, FileText, ShoppingCart, FileOutput, LogOut, Settings, Menu, X, Scale
 } from 'lucide-react';
 
 
@@ -34,6 +34,9 @@ const menuItems = [
             },
             {
                 href: '/admin/phieu-xuat', label: 'Phiếu đề xuất vật tư', icon: FileOutput
+            },
+            {
+                href: '/admin/phan-phat', label: 'Theo dõi cấp phát', icon: Scale
             },
         ]
     }

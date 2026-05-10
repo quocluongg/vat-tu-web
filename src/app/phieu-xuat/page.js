@@ -592,17 +592,27 @@ export default function PhieuXuatPublicPage() {
                                                                             const key = `${cls.lop_id}-${ct.vat_tu_id}`;
                                                                             const qty = exportItems[key] || 0;
                                                                             const proposedQty = ct.so_luong || 0;
-                                                                            const stats = exportedMap[ct.vat_tu_id] || { da_xuat: 0, total_supply: 0, total_proposed: 0 };
+                                                                            const stats = exportedMap[ct.vat_tu_id] || { da_xuat: 0, total_supply: 0, total_proposed: 0, so_luong_free: 999 };
                                                                             const alreadyExported = stats.da_xuat || 0;
                                                                             const remainingQty = Math.max(0, proposedQty - alreadyExported);
 
-                                                                            // Calculate practical limit based on total supply ratio (fixed for the semester)
+                                                                            // Calculate ratio for scaling
                                                                             const totalProposed = stats.total_proposed || proposedQty;
                                                                             const supply = stats.total_supply || 0;
                                                                             const ratio = (totalProposed > 0 && supply < totalProposed) ? supply / totalProposed : 1;
-                                                                            const practicalTotal = Math.floor(proposedQty * ratio);
-                                                                            const canXuatThucTe = Math.max(0, practicalTotal - alreadyExported);
+                                                                            
+                                                                            // Resolve absolute Global Cap vs Usage for the Entire Teacher (across all subjects)
+                                                                            const globalQuotaRemaining = stats.fair_practical_total !== undefined 
+                                                                                ? Math.max(0, stats.fair_practical_total - (stats.teacher_global_used || 0)) 
+                                                                                : Math.max(0, Math.floor(proposedQty * ratio) - alreadyExported);
+
+                                                                            // The maximum allowance available to this material for this user now
+                                                                            const quotaRemaining = globalQuotaRemaining;
+                                                                            const physicalFree = stats.so_luong_free !== undefined ? stats.so_luong_free : quotaRemaining;
+                                                                            
+                                                                            const canXuatThucTe = Math.min(quotaRemaining, physicalFree);
                                                                             const isCapped = ratio < 1;
+                                                                            const isPhysicallyLimited = physicalFree < quotaRemaining;
 
                                                                             const maxQty = Math.min(remainingQty, canXuatThucTe);
 
@@ -621,6 +631,7 @@ export default function PhieuXuatPublicPage() {
                                                                                             <span style={{ fontWeight: 600, color: '#f87171' }}>Đề xuất: {proposedQty} • Còn lại: <span style={{ color: remainingQty > 0 ? '#34d399' : '#ef4444' }}>{remainingQty}</span> {ct.don_vi_tinh}</span>
                                                                                             {isCapped && <span style={{ marginLeft: 8, color: '#f59e0b', fontWeight: 600 }}>(Tỉ lệ cấp: {Math.round(ratio * 100)}%)</span>}
                                                                                             <span style={{ marginLeft: 8, color: 'var(--text-accent)', fontWeight: 700 }}>• Có thể xuất thực tế: <span style={{ color: canXuatThucTe > 0 ? 'var(--text-accent)' : '#ef4444' }}>{canXuatThucTe}</span> {ct.don_vi_tinh}</span>
+                                                                                            {isPhysicallyLimited && <span style={{ marginLeft: 8, color: '#ef4444', fontWeight: 600 }}>(Giới hạn kho thực tế: {physicalFree})</span>}
                                                                                         </p>
                                                                                     </div>
                                                                                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
