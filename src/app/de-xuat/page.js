@@ -591,7 +591,7 @@ export default function DeXuatPublicPage() {
                     {showNewMaterialModal && (() => {
                         const nganhName = selectedNganhDeXuat === 'all' ? 'Tất cả (chưa xác định)'
                             : selectedNganhDeXuat === 'chung' ? 'Dùng chung'
-                            : nganhs.find(n => n.id.toString() === selectedNganhDeXuat)?.ten_nganh || 'Không rõ';
+                                : nganhs.find(n => n.id.toString() === selectedNganhDeXuat)?.ten_nganh || 'Không rõ';
                         return (
                             <div className="modal-overlay">
                                 <div className="modal">
@@ -733,7 +733,7 @@ const PrintLayout = ({ kiInfo, selectedGv, giaoViens, phanCongs, vatTus, vatTuTa
                                     <td style={{ width: '60%', verticalAlign: 'top', paddingRight: 20 }}>
                                         <div style={{ marginBottom: 6 }}>Tên người đề nghị: {gv?.ho_ten}</div>
                                         <div style={{ marginBottom: 6 }}>Chức vụ: Giảng viên</div>
-                                        <div style={{ marginBottom: 6 }}>Phòng (Khoa): .............................................................</div>
+                                        <div style={{ marginBottom: 6 }}>Phòng (Khoa): Điện - Điện tử</div>
                                     </td>
                                     <td style={{ width: '40%', verticalAlign: 'top' }}>
                                         <div style={{ marginBottom: 6 }}>Lớp: {pc.ten_lop}</div>
@@ -817,7 +817,7 @@ const PrintLayout = ({ kiInfo, selectedGv, giaoViens, phanCongs, vatTus, vatTuTa
                                 </tr>
                             </tbody>
                         </table>
-                        
+
                         <div style={{ textAlign: 'center', fontSize: '10pt', fontStyle: 'italic', marginTop: '20px', opacity: 0.6 }}>
                             Phần mềm quản lý vật tư Khoa Điện - Điện tử
                         </div>
