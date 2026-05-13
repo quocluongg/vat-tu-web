@@ -596,10 +596,47 @@ export async function POST(request) {
 export async function PUT(request) {
     try {
         const db = getDb();
-        const { id, trang_thai, ghi_chu } = await request.json();
+        const { id, trang_thai, ghi_chu, chi_tiet } = await request.json();
 
         if (!id) {
             return NextResponse.json({ error: 'ID phiếu xuất không được cung cấp' }, { status: 400 });
+        }
+
+        // Adjusting quantities if chi_tiet is provided
+        if (chi_tiet && Array.isArray(chi_tiet)) {
+            const pxCheck = await db.execute({
+                sql: 'SELECT trang_thai FROM phieu_xuat WHERE id = ?',
+                args: [id]
+            });
+            if (pxCheck.rows.length === 0) {
+                return NextResponse.json({ error: 'Phiếu xuất không tồn tại' }, { status: 404 });
+            }
+            const currentStatus = pxCheck.rows[0].trang_thai;
+            if (currentStatus === 'da_xuat') {
+                return NextResponse.json({ error: 'Không thể điều chỉnh phiếu đã xuất kho' }, { status: 400 });
+            }
+
+            const updateDetailStmts = [];
+            for (const item of chi_tiet) {
+                const qty = parseInt(item.so_luong);
+                if (isNaN(qty) || qty < 0) {
+                    return NextResponse.json({ error: 'Số lượng vật tư không hợp lệ' }, { status: 400 });
+                }
+                if (qty === 0) {
+                    updateDetailStmts.push({
+                        sql: 'DELETE FROM phieu_xuat_chi_tiet WHERE id = ? AND phieu_xuat_id = ?',
+                        args: [item.id, id]
+                    });
+                } else {
+                    updateDetailStmts.push({
+                        sql: 'UPDATE phieu_xuat_chi_tiet SET so_luong = ? WHERE id = ? AND phieu_xuat_id = ?',
+                        args: [qty, item.id, id]
+                    });
+                }
+            }
+            if (updateDetailStmts.length > 0) {
+                await db.batch(updateDetailStmts, "write");
+            }
         }
 
         let query = 'UPDATE phieu_xuat SET';

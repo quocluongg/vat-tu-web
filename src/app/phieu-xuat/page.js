@@ -1,6 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { FileOutput, Eye, Plus, Minus, Send, CheckCircle, Download, BookOpen, Package, Clock, Printer, ChevronDown, AlertCircle } from 'lucide-react';
+import Tooltip from '@/components/Tooltip';
 
 export default function PhieuXuatPublicPage() {
     const [kiHocs, setKiHocs] = useState([]);
@@ -480,9 +481,21 @@ export default function PhieuXuatPublicPage() {
                                                     <td><span className={`badge ${statusLabels[px.trang_thai]?.badge}`}>{statusLabels[px.trang_thai]?.label}</span></td>
                                                     <td>
                                                         <div className="table-actions">
-                                                            <button className="btn btn-sm btn-secondary" onClick={() => generatePDF(px)}>
-                                                                <Download size={14} /> Tải PDF
-                                                            </button>
+                                                            <Tooltip 
+                                                                position="left"
+                                                                content={!(px.trang_thai === 'da_ky' || px.trang_thai === 'da_xuat') 
+                                                                    ? (px.trang_thai === 'tu_choi' ? "Phiếu đã bị từ chối" : "Phiếu xuất cần được ký duyệt để thực hiện in và nhận vật tư") 
+                                                                    : "Tải phiếu xuất PDF"}
+                                                            >
+                                                                <button 
+                                                                    className="btn btn-sm btn-secondary" 
+                                                                    onClick={() => generatePDF(px)}
+                                                                    disabled={!(px.trang_thai === 'da_ky' || px.trang_thai === 'da_xuat')}
+                                                                    style={!(px.trang_thai === 'da_ky' || px.trang_thai === 'da_xuat') ? { opacity: 0.55, cursor: 'not-allowed', pointerEvents: 'none' } : {}}
+                                                                >
+                                                                    <Download size={14} /> Tải PDF
+                                                                </button>
+                                                            </Tooltip>
                                                         </div>
                                                     </td>
                                                 </tr>
@@ -577,14 +590,6 @@ export default function PhieuXuatPublicPage() {
                                                                     </div>
                                                                 </div>
                                                                 <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-                                                                    <button
-                                                                        className="btn-icon"
-                                                                        title="In phiếu đề xuất lớp này"
-                                                                        onClick={(e) => { e.stopPropagation(); printClassProposal(cls); }}
-                                                                        style={{ width: 28, height: 28 }}
-                                                                    >
-                                                                        <Printer size={14} />
-                                                                    </button>
                                                                     {classTotal > 0 && (
                                                                         <span className="badge badge-success">{classTotal} {cls.items[0]?.don_vi_tinh}</span>
                                                                     )}
