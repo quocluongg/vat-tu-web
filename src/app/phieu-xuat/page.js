@@ -121,19 +121,23 @@ export default function PhieuXuatPublicPage() {
             return;
         }
 
-        // Group by mon_hoc for submission, then MERGE same vat_tu
-        const groupedByMon = {};
+        // Group by lop_id and mon_hoc_id for submission
+        const groupedByLopAndMon = {};
         if (deXuatDetail && deXuatDetail.chi_tiet) {
             Object.entries(exportItems).forEach(([key, qty]) => {
                 const [lopId, vtId] = key.split('-');
                 const ct = deXuatDetail.chi_tiet.find(c => c.lop_id === parseInt(lopId) && c.vat_tu_id === parseInt(vtId));
                 if (ct) {
-                    if (!groupedByMon[ct.mon_hoc_id]) {
-                        groupedByMon[ct.mon_hoc_id] = {};
+                    const groupKey = `${ct.lop_id}-${ct.mon_hoc_id}`;
+                    if (!groupedByLopAndMon[groupKey]) {
+                        groupedByLopAndMon[groupKey] = {
+                            lop_id: ct.lop_id,
+                            mon_hoc_id: ct.mon_hoc_id,
+                            items: {}
+                        };
                     }
-                    // Merge: cộng dồn nếu vật tư đã có
                     const vtIdKey = ct.vat_tu_id;
-                    groupedByMon[ct.mon_hoc_id][vtIdKey] = (groupedByMon[ct.mon_hoc_id][vtIdKey] || 0) + parseInt(qty);
+                    groupedByLopAndMon[groupKey].items[vtIdKey] = (groupedByLopAndMon[groupKey].items[vtIdKey] || 0) + parseInt(qty);
                 }
             });
         }
@@ -142,9 +146,9 @@ export default function PhieuXuatPublicPage() {
         setError('');
 
         try {
-            // Create one phieu for each subject
-            for (const [monId, vtMap] of Object.entries(groupedByMon)) {
-                const chiTiet = Object.entries(vtMap).map(([vtId, soLuong]) => ({
+            // Create one phieu for each class and subject combination
+            for (const group of Object.values(groupedByLopAndMon)) {
+                const chiTiet = Object.entries(group.items).map(([vtId, soLuong]) => ({
                     vat_tu_id: parseInt(vtId),
                     so_luong: soLuong
                 }));
@@ -155,7 +159,8 @@ export default function PhieuXuatPublicPage() {
                     body: JSON.stringify({
                         giao_vien_id: parseInt(selectedGv),
                         ki_id: parseInt(selectedKi),
-                        mon_hoc_id: parseInt(monId),
+                        mon_hoc_id: parseInt(group.mon_hoc_id),
+                        lop_id: parseInt(group.lop_id),
                         chi_tiet: chiTiet,
                     }),
                 });
@@ -457,6 +462,7 @@ export default function PhieuXuatPublicPage() {
                                             <tr>
                                                 <th>Mã phiếu</th>
                                                 <th>Môn học</th>
+                                                <th>Lớp</th>
                                                 <th>Số vật tư</th>
                                                 <th>Ngày tạo</th>
                                                 <th>Trạng thái</th>
@@ -468,6 +474,7 @@ export default function PhieuXuatPublicPage() {
                                                 <tr key={px.id}>
                                                     <td style={{ fontWeight: 500, color: 'var(--text-accent)' }}>PX-{String(px.id).padStart(4, '0')}</td>
                                                     <td>{px.ten_mon}</td>
+                                                    <td>{px.ten_lop || '—'}</td>
                                                     <td>{px.so_vat_tu} ({px.tong_so_luong})</td>
                                                     <td>{new Date(px.ngay_tao).toLocaleDateString('vi-VN')}</td>
                                                     <td><span className={`badge ${statusLabels[px.trang_thai]?.badge}`}>{statusLabels[px.trang_thai]?.label}</span></td>

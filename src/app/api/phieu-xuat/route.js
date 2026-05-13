@@ -228,12 +228,13 @@ export async function GET(request) {
         }
 
         let query = `
-      SELECT px.*, gv.ho_ten as ten_gv, m.ten_mon,
+      SELECT px.*, gv.ho_ten as ten_gv, m.ten_mon, l.ten_lop,
         (SELECT COUNT(*) FROM phieu_xuat_chi_tiet WHERE phieu_xuat_id = px.id) as so_vat_tu,
         (SELECT SUM(so_luong) FROM phieu_xuat_chi_tiet WHERE phieu_xuat_id = px.id) as tong_so_luong
       FROM phieu_xuat px
       JOIN giao_vien gv ON px.giao_vien_id = gv.id
       JOIN mon_hoc m ON px.mon_hoc_id = m.id
+      LEFT JOIN lop l ON px.lop_id = l.id
     `;
 
         const conditions = [];
@@ -266,7 +267,7 @@ export async function GET(request) {
 export async function POST(request) {
     try {
         const db = getDb();
-        const { giao_vien_id, ki_id, mon_hoc_id, chi_tiet } = await request.json();
+        const { giao_vien_id, ki_id, mon_hoc_id, lop_id, chi_tiet } = await request.json();
 
         // Input validation
         if (!giao_vien_id || !ki_id || !mon_hoc_id) {
@@ -328,6 +329,19 @@ export async function POST(request) {
             return NextResponse.json({
                 error: `Môn học ID ${mon_hoc_id} không tồn tại`
             }, { status: 400 });
+        }
+
+        // Validate lop exists if provided
+        if (lop_id) {
+            const lopCheck = await db.execute({
+                sql: 'SELECT id FROM lop WHERE id = ?',
+                args: [lop_id]
+            });
+            if (lopCheck.rows.length === 0) {
+                return NextResponse.json({
+                    error: `Lớp ID ${lop_id} không tồn tại`
+                }, { status: 400 });
+            }
         }
 
         // Validate all materials exist and prepare validation
@@ -514,26 +528,22 @@ export async function POST(request) {
         }
 
         // Insert phieu_xuat
-        await db.execute({
-            sql: "INSERT INTO phieu_xuat (giao_vien_id, ki_id, mon_hoc_id) VALUES (?, ?, ?)",
-            args: [giao_vien_id, ki_id, mon_hoc_id]
+        const insertResult = await db.execute({
+            sql: "INSERT INTO phieu_xuat (giao_vien_id, ki_id, mon_hoc_id, lop_id) VALUES (?, ?, ?, ?)",
+            args: [giao_vien_id, ki_id, mon_hoc_id, lop_id || null]
         });
 
-        // Query to get the ID (ensure it's correct)
-        const idResult = await db.execute({
-            sql: 'SELECT id FROM phieu_xuat WHERE giao_vien_id = ? AND ki_id = ? AND mon_hoc_id = ? ORDER BY ngay_tao DESC LIMIT 1',
-            args: [giao_vien_id, ki_id, mon_hoc_id]
-        });
+        let phieuXuatId = insertResult.lastInsertRowid !== undefined ? Number(insertResult.lastInsertRowid) : null;
 
-        if (idResult.rows.length === 0) {
-            return NextResponse.json({
-                error: 'Không thể tạo phiếu xuất (INSERT thất bại)'
-            }, { status: 500 });
+        // Fallback to Select if lastInsertRowid is missing
+        if (!phieuXuatId) {
+            const idResult = await db.execute({
+                sql: 'SELECT id FROM phieu_xuat WHERE giao_vien_id = ? AND ki_id = ? AND mon_hoc_id = ? ORDER BY ngay_tao DESC LIMIT 1',
+                args: [giao_vien_id, ki_id, mon_hoc_id]
+            });
+            phieuXuatId = idResult.rows[0]?.id;
         }
 
-        let phieuXuatId = idResult.rows[0].id;
-
-        // Ensure ID is valid
         if (!phieuXuatId) {
             return NextResponse.json({
                 error: 'Không thể tạo phiếu xuất (ID lỗi)'

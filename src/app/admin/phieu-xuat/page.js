@@ -104,6 +104,7 @@ export default function PhieuXuatAdminPage() {
                                 <th>Mã phiếu</th>
                                 <th>Giáo viên</th>
                                 <th>Môn học</th>
+                                <th>Lớp</th>
                                 <th>Số vật tư</th>
                                 <th>Ngày tạo</th>
                                 <th>Trạng thái</th>
@@ -112,12 +113,13 @@ export default function PhieuXuatAdminPage() {
                         </thead>
                         <tbody>
                             {phieuXuats.length === 0 ? (
-                                <tr><td colSpan={7}><div className="empty-state"><FileOutput size={48} /><h3>Chưa có phiếu xuất</h3></div></td></tr>
+                                <tr><td colSpan={8}><div className="empty-state"><FileOutput size={48} /><h3>Chưa có phiếu xuất</h3></div></td></tr>
                             ) : phieuXuats.map(px => (
                                 <tr key={px.id}>
                                     <td style={{ fontWeight: 500, color: 'var(--text-accent)' }}>PX-{String(px.id).padStart(4, '0')}</td>
                                     <td style={{ fontWeight: 500, color: 'var(--text-primary)' }}>{px.ten_gv}</td>
                                     <td>{px.ten_mon}</td>
+                                    <td>{px.ten_lop || '—'}</td>
                                     <td>{px.so_vat_tu} ({px.tong_so_luong} đơn vị)</td>
                                     <td>{new Date(px.ngay_tao).toLocaleDateString('vi-VN')}</td>
                                     <td><span className={`badge ${statusConfig[px.trang_thai].badge}`}>{statusConfig[px.trang_thai].label}</span></td>
