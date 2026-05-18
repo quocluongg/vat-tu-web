@@ -1,6 +1,6 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { FileOutput, Eye, Check, X, Truck, Clock, CheckCircle, XCircle, FileCheck, Printer, Edit2, Save, RotateCcw } from 'lucide-react';
+import { FileOutput, Eye, Check, X, Truck, Clock, CheckCircle, XCircle, FileCheck, Printer, Edit2, Save, RotateCcw, Plus, Search, Trash2 } from 'lucide-react';
 import { useToast } from '@/components/Toast';
 
 const statusConfig = {
@@ -19,6 +19,12 @@ export default function PhieuXuatAdminPage() {
     const [isEditing, setIsEditing] = useState(false);
     const [editedDetails, setEditedDetails] = useState({}); // { pxct_id: quantity }
     const [saving, setSaving] = useState(false);
+    // Add material modal
+    const [addVtModal, setAddVtModal] = useState(false);
+    const [allVatTus, setAllVatTus] = useState([]);
+    const [addVtSearch, setAddVtSearch] = useState('');
+    const [newItems, setNewItems] = useState({}); // { vat_tu_id: so_luong }
+    const [addingSaving, setAddingSaving] = useState(false);
     const addToast = useToast();
 
     useEffect(() => {
@@ -36,7 +42,14 @@ export default function PhieuXuatAdminPage() {
         setPhieuXuats(data);
     };
 
-    useEffect(() => { if (selectedKi) fetchData(); }, [selectedKi]);
+    const fetchAllVatTus = async () => {
+        if (!selectedKi) return;
+        const res = await fetch(`/api/vat-tu?ki_id=${selectedKi}`);
+        const data = await res.json();
+        setAllVatTus(data);
+    };
+
+    useEffect(() => { if (selectedKi) { fetchData(); fetchAllVatTus(); } }, [selectedKi]);
 
     const viewDetail = async (px) => {
         const res = await fetch(`/api/phieu-xuat?id=${px.id}`);
@@ -44,6 +57,43 @@ export default function PhieuXuatAdminPage() {
         setDetail(data);
         setIsEditing(false);
         setEditedDetails({});
+    };
+
+    const handleAddNewItems = async () => {
+        if (!detail) return;
+        const items = Object.entries(newItems).filter(([_, qty]) => qty > 0).map(([vtId, qty]) => ({ vat_tu_id: parseInt(vtId), so_luong: qty }));
+        if (items.length === 0) { addToast('Chưa chọn vật tư nào', 'info'); return; }
+        setAddingSaving(true);
+        try {
+            const res = await fetch('/api/phieu-xuat', {
+                method: 'PUT', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id: detail.id, new_items: items })
+            });
+            const result = await res.json();
+            if (!res.ok) { addToast(result.error || 'Lỗi', 'error'); }
+            else {
+                addToast(`Đã thêm ${items.length} vật tư vào phiếu`, 'success');
+                setAddVtModal(false); setNewItems({}); setAddVtSearch('');
+                const r2 = await fetch(`/api/phieu-xuat?id=${detail.id}`); setDetail(await r2.json());
+                fetchData();
+            }
+        } catch (e) { addToast('Lỗi kết nối', 'error'); }
+        setAddingSaving(false);
+    };
+
+    const handleDeleteChiTiet = async (ctId, tenVt) => {
+        if (!confirm(`Xóa "${tenVt}" khỏi phiếu xuất?`)) return;
+        try {
+            const res = await fetch('/api/phieu-xuat', {
+                method: 'PUT', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id: detail.id, chi_tiet: [{ id: ctId, so_luong: 0 }] })
+            });
+            if (res.ok) {
+                addToast('Đã xóa vật tư khỏi phiếu', 'success');
+                const r2 = await fetch(`/api/phieu-xuat?id=${detail.id}`); setDetail(await r2.json());
+                fetchData();
+            } else { const d = await res.json(); addToast(d.error || 'Lỗi', 'error'); }
+        } catch (e) { addToast('Lỗi kết nối', 'error'); }
     };
 
     const handleSaveAdjustments = async () => {
@@ -344,6 +394,7 @@ export default function PhieuXuatAdminPage() {
                                         <th>Đơn vị</th>
                                         <th>Số lượng xuất</th>
                                         <th>Tồn kho</th>
+                                        {detail.trang_thai !== 'da_xuat' && <th style={{ width: 70 }}>Xóa</th>}
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -371,10 +422,24 @@ export default function PhieuXuatAdminPage() {
                                                 )}
                                             </td>
                                             <td>{ct.so_luong_kho}</td>
+                                            {detail.trang_thai !== 'da_xuat' && (
+                                                <td>
+                                                    <button className="btn-icon" title="Xóa vật tư này" onClick={() => handleDeleteChiTiet(ct.id, ct.ten_vat_tu)} style={{ color: '#f87171' }}>
+                                                        <Trash2 size={15} />
+                                                    </button>
+                                                </td>
+                                            )}
                                         </tr>
                                     ))}
                                 </tbody>
                             </table>
+                            {detail.trang_thai !== 'da_xuat' && (
+                                <div style={{ marginTop: 16, textAlign: 'center' }}>
+                                    <button className="btn btn-secondary" onClick={() => { setAddVtModal(true); setNewItems({}); setAddVtSearch(''); }} style={{ gap: 6 }}>
+                                        <Plus size={16} /> Thêm vật tư mới
+                                    </button>
+                                </div>
+                            )}
                         </div>
                         <div className="modal-footer" style={{ justifyContent: 'space-between' }}>
                             <div>
@@ -424,6 +489,69 @@ export default function PhieuXuatAdminPage() {
                     </div>
                 </div>
             )}
+
+            {/* Add Material Modal */}
+            {addVtModal && (() => {
+                const searchQ = addVtSearch.toLowerCase().trim();
+                const existingVtIds = new Set((detail?.chi_tiet || []).map(ct => ct.vat_tu_id));
+                const filtered = allVatTus
+                    .filter(vt => !existingVtIds.has(vt.id) || newItems[vt.id])
+                    .filter(vt => !searchQ || vt.ten_vat_tu.toLowerCase().includes(searchQ) || (vt.yeu_cau_ky_thuat || '').toLowerCase().includes(searchQ));
+                const selectedCount = Object.values(newItems).filter(q => q > 0).length;
+                return (
+                    <div className="modal-overlay" style={{ zIndex: 1100 }} onClick={() => setAddVtModal(false)}>
+                        <div className="modal" style={{ maxWidth: 620, maxHeight: '90vh', display: 'flex', flexDirection: 'column' }} onClick={e => e.stopPropagation()}>
+                            <div className="modal-header">
+                                <div>
+                                    <h2 style={{ fontSize: 18, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8 }}>
+                                        <Plus size={18} style={{ color: 'var(--text-accent)' }} /> Thêm vật tư vào phiếu xuất
+                                    </h2>
+                                    <p style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>
+                                        PX-{String(detail?.id).padStart(4, '0')} • {detail?.ten_gv}
+                                    </p>
+                                </div>
+                                <button className="btn-ghost" onClick={() => setAddVtModal(false)}>✕</button>
+                            </div>
+                            <div style={{ padding: '0 24px 12px', position: 'relative' }}>
+                                <Search size={15} style={{ position: 'absolute', left: 36, top: 12, color: 'var(--text-muted)', pointerEvents: 'none' }} />
+                                <input className="form-input" style={{ paddingLeft: 36, fontSize: 14 }} placeholder="Tìm vật tư..." value={addVtSearch} autoFocus onChange={e => setAddVtSearch(e.target.value)} />
+                            </div>
+                            <div style={{ flex: 1, overflowY: 'auto', padding: '0 24px 16px' }}>
+                                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 8, fontWeight: 600 }}>
+                                    {filtered.length} vật tư {selectedCount > 0 && `• Đã chọn: ${selectedCount}`}
+                                </div>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                                    {filtered.slice(0, 50).map(vt => {
+                                        const qty = newItems[vt.id] || 0;
+                                        const alreadyInPhieu = existingVtIds.has(vt.id);
+                                        return (
+                                            <div key={vt.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 12px', borderRadius: 10, border: qty > 0 ? '1.5px solid rgba(14,165,233,0.5)' : '1px solid var(--border-color)', background: qty > 0 ? 'rgba(14,165,233,0.05)' : alreadyInPhieu ? 'rgba(99,102,241,0.04)' : 'var(--bg-glass)' }}>
+                                                <div style={{ flex: 1, minWidth: 0 }}>
+                                                    <div style={{ fontWeight: 600, fontSize: 13, display: 'flex', alignItems: 'center', gap: 6 }}>
+                                                        {vt.ten_vat_tu}
+                                                        {alreadyInPhieu && <span style={{ fontSize: 10, padding: '1px 5px', borderRadius: 4, background: 'rgba(99,102,241,0.12)', color: '#818cf8' }}>Đã có</span>}
+                                                    </div>
+                                                    <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 1 }}>
+                                                        {vt.yeu_cau_ky_thuat || '—'} • {vt.don_vi_tinh} • Kho: <span style={{ color: vt.so_luong_kho > 0 ? '#34d399' : '#f87171', fontWeight: 600 }}>{vt.so_luong_kho}</span>
+                                                    </div>
+                                                </div>
+                                                <input type="number" className="form-input" style={{ width: 70, padding: '4px 8px', textAlign: 'center', fontSize: 13 }} placeholder="SL" min="0" max={vt.so_luong_kho} value={qty || ''} onChange={e => { const v = Math.max(0, Math.min(parseInt(e.target.value) || 0, vt.so_luong_kho)); setNewItems(prev => { if (v === 0) { const { [vt.id]: _, ...rest } = prev; return rest; } return { ...prev, [vt.id]: v }; }); }} />
+                                            </div>
+                                        );
+                                    })}
+                                    {filtered.length === 0 && <div style={{ textAlign: 'center', padding: 24, color: 'var(--text-muted)' }}>Không tìm thấy vật tư</div>}
+                                </div>
+                            </div>
+                            <div className="modal-footer" style={{ padding: '12px 24px', borderTop: '1px solid var(--border-color)', display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
+                                <button className="btn btn-secondary" onClick={() => setAddVtModal(false)}>Hủy</button>
+                                <button className="btn btn-primary" disabled={selectedCount === 0 || addingSaving} onClick={handleAddNewItems} style={{ minWidth: 140 }}>
+                                    {addingSaving ? <div className="spinner" style={{ width: 16, height: 16 }} /> : <><Plus size={15} /> Thêm {selectedCount} vật tư</>}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                );
+            })()}
         </div>
     );
 }

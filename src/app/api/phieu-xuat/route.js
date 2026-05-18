@@ -596,22 +596,25 @@ export async function POST(request) {
 export async function PUT(request) {
     try {
         const db = getDb();
-        const { id, trang_thai, ghi_chu, chi_tiet } = await request.json();
+        const { id, trang_thai, ghi_chu, chi_tiet, new_items } = await request.json();
 
         if (!id) {
             return NextResponse.json({ error: 'ID phiếu xuất không được cung cấp' }, { status: 400 });
         }
 
+        // Check phieu_xuat status once for both chi_tiet and new_items
+        const pxCheck = await db.execute({
+            sql: 'SELECT trang_thai, ki_id FROM phieu_xuat WHERE id = ?',
+            args: [id]
+        });
+        if (pxCheck.rows.length === 0) {
+            return NextResponse.json({ error: 'Phiếu xuất không tồn tại' }, { status: 404 });
+        }
+        const currentStatus = pxCheck.rows[0].trang_thai;
+        const pxKiId = pxCheck.rows[0].ki_id;
+
         // Adjusting quantities if chi_tiet is provided
         if (chi_tiet && Array.isArray(chi_tiet)) {
-            const pxCheck = await db.execute({
-                sql: 'SELECT trang_thai FROM phieu_xuat WHERE id = ?',
-                args: [id]
-            });
-            if (pxCheck.rows.length === 0) {
-                return NextResponse.json({ error: 'Phiếu xuất không tồn tại' }, { status: 404 });
-            }
-            const currentStatus = pxCheck.rows[0].trang_thai;
             if (currentStatus === 'da_xuat') {
                 return NextResponse.json({ error: 'Không thể điều chỉnh phiếu đã xuất kho' }, { status: 400 });
             }
@@ -636,6 +639,55 @@ export async function PUT(request) {
             }
             if (updateDetailStmts.length > 0) {
                 await db.batch(updateDetailStmts, "write");
+            }
+        }
+
+        // Adding new materials to the phieu_xuat
+        if (new_items && Array.isArray(new_items) && new_items.length > 0) {
+            if (currentStatus === 'da_xuat') {
+                return NextResponse.json({ error: 'Không thể thêm vật tư vào phiếu đã xuất kho' }, { status: 400 });
+            }
+
+            const insertStmts = [];
+            for (const item of new_items) {
+                const qty = parseInt(item.so_luong);
+                if (!item.vat_tu_id || isNaN(qty) || qty <= 0) {
+                    return NextResponse.json({ error: 'Vật tư hoặc số lượng không hợp lệ' }, { status: 400 });
+                }
+
+                // Validate vat_tu exists and belongs to same ki_id
+                const vtCheck = await db.execute({
+                    sql: 'SELECT id, ten_vat_tu, ki_id FROM vat_tu WHERE id = ?',
+                    args: [item.vat_tu_id]
+                });
+                if (vtCheck.rows.length === 0) {
+                    return NextResponse.json({ error: `Vật tư ID ${item.vat_tu_id} không tồn tại` }, { status: 400 });
+                }
+                if (vtCheck.rows[0].ki_id !== pxKiId) {
+                    return NextResponse.json({ error: `Vật tư "${vtCheck.rows[0].ten_vat_tu}" không thuộc kỳ học này` }, { status: 400 });
+                }
+
+                // Check if this vat_tu already exists in the phieu_xuat
+                const existCheck = await db.execute({
+                    sql: 'SELECT id, so_luong FROM phieu_xuat_chi_tiet WHERE phieu_xuat_id = ? AND vat_tu_id = ?',
+                    args: [id, item.vat_tu_id]
+                });
+
+                if (existCheck.rows.length > 0) {
+                    // If already exists, add to existing quantity
+                    insertStmts.push({
+                        sql: 'UPDATE phieu_xuat_chi_tiet SET so_luong = so_luong + ? WHERE phieu_xuat_id = ? AND vat_tu_id = ?',
+                        args: [qty, id, item.vat_tu_id]
+                    });
+                } else {
+                    insertStmts.push({
+                        sql: 'INSERT INTO phieu_xuat_chi_tiet (phieu_xuat_id, vat_tu_id, so_luong) VALUES (?, ?, ?)',
+                        args: [id, item.vat_tu_id, qty]
+                    });
+                }
+            }
+            if (insertStmts.length > 0) {
+                await db.batch(insertStmts, "write");
             }
         }
 
@@ -690,7 +742,11 @@ export async function PUT(request) {
             params.push(ghi_chu);
         }
 
+        // If only chi_tiet or new_items were modified (no status/ghi_chu change), return success
         if (sets.length === 0) {
+            if ((chi_tiet && chi_tiet.length > 0) || (new_items && new_items.length > 0)) {
+                return NextResponse.json({ message: 'Cập nhật thành công' });
+            }
             return NextResponse.json({ error: 'Không có dữ liệu để cập nhật' }, { status: 400 });
         }
 

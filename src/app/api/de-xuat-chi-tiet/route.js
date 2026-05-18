@@ -3,21 +3,20 @@ import getDb from '@/lib/db';
 
 /**
  * PATCH /api/de-xuat-chi-tiet
- * Admin thay đổi vật tư trong một dòng chi tiết đề xuất.
+ * Admin thay đổi vật tư hoặc số lượng trong một dòng chi tiết đề xuất.
  * Body: { id, vat_tu_id } — đổi sang vật tư trong kho
  *    or { id, vat_tu_tam_id } — đổi sang vật tư tạm (ít dùng)
+ *    or { id, so_luong } — chỉnh số lượng
+ *    or { id, vat_tu_id, so_luong } — đổi cả vật tư và số lượng
  */
 export async function PATCH(request) {
     try {
         const db = getDb();
         const body = await request.json();
-        const { id, vat_tu_id, vat_tu_tam_id } = body;
+        const { id, vat_tu_id, vat_tu_tam_id, so_luong } = body;
 
         if (!id) {
             return NextResponse.json({ error: 'Thiếu id của dòng chi tiết' }, { status: 400 });
-        }
-        if (!vat_tu_id && !vat_tu_tam_id) {
-            return NextResponse.json({ error: 'Phải cung cấp vat_tu_id hoặc vat_tu_tam_id' }, { status: 400 });
         }
 
         // Kiểm tra dòng chi tiết tồn tại
@@ -27,6 +26,23 @@ export async function PATCH(request) {
         });
         if (rowCheck.rows.length === 0) {
             return NextResponse.json({ error: 'Dòng chi tiết không tồn tại' }, { status: 404 });
+        }
+
+        // Chỉ cập nhật số lượng (không đổi vật tư)
+        if (so_luong !== undefined && !vat_tu_id && !vat_tu_tam_id) {
+            const qty = parseInt(so_luong);
+            if (isNaN(qty) || qty <= 0) {
+                return NextResponse.json({ error: 'Số lượng phải là số dương' }, { status: 400 });
+            }
+            await db.execute({
+                sql: 'UPDATE de_xuat_chi_tiet SET so_luong = ? WHERE id = ?',
+                args: [qty, id]
+            });
+            return NextResponse.json({ message: `Đã cập nhật số lượng thành ${qty}` });
+        }
+
+        if (!vat_tu_id && !vat_tu_tam_id) {
+            return NextResponse.json({ error: 'Phải cung cấp vat_tu_id, vat_tu_tam_id hoặc so_luong' }, { status: 400 });
         }
 
         if (vat_tu_id) {
@@ -39,11 +55,22 @@ export async function PATCH(request) {
                 return NextResponse.json({ error: 'Vật tư không tồn tại trong kho' }, { status: 400 });
             }
 
-            // Cập nhật: trỏ về vật tư kho, xóa vật tư tạm
-            await db.execute({
-                sql: 'UPDATE de_xuat_chi_tiet SET vat_tu_id = ?, vat_tu_tam_id = NULL WHERE id = ?',
-                args: [vat_tu_id, id]
-            });
+            // Cập nhật: trỏ về vật tư kho, xóa vật tư tạm, và số lượng nếu có
+            if (so_luong !== undefined) {
+                const qty = parseInt(so_luong);
+                if (isNaN(qty) || qty <= 0) {
+                    return NextResponse.json({ error: 'Số lượng phải là số dương' }, { status: 400 });
+                }
+                await db.execute({
+                    sql: 'UPDATE de_xuat_chi_tiet SET vat_tu_id = ?, vat_tu_tam_id = NULL, so_luong = ? WHERE id = ?',
+                    args: [vat_tu_id, qty, id]
+                });
+            } else {
+                await db.execute({
+                    sql: 'UPDATE de_xuat_chi_tiet SET vat_tu_id = ?, vat_tu_tam_id = NULL WHERE id = ?',
+                    args: [vat_tu_id, id]
+                });
+            }
 
             return NextResponse.json({
                 message: `Đã đổi sang vật tư: ${vtCheck.rows[0].ten_vat_tu}`
@@ -59,10 +86,21 @@ export async function PATCH(request) {
             }
 
             // Cập nhật: trỏ về vật tư tạm, xóa vật tư kho
-            await db.execute({
-                sql: 'UPDATE de_xuat_chi_tiet SET vat_tu_id = NULL, vat_tu_tam_id = ? WHERE id = ?',
-                args: [vat_tu_tam_id, id]
-            });
+            if (so_luong !== undefined) {
+                const qty = parseInt(so_luong);
+                if (isNaN(qty) || qty <= 0) {
+                    return NextResponse.json({ error: 'Số lượng phải là số dương' }, { status: 400 });
+                }
+                await db.execute({
+                    sql: 'UPDATE de_xuat_chi_tiet SET vat_tu_id = NULL, vat_tu_tam_id = ?, so_luong = ? WHERE id = ?',
+                    args: [vat_tu_tam_id, qty, id]
+                });
+            } else {
+                await db.execute({
+                    sql: 'UPDATE de_xuat_chi_tiet SET vat_tu_id = NULL, vat_tu_tam_id = ? WHERE id = ?',
+                    args: [vat_tu_tam_id, id]
+                });
+            }
 
             return NextResponse.json({
                 message: `Đã đổi sang vật tư tạm: ${vttCheck.rows[0].ten_vat_tu}`
