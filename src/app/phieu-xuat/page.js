@@ -1,14 +1,16 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { FileOutput, Eye, Plus, Minus, Send, CheckCircle, Download, BookOpen, Package, Clock, Printer, ChevronDown, AlertCircle } from 'lucide-react';
-import Tooltip from '@/components/Tooltip';
+import Link from 'next/link';
+import {
+    ArrowLeft, User, BookOpen, FileOutput, Plus, Minus, Send, CheckCircle,
+    Download, Package, AlertCircle, ChevronDown, Clock, Inbox,
+} from 'lucide-react';
 
 export default function PhieuXuatPublicPage() {
     const [kiHocs, setKiHocs] = useState([]);
     const [giaoViens, setGiaoViens] = useState([]);
     const [selectedKi, setSelectedKi] = useState('');
     const [selectedGv, setSelectedGv] = useState('');
-    const [phanCongs, setPhanCongs] = useState([]);
     const [deXuats, setDeXuats] = useState([]);
     const [phieuXuats, setPhieuXuats] = useState([]);
     const [deXuatDetail, setDeXuatDetail] = useState(null);
@@ -16,42 +18,73 @@ export default function PhieuXuatPublicPage() {
     const [exportItems, setExportItems] = useState({}); // { "lop_id-vat_tu_id": soLuong }
     const [submitting, setSubmitting] = useState(false);
     const [submitted, setSubmitted] = useState(false);
+    const [createdCount, setCreatedCount] = useState(0);
     const [error, setError] = useState('');
     const [expandedClass, setExpandedClass] = useState({});
-    const [selectedMon, setSelectedMon] = useState(''); // New state for subject selection
-    const [exportedMap, setExportedMap] = useState({}); // { vat_tu_id: total_exported }
+    const [selectedMon, setSelectedMon] = useState('');
+    const [exportedMap, setExportedMap] = useState({});
+    const [initLoading, setInitLoading] = useState(true);
+    const [dataLoading, setDataLoading] = useState(false);
+    const [showAllSlips, setShowAllSlips] = useState(false);
+    const [toast, setToast] = useState(null); // { type, message }
+
+    // Auto-dismiss toast
+    useEffect(() => {
+        if (!toast) return;
+        const t = setTimeout(() => setToast(null), 3200);
+        return () => clearTimeout(t);
+    }, [toast]);
 
     useEffect(() => {
-        fetch('/api/ki-hoc').then(r => r.json()).then(data => {
-            const activeKis = data.filter(k => k.trang_thai === 'hoat_dong');
+        Promise.all([
+            fetch('/api/ki-hoc').then(r => r.json()),
+            fetch('/api/giao-vien').then(r => r.json()),
+        ]).then(([kiData, gvData]) => {
+            const activeKis = kiData.filter(k => k.trang_thai === 'hoat_dong');
             setKiHocs(activeKis);
             if (activeKis.length > 0) setSelectedKi(activeKis[0].id.toString());
-        });
-        fetch('/api/giao-vien').then(r => r.json()).then(setGiaoViens);
+            setGiaoViens(gvData);
+            setInitLoading(false);
+        }).catch(() => setInitLoading(false));
     }, []);
 
     useEffect(() => {
         if (selectedKi && selectedGv) {
-            fetch(`/api/phan-cong?ki_id=${selectedKi}&giao_vien_id=${selectedGv}`)
-                .then(r => r.json()).then(setPhanCongs);
-            fetch(`/api/de-xuat?ki_id=${selectedKi}&giao_vien_id=${selectedGv}`)
-                .then(r => r.json()).then(data => {
-                    setDeXuats(data);
-                    if (data.length > 0) {
-                        fetch(`/api/de-xuat?id=${data[0].id}`)
-                            .then(r => r.json())
-                            .then(setDeXuatDetail);
-                    } else {
-                        setDeXuatDetail(null);
-                    }
-                });
-            fetch(`/api/phieu-xuat?ki_id=${selectedKi}&giao_vien_id=${selectedGv}`)
-                .then(r => r.json()).then(setPhieuXuats);
+            setDataLoading(true);
+            Promise.all([
+                fetch(`/api/de-xuat?ki_id=${selectedKi}&giao_vien_id=${selectedGv}`).then(r => r.json()),
+                fetch(`/api/phieu-xuat?ki_id=${selectedKi}&giao_vien_id=${selectedGv}`).then(r => r.json()),
+            ]).then(([dxData, pxData]) => {
+                setDeXuats(dxData);
+                setPhieuXuats(pxData);
+                if (dxData.length > 0) {
+                    return fetch(`/api/de-xuat?id=${dxData[0].id}`)
+                        .then(r => r.json())
+                        .then(detail => {
+                            setDeXuatDetail(detail);
+                            if (detail?.chi_tiet?.length > 0) {
+                                const firstMon = detail.chi_tiet[0].mon_hoc_id;
+                                setSelectedMon(prev => (
+                                    prev && detail.chi_tiet.some(ct => ct.mon_hoc_id === parseInt(prev))
+                                ) ? prev : firstMon.toString());
+                            } else {
+                                setSelectedMon('');
+                            }
+                        });
+                } else {
+                    setDeXuatDetail(null);
+                    setSelectedMon('');
+                }
+            }).catch(() => {
+                setDeXuatDetail(null);
+                setDeXuats([]);
+                setPhieuXuats([]);
+            }).finally(() => setDataLoading(false));
             setMode('view');
             setExportItems({});
             setSubmitted(false);
-            setSelectedMon(''); // Reset subject when teacher changes
             setExportedMap({});
+            setShowAllSlips(false);
         }
     }, [selectedKi, selectedGv]);
 
@@ -63,12 +96,6 @@ export default function PhieuXuatPublicPage() {
                 .catch(() => setExportedMap({}));
         }
     }, [selectedKi, selectedGv, selectedMon]);
-
-    const getDeXuatDetail = async () => {
-        if (deXuats.length === 0) return null;
-        const res = await fetch(`/api/de-xuat?id=${deXuats[0].id}`);
-        return await res.json();
-    };
 
     const handleCreatePhieu = () => {
         setMode('create');
@@ -103,11 +130,10 @@ export default function PhieuXuatPublicPage() {
         });
     };
 
-    const handleQtyBlur = (lopId, vtId, maxQty) => {
+    const handleQtyBlur = (lopId, vtId) => {
         const key = `${lopId}-${vtId}`;
         setExportItems(prev => {
             const val = prev[key];
-            // Nếu trống hoặc 0, xóa item
             if (val === '' || val === 0) {
                 const { [key]: _, ...rest } = prev;
                 return rest;
@@ -119,6 +145,7 @@ export default function PhieuXuatPublicPage() {
     const handleSubmitPhieu = async () => {
         if (Object.keys(exportItems).length === 0) {
             setError('Vui lòng chọn ít nhất một vật tư');
+            setToast({ type: 'error', message: 'Vui lòng chọn ít nhất một vật tư' });
             return;
         }
 
@@ -169,17 +196,21 @@ export default function PhieuXuatPublicPage() {
                 if (!res.ok) {
                     const data = await res.json();
                     setError(data.error || 'Có lỗi xảy ra');
+                    setToast({ type: 'error', message: data.error || 'Có lỗi xảy ra' });
                     setSubmitting(false);
                     return;
                 }
             }
 
+            setCreatedCount(Object.keys(groupedByLopAndMon).length);
             setSubmitted(true);
+            setToast({ type: 'success', message: 'Đã gửi phiếu xuất thành công' });
             // Refresh data
             const pxRes = await fetch(`/api/phieu-xuat?ki_id=${selectedKi}&giao_vien_id=${selectedGv}`);
             setPhieuXuats(await pxRes.json());
         } catch (err) {
             setError('Không thể kết nối đến server');
+            setToast({ type: 'error', message: 'Không thể kết nối đến server' });
         }
         setSubmitting(false);
     };
@@ -318,398 +349,501 @@ export default function PhieuXuatPublicPage() {
         tu_choi: { label: 'Từ chối', badge: 'badge-danger' },
     };
 
-    const printDeXuatPhieu = () => {
-        if (!deXuatDetail || !deXuatDetail.chi_tiet) return;
+    // Compute max exportable quantity + human-readable quota info for one proposal item
+    const computeQtyLimits = (ct) => {
+        const stats = exportedMap[ct.vat_tu_id] || { da_xuat: 0, total_supply: 0, total_proposed: 0, so_luong_free: 999 };
+        const alreadyExported = stats.da_xuat || 0;
+        const proposedQty = ct.so_luong || 0;
+        const remainingQty = Math.max(0, proposedQty - alreadyExported);
 
-        const gv = giaoViens.find(g => g.id === parseInt(selectedGv));
-        if (!gv) return;
+        // Calculate ratio for scaling
+        const totalProposed = stats.total_proposed || proposedQty;
+        const supply = stats.total_supply || 0;
+        const ratio = (totalProposed > 0 && supply < totalProposed) ? supply / totalProposed : 1;
 
-        // Filter details by selected subject
-        const filteredDetails = deXuatDetail.chi_tiet.filter(ct => ct.mon_hoc_id === parseInt(selectedMon));
-        if (filteredDetails.length === 0) return;
+        // Resolve absolute Global Cap vs Usage for the Entire Teacher (across all subjects)
+        const globalQuotaRemaining = stats.fair_practical_total !== undefined
+            ? Math.max(0, stats.fair_practical_total - (stats.teacher_global_used || 0))
+            : Math.max(0, Math.floor(proposedQty * ratio) - alreadyExported);
 
-        const firstCt = filteredDetails[0];
-        const data = {
-            ten_gv: gv.ho_ten,
-            ten_mon: firstCt.ten_mon,
-            ten_lop: firstCt.ten_lop,
-            si_so: firstCt.si_so,
-            chi_tiet: filteredDetails,
-            id: null, // No ID for proposal print
-            ngay_tao: deXuatDetail.ngay_nop
-        };
+        const quotaRemaining = globalQuotaRemaining;
+        const physicalFree = stats.so_luong_free !== undefined ? stats.so_luong_free : quotaRemaining;
 
-        const html = getPrintHTML(data);
-        const printWindow = window.open('', '_blank');
-        printWindow.document.write(html);
-        printWindow.document.close();
-        printWindow.onload = () => {
-            printWindow.print();
+        const canXuatThucTe = Math.min(quotaRemaining, physicalFree);
+        const maxQty = Math.min(remainingQty, canXuatThucTe);
+
+        return {
+            proposedQty, alreadyExported, remainingQty, ratio,
+            physicalFree, canXuatThucTe, maxQty,
+            isCapped: ratio < 1,
+            isPhysicallyLimited: physicalFree < quotaRemaining,
         };
     };
 
-    const printClassProposal = (cls) => {
-        const gv = giaoViens.find(g => g.id === parseInt(selectedGv));
-        if (!gv) return;
+    // Fill every item of a class up to its allowed maximum
+    const fillClassMax = (cls) => {
+        setExportItems(prev => {
+            const next = { ...prev };
+            cls.items
+                .filter(it => it.mon_hoc_id === parseInt(selectedMon))
+                .forEach(ct => {
+                    const { maxQty } = computeQtyLimits(ct);
+                    if (maxQty > 0) next[`${cls.lop_id}-${ct.vat_tu_id}`] = maxQty;
+                });
+            return next;
+        });
+    };
 
-        // Use ONLY items from this class and subject, and apply practical limits
-        const classDetails = cls.items
-            .filter(it => it.mon_hoc_id === parseInt(selectedMon))
-            .map(ct => {
-                const stats = exportedMap[ct.vat_tu_id] || { da_xuat: 0, total_supply: 0, total_proposed: 0 };
-                const alreadyExported = stats.da_xuat || 0;
-                const proposedQty = ct.so_luong || 0;
+    // Derived data -------------------------------------------------------
+    const currentKi = kiHocs.find(k => k.id === parseInt(selectedKi));
+    const currentGv = giaoViens.find(g => g.id === parseInt(selectedGv));
 
-                const totalProposed = stats.total_proposed || proposedQty;
-                const supply = stats.total_supply || 0;
-                const ratio = (totalProposed > 0 && supply < totalProposed) ? supply / totalProposed : 1;
-                const practicalTotal = Math.floor(proposedQty * ratio);
-                const canXuatThucTe = Math.max(0, practicalTotal - alreadyExported);
+    const subjectList = (() => {
+        if (!deXuatDetail?.chi_tiet) return [];
+        const map = new Map();
+        deXuatDetail.chi_tiet.forEach(ct => {
+            if (!map.has(ct.mon_hoc_id)) {
+                map.set(ct.mon_hoc_id, { id: ct.mon_hoc_id, name: ct.ten_mon, count: 0 });
+            }
+            map.get(ct.mon_hoc_id).count += 1;
+        });
+        return Array.from(map.values());
+    })();
 
+    const visibleSlips = (() => {
+        if (showAllSlips || !selectedMon) return phieuXuats;
+        return phieuXuats.filter(px => px.mon_hoc_id === parseInt(selectedMon));
+    })();
+
+    const slipStats = {
+        cho_duyet: phieuXuats.filter(px => px.trang_thai === 'cho_duyet').length,
+        da_ky: phieuXuats.filter(px => px.trang_thai === 'da_ky').length,
+        da_xuat: phieuXuats.filter(px => px.trang_thai === 'da_xuat').length,
+    };
+
+    const selectedEntries = Object.entries(exportItems).filter(([, q]) => q !== '' && q > 0);
+    const totalSelectedItems = selectedEntries.length;
+    const totalSelectedQty = selectedEntries.reduce((sum, [, q]) => sum + (parseInt(q) || 0), 0);
+
+    const classGroups = (() => {
+        if (!deXuatDetail?.chi_tiet) return [];
+        const groupedByClass = {};
+        deXuatDetail.chi_tiet.forEach(ct => {
+            if (!groupedByClass[ct.lop_id]) {
+                groupedByClass[ct.lop_id] = { ten_lop: ct.ten_lop, si_so: ct.si_so, items: [] };
+            }
+            groupedByClass[ct.lop_id].items.push(ct);
+        });
+        return Object.entries(groupedByClass)
+            .map(([lopId, data]) => {
+                const itemsInSelectedMon = data.items.filter(it => it.mon_hoc_id === parseInt(selectedMon));
                 return {
-                    ...ct,
-                    so_luong: canXuatThucTe // Show the practical amount instead of original proposal
+                    lop_id: parseInt(lopId),
+                    ...data,
+                    ten_mon: itemsInSelectedMon.length > 0 ? itemsInSelectedMon[0].ten_mon : '',
+                    hasItems: itemsInSelectedMon.length > 0
                 };
             })
-            .filter(ct => ct.so_luong > 0); // Only print items that can actually be exported
+            .filter(cls => cls.hasItems);
+    })();
 
-        if (classDetails.length === 0) {
-            setError('Không có vật tư nào khả thi để xuất cho lớp này');
-            return;
-        }
+    // Render ---------------------------------------------------------------
 
-        const data = {
-            ten_gv: gv.ho_ten,
-            ten_mon: cls.ten_mon,
-            ten_lop: cls.ten_lop,
-            si_so: cls.si_so,
-            chi_tiet: classDetails,
-            id: null,
-            ngay_tao: deXuatDetail?.ngay_nop
-        };
-
-        const html = getPrintHTML(data);
-        const printWindow = window.open('', '_blank');
-        printWindow.document.write(html);
-        printWindow.document.close();
-        printWindow.onload = () => {
-            printWindow.print();
-        };
-    };
+    if (initLoading) {
+        return (
+            <div className="public-page tx-shell">
+                <div className="tx-appbar">
+                    <Link href="/giao-vien" className="tx-appbar-btn" aria-label="Quay lại"><ArrowLeft size={20} /></Link>
+                    <span className="tx-appbar-title">Phiếu xuất vật tư</span>
+                </div>
+                <div className="tx-skel" style={{ height: 72, marginBottom: 16 }} />
+                <div className="tx-skel" style={{ height: 56, marginBottom: 24 }} />
+                <div className="tx-skel" style={{ height: 120, marginBottom: 12 }} />
+                <div className="tx-skel" style={{ height: 120, marginBottom: 12 }} />
+                <div className="tx-skel" style={{ height: 120 }} />
+            </div>
+        );
+    }
 
     if (kiHocs.length === 0) {
         return (
-            <div className="public-page">
-                <div className="public-container" style={{ textAlign: 'center', paddingTop: 100 }}>
-                    <FileOutput size={60} style={{ color: 'var(--text-muted)', marginBottom: 16 }} />
-                    <h1 style={{ fontSize: 24, fontWeight: 600, marginBottom: 8 }}>Chưa có kỳ hoạt động</h1>
-                    <p style={{ color: 'var(--text-secondary)' }}>Kỳ học chưa ở trạng thái hoạt động để tạo phiếu xuất.</p>
+            <div className="public-page tx-shell">
+                <div className="tx-appbar">
+                    <Link href="/giao-vien" className="tx-appbar-btn" aria-label="Quay lại"><ArrowLeft size={20} /></Link>
+                    <span className="tx-appbar-title">Phiếu xuất vật tư</span>
+                </div>
+                <div className="card" style={{ marginTop: 24 }}>
+                    <div className="empty-state">
+                        <FileOutput size={48} />
+                        <h3>Chưa có kỳ hoạt động</h3>
+                        <p>Kỳ học chưa ở trạng thái hoạt động để tạo phiếu xuất.</p>
+                        <Link href="/giao-vien" className="btn btn-secondary" style={{ marginTop: 16 }}>
+                            <ArrowLeft size={16} /> Về cổng giáo viên
+                        </Link>
+                    </div>
                 </div>
             </div>
         );
     }
 
     return (
-        <div className="public-page">
-            <div className="public-container">
-                <div className="public-header">
-                    <h1>📤 Phiếu xuất vật tư</h1>
-                    <p>Xem đề xuất, tạo phiếu xuất và tải phiếu in</p>
+        <div className="public-page tx-shell">
+            {/* Sticky app bar */}
+            <div className="tx-appbar">
+                <Link href="/giao-vien" className="tx-appbar-btn" aria-label="Quay lại"><ArrowLeft size={20} /></Link>
+                <div className="tx-appbar-heading">
+                    <span className="tx-appbar-title">Phiếu xuất vật tư</span>
+                    {currentKi && (
+                        <span className="tx-appbar-sub">{currentKi.ten_ki} • {currentKi.nam_hoc}</span>
+                    )}
                 </div>
+            </div>
 
-                {/* Select teacher */}
-                <div style={{ display: 'grid', gridTemplateColumns: selectedGv ? '1fr 1fr' : '1fr', gap: 24, marginBottom: 24 }}>
-                    <div className="card">
-                        <div className="card-header"><h2>1. Chọn giáo viên</h2></div>
-                        <div className="card-body">
-                            <select className="form-select" value={selectedGv} onChange={e => { setSelectedGv(e.target.value); setMode('view'); }}>
+            {/* Step 1: teacher */}
+            {!selectedGv ? (
+                <div className="card tx-intro-card">
+                    <div className="card-body">
+                        <h2 className="tx-intro-title"><User size={20} /> Bạn là giáo viên nào?</h2>
+                        <p className="tx-intro-text">Chọn tên của bạn để xem đề xuất và tạo phiếu xuất vật tư.</p>
+                        <div className="tx-field">
+                            <User size={18} className="tx-field-icon" />
+                            <select
+                                className="form-select tx-big-select"
+                                value={selectedGv}
+                                onChange={e => setSelectedGv(e.target.value)}
+                            >
                                 <option value="">-- Chọn giáo viên --</option>
                                 {giaoViens.map(gv => <option key={gv.id} value={gv.id}>{gv.ho_ten}</option>)}
                             </select>
                         </div>
                     </div>
+                </div>
+            ) : (
+                <>
+                    {/* Selected teacher pill */}
+                    <div className="tx-gv-pill">
+                        <div className="tx-gv-avatar"><User size={20} /></div>
+                        <div className="tx-gv-info">
+                            <span className="tx-gv-name">{currentGv?.ho_ten || 'Giáo viên'}</span>
+                            <span className="tx-gv-label">Đang xem phiếu xuất</span>
+                        </div>
+                        <button className="tx-gv-change" onClick={() => { setSelectedGv(''); setSelectedMon(''); setMode('view'); }}>
+                            Đổi
+                        </button>
+                    </div>
 
-                    {selectedGv && deXuatDetail && deXuatDetail.chi_tiet && (
-                        <div className="card">
-                            <div className="card-header"><h2>2. Chọn môn học</h2></div>
-                            <div className="card-body">
-                                <select className="form-select" value={selectedMon} onChange={e => { setSelectedMon(e.target.value); setMode('view'); }}>
-                                    <option value="">-- Chọn môn học --</option>
-                                    {Array.from(new Set(deXuatDetail.chi_tiet.map(ct => JSON.stringify({ id: ct.mon_hoc_id, name: ct.ten_mon }))))
-                                        .map(mStr => JSON.parse(mStr))
-                                        .map(m => (
-                                            <option key={m.id} value={m.id}>{m.name}</option>
-                                        ))
-                                    }
-                                </select>
+                    {/* Step 2: subject chips */}
+                    {dataLoading && subjectList.length === 0 && (
+                        <div className="tx-skel" style={{ height: 44, marginBottom: 16 }} />
+                    )}
+                    {!dataLoading && subjectList.length > 0 && (
+                        <div className="tx-block">
+                            <div className="tx-block-label"><BookOpen size={14} /> Môn học</div>
+                            <div className="tx-chips">
+                                {subjectList.map(m => (
+                                    <button
+                                        key={m.id}
+                                        className={`tx-chip ${selectedMon === m.id.toString() ? 'active' : ''}`}
+                                        onClick={() => { setSelectedMon(m.id.toString()); setMode('view'); setShowAllSlips(false); }}
+                                    >
+                                        {m.name}
+                                        <span className="tx-chip-count">{m.count}</span>
+                                    </button>
+                                ))}
                             </div>
                         </div>
                     )}
-                </div>
 
-                {selectedGv && selectedMon && (
-                    <>
-
-                        {/* Existing export slips */}
-                        {phieuXuats.length > 0 && (
-                            <div className="card" style={{ marginBottom: 24 }}>
-                                <div className="card-header">
-                                    <h2>📄 Phiếu xuất đã tạo</h2>
-                                    <span className="badge badge-primary">{phieuXuats.length} phiếu</span>
-                                </div>
-                                <div className="table-container">
-                                    <table className="data-table">
-                                        <thead>
-                                            <tr>
-                                                <th>Mã phiếu</th>
-                                                <th>Môn học</th>
-                                                <th>Lớp</th>
-                                                <th>Số vật tư</th>
-                                                <th>Ngày tạo</th>
-                                                <th>Trạng thái</th>
-                                                <th>Thao tác</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {phieuXuats.map(px => (
-                                                <tr key={px.id}>
-                                                    <td style={{ fontWeight: 500, color: 'var(--text-accent)' }}>PX-{String(px.id).padStart(4, '0')}</td>
-                                                    <td>{px.ten_mon}</td>
-                                                    <td>{px.ten_lop || '—'}</td>
-                                                    <td>{px.so_vat_tu} ({px.tong_so_luong})</td>
-                                                    <td>{new Date(px.ngay_tao).toLocaleDateString('vi-VN')}</td>
-                                                    <td><span className={`badge ${statusLabels[px.trang_thai]?.badge}`}>{statusLabels[px.trang_thai]?.label}</span></td>
-                                                    <td>
-                                                        <div className="table-actions">
-                                                            <Tooltip 
-                                                                position="left"
-                                                                content={!(px.trang_thai === 'da_ky' || px.trang_thai === 'da_xuat') 
-                                                                    ? (px.trang_thai === 'tu_choi' ? "Phiếu đã bị từ chối" : "Phiếu xuất cần được ký duyệt để thực hiện in và nhận vật tư") 
-                                                                    : "Tải phiếu xuất PDF"}
-                                                            >
-                                                                <button 
-                                                                    className="btn btn-sm btn-secondary" 
-                                                                    onClick={() => generatePDF(px)}
-                                                                    disabled={!(px.trang_thai === 'da_ky' || px.trang_thai === 'da_xuat')}
-                                                                    style={!(px.trang_thai === 'da_ky' || px.trang_thai === 'da_xuat') ? { opacity: 0.55, cursor: 'not-allowed', pointerEvents: 'none' } : {}}
-                                                                >
-                                                                    <Download size={14} /> Tải PDF
-                                                                </button>
-                                                            </Tooltip>
-                                                        </div>
-                                                    </td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                </div>
+                    {/* No proposal yet */}
+                    {!dataLoading && deXuats.length === 0 && (
+                        <div className="card">
+                            <div className="empty-state">
+                                <Inbox size={48} />
+                                <h3>Chưa có đề xuất vật tư</h3>
+                                <p>Bạn cần nộp đề xuất dự trù trước khi tạo phiếu xuất.</p>
+                                <Link href="/de-xuat" className="btn btn-primary" style={{ marginTop: 16 }}>
+                                    <Plus size={16} /> Tạo đề xuất ngay
+                                </Link>
                             </div>
-                        )}
+                        </div>
+                    )}
 
-                        {/* Create new export slip */}
-                        {mode === 'view' && deXuats.length > 0 && (
-                            <div style={{ textAlign: 'center', marginBottom: 24 }}>
-                                <button className="btn btn-primary btn-lg" onClick={handleCreatePhieu}>
-                                    <Plus size={20} /> Tạo phiếu xuất mới
-                                </button>
-                            </div>
-                        )}
+                    {/* Loading data */}
+                    {dataLoading && subjectList.length > 0 && (
+                        <>
+                            <div className="tx-skel" style={{ height: 84, marginBottom: 12 }} />
+                            <div className="tx-skel" style={{ height: 84, marginBottom: 12 }} />
+                            <div className="tx-skel" style={{ height: 84 }} />
+                        </>
+                    )}
 
-                        {mode === 'create' && !submitted && deXuatDetail && (
-                            <div className="card" style={{ marginBottom: 24 }}>
-                                <div className="card-header">
-                                    <div>
-                                        <h2>📝 Xuất vật tư theo lớp</h2>
-                                        <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 4 }}>Chọn vật tư từ đề xuất để xuất kho</p>
+                    {!dataLoading && subjectList.length > 0 && (
+                        <>
+                            {/* Quick stats */}
+                            {phieuXuats.length > 0 && (
+                                <div className="tx-stats">
+                                    <div className="tx-stat">
+                                        <div className="tx-stat-num" style={{ color: '#fbbf24' }}>{slipStats.cho_duyet}</div>
+                                        <div className="tx-stat-label">Chờ duyệt</div>
+                                    </div>
+                                    <div className="tx-stat">
+                                        <div className="tx-stat-num" style={{ color: '#60a5fa' }}>{slipStats.da_ky}</div>
+                                        <div className="tx-stat-label">Đã ký</div>
+                                    </div>
+                                    <div className="tx-stat">
+                                        <div className="tx-stat-num" style={{ color: '#34d399' }}>{slipStats.da_xuat}</div>
+                                        <div className="tx-stat-label">Đã xuất</div>
                                     </div>
                                 </div>
-                                <div className="card-body">
-                                    {error && <div className="alert alert-error" style={{ marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
-                                        <AlertCircle size={18} /> {error}
-                                    </div>}
+                            )}
 
-                                    {(() => {
-                                        // Group chi tiết đề xuất theo lớp
-                                        const groupedByClass = {};
-                                        if (deXuatDetail.chi_tiet) {
-                                            deXuatDetail.chi_tiet.forEach(ct => {
-                                                if (!groupedByClass[ct.lop_id]) {
-                                                    groupedByClass[ct.lop_id] = {
-                                                        ten_lop: ct.ten_lop,
-                                                        si_so: ct.si_so,
-                                                        // items: [] // Removed here, will handle below
-                                                    };
-                                                }
-                                                // Group all items, but we'll prioritize ten_mon later
-                                                if (!groupedByClass[ct.lop_id].items) groupedByClass[ct.lop_id].items = [];
-                                                groupedByClass[ct.lop_id].items.push(ct);
-                                            });
-                                        }
+                            {mode === 'view' && (
+                                <>
+                                    {/* Slip list */}
+                                    <div className="tx-section">
+                                        <h2><FileOutput size={18} /> Phiếu xuất của bạn</h2>
+                                        {selectedMon && phieuXuats.length > 0 && (
+                                            <button className="tx-link-btn" onClick={() => setShowAllSlips(v => !v)}>
+                                                {showAllSlips ? 'Chỉ môn này' : `Tất cả (${phieuXuats.length})`}
+                                            </button>
+                                        )}
+                                    </div>
 
-                                        const classes = Object.entries(groupedByClass)
-                                            .map(([lopId, data]) => {
-                                                const itemsInSelectedMon = data.items.filter(it => it.mon_hoc_id === parseInt(selectedMon));
-                                                return {
-                                                    lop_id: parseInt(lopId),
-                                                    ...data,
-                                                    ten_mon: itemsInSelectedMon.length > 0 ? itemsInSelectedMon[0].ten_mon : '',
-                                                    hasItems: itemsInSelectedMon.length > 0
-                                                };
-                                            })
-                                            .filter(cls => cls.hasItems);
-
-                                        if (classes.length === 0) {
-                                            return <div className="empty-state"><BookOpen size={48} /><h3>Chưa có đề xuất</h3></div>;
-                                        }
-
-                                        return (
-                                            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                                                {classes.map((cls) => {
-                                                    const isExpanded = expandedClass[cls.lop_id];
-                                                    const classTotal = cls.items.reduce((sum, ct) => {
-                                                        const key = `${cls.lop_id}-${ct.vat_tu_id}`;
-                                                        return sum + (exportItems[key] || 0);
-                                                    }, 0);
-
-                                                    return (
-                                                        <div key={cls.lop_id} style={{ border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', overflow: 'hidden' }}>
-                                                            {/* Class Header */}
-                                                            <div
-                                                                onClick={() => toggleClass(cls.lop_id)}
-                                                                style={{
-                                                                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                                                                    padding: '12px 16px', background: 'var(--bg-glass)',
-                                                                    cursor: 'pointer', userSelect: 'none'
-                                                                }}
+                                    {visibleSlips.length === 0 ? (
+                                        <div className="card">
+                                            <div className="empty-state" style={{ padding: '36px 20px' }}>
+                                                <Inbox size={40} />
+                                                <h3>Chưa có phiếu xuất nào</h3>
+                                                <p>Phiếu đã tạo sẽ hiển thị tại đây theo trạng thái.</p>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div>
+                                            {visibleSlips.map(px => {
+                                                const canPrint = px.trang_thai === 'da_ky' || px.trang_thai === 'da_xuat';
+                                                const st = statusLabels[px.trang_thai] || {};
+                                                return (
+                                                    <div key={px.id} className="tx-slip">
+                                                        <div className="tx-slip-top">
+                                                            <span className="tx-slip-code">PX-{String(px.id).padStart(4, '0')}</span>
+                                                            <span className={`badge ${st.badge}`}>{st.label}</span>
+                                                        </div>
+                                                        <div className="tx-slip-title">{px.ten_mon}{px.ten_lop ? ` • ${px.ten_lop}` : ''}</div>
+                                                        <div className="tx-slip-meta">
+                                                            <span><Package size={13} /> {px.so_vat_tu} vật tư • {px.tong_so_luong} đơn vị</span>
+                                                            <span><Clock size={13} /> {new Date(px.ngay_tao).toLocaleDateString('vi-VN')}</span>
+                                                        </div>
+                                                        <div className="tx-slip-actions">
+                                                            <button
+                                                                className={`btn ${canPrint ? 'btn-primary' : 'btn-secondary'} btn-full`}
+                                                                onClick={() => generatePDF(px)}
+                                                                disabled={!canPrint}
                                                             >
-                                                                <div style={{ display: 'flex', alignItems: 'center', gap: 12, flex: 1 }}>
-                                                                    <ChevronDown size={18} style={{ transform: isExpanded ? 'rotate(0)' : 'rotate(-90deg)', transition: 'transform 0.2s', color: 'var(--text-accent)' }} />
-                                                                    <div>
-                                                                        <h3 style={{ fontSize: 15, fontWeight: 600, marginBottom: 2 }}>{cls.ten_lop}</h3>
-                                                                        <p style={{ fontSize: 12, color: 'var(--text-muted)' }}>Sĩ số: {cls.si_so} • {cls.ten_mon}</p>
-                                                                    </div>
+                                                                <Download size={16} />
+                                                                {canPrint ? 'Tải phiếu in' : (px.trang_thai === 'tu_choi' ? 'Bị từ chối' : 'Chờ kho ký duyệt')}
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    )}
+
+                                    {/* Create CTA */}
+                                    {deXuats.length > 0 && (
+                                        <button className="tx-cta" onClick={handleCreatePhieu}>
+                                            <span className="tx-cta-icon"><Plus size={22} /></span>
+                                            <span className="tx-cta-text">
+                                                <strong>Tạo phiếu xuất mới</strong>
+                                                <small>Chọn vật tư theo lớp từ đề xuất đã duyệt</small>
+                                            </span>
+                                            <ChevronDown size={20} style={{ transform: 'rotate(-90deg)' }} />
+                                        </button>
+                                    )}
+                                </>
+                            )}
+
+                            {/* Create mode */}
+                            {mode === 'create' && !submitted && (
+                                <div>
+                                    <div className="tx-section">
+                                        <h2><Package size={18} /> Chọn vật tư xuất</h2>
+                                        <button className="tx-link-btn" onClick={() => setMode('view')}>Hủy</button>
+                                    </div>
+                                    <p className="tx-hint">
+                                        Môn <strong>{subjectList.find(m => m.id.toString() === selectedMon)?.name}</strong> —
+                                        nhấn &ldquo;Chọn đủ&rdquo; để lấy hết định mức của lớp.
+                                    </p>
+
+                                    {error && (
+                                        <div className="alert alert-error" style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+                                            <AlertCircle size={18} /> {error}
+                                        </div>
+                                    )}
+
+                                    {classGroups.length === 0 ? (
+                                        <div className="card">
+                                            <div className="empty-state"><BookOpen size={48} /><h3>Chưa có đề xuất</h3></div>
+                                        </div>
+                                    ) : (
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                                            {classGroups.map(cls => {
+                                                const isExpanded = expandedClass[cls.lop_id] !== false; // default open
+                                                const classItems = cls.items.filter(it => it.mon_hoc_id === parseInt(selectedMon));
+                                                const classTotal = classItems.reduce((sum, ct) => {
+                                                    const key = `${cls.lop_id}-${ct.vat_tu_id}`;
+                                                    const q = exportItems[key];
+                                                    return sum + (q !== '' && q > 0 ? q : 0);
+                                                }, 0);
+                                                const classSelectedCount = classItems.filter(ct => {
+                                                    const q = exportItems[`${cls.lop_id}-${ct.vat_tu_id}`];
+                                                    return q !== '' && q > 0;
+                                                }).length;
+
+                                                return (
+                                                    <div key={cls.lop_id} className="tx-class">
+                                                        <button className="tx-class-head" onClick={() => toggleClass(cls.lop_id)}>
+                                                            <ChevronDown
+                                                                size={20}
+                                                                className="tx-class-chevron"
+                                                                style={{ transform: isExpanded ? 'rotate(0deg)' : 'rotate(-90deg)' }}
+                                                            />
+                                                            <div className="tx-class-info">
+                                                                <span className="tx-class-name">{cls.ten_lop}</span>
+                                                                <span className="tx-class-meta">Sĩ số {cls.si_so} • {classItems.length} vật tư</span>
+                                                            </div>
+                                                            {classTotal > 0 && (
+                                                                <span className="badge badge-success">{classTotal} đơn vị</span>
+                                                            )}
+                                                        </button>
+
+                                                        {isExpanded && (
+                                                            <div className="tx-class-body">
+                                                                <div className="tx-class-tools">
+                                                                    <span>{classSelectedCount}/{classItems.length} đã chọn</span>
+                                                                    <button className="tx-link-btn" onClick={() => fillClassMax(cls)}>
+                                                                        Chọn đủ định mức
+                                                                    </button>
                                                                 </div>
-                                                                <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-                                                                    {classTotal > 0 && (
-                                                                        <span className="badge badge-success">{classTotal} {cls.items[0]?.don_vi_tinh}</span>
-                                                                    )}
+                                                                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                                                                    {classItems.map(ct => {
+                                                                        const key = `${cls.lop_id}-${ct.vat_tu_id}`;
+                                                                        const rawQty = exportItems[key];
+                                                                        const qty = rawQty === '' || rawQty === undefined ? 0 : rawQty;
+                                                                        const lim = computeQtyLimits(ct);
+                                                                        const disabled = lim.maxQty <= 0;
+
+                                                                        return (
+                                                                            <div key={key} className={`tx-mat ${qty > 0 ? 'selected' : ''}`}>
+                                                                                <div className="tx-mat-info">
+                                                                                    <div className="tx-mat-name">{ct.ten_vat_tu}</div>
+                                                                                    {ct.yeu_cau_ky_thuat && (
+                                                                                        <div className="tx-mat-spec">{ct.yeu_cau_ky_thuat}</div>
+                                                                                    )}
+                                                                                    <div className="tx-mat-quota">
+                                                                                        Đề xuất {lim.proposedQty} • Đã xuất {lim.alreadyExported} •{' '}
+                                                                                        <strong className={lim.maxQty > 0 ? 'tx-quota-ok' : 'tx-quota-none'}>
+                                                                                            Còn được {lim.maxQty} {ct.don_vi_tinh}
+                                                                                        </strong>
+                                                                                    </div>
+                                                                                    {lim.isCapped && (
+                                                                                        <span className="tx-mat-warn warn">Kho thiếu — duyệt theo tỉ lệ {Math.round(lim.ratio * 100)}%</span>
+                                                                                    )}
+                                                                                    {lim.isPhysicallyLimited && (
+                                                                                        <span className="tx-mat-warn danger">Kho thực tế chỉ còn {lim.physicalFree} {ct.don_vi_tinh}</span>
+                                                                                    )}
+                                                                                    {disabled && !lim.isCapped && !lim.isPhysicallyLimited && (
+                                                                                        <span className="tx-mat-warn muted">Đã xuất đủ định mức</span>
+                                                                                    )}
+                                                                                </div>
+                                                                                <div className="tx-stepper">
+                                                                                    <button
+                                                                                        className="tx-step-btn"
+                                                                                        onClick={() => updateExportQty(cls.lop_id, ct.vat_tu_id, -1, lim.maxQty)}
+                                                                                        disabled={qty <= 0}
+                                                                                        aria-label="Giảm"
+                                                                                    >
+                                                                                        <Minus size={18} />
+                                                                                    </button>
+                                                                                    <input
+                                                                                        type="number"
+                                                                                        inputMode="numeric"
+                                                                                        className="tx-step-input"
+                                                                                        value={rawQty === undefined ? 0 : rawQty}
+                                                                                        onChange={e => setExportQty(cls.lop_id, ct.vat_tu_id, e.target.value, lim.maxQty)}
+                                                                                        onBlur={() => handleQtyBlur(cls.lop_id, ct.vat_tu_id)}
+                                                                                        min="0"
+                                                                                        max={lim.maxQty}
+                                                                                        disabled={disabled}
+                                                                                    />
+                                                                                    <button
+                                                                                        className="tx-step-btn"
+                                                                                        onClick={() => updateExportQty(cls.lop_id, ct.vat_tu_id, 1, lim.maxQty)}
+                                                                                        disabled={qty >= lim.maxQty}
+                                                                                        aria-label="Tăng"
+                                                                                    >
+                                                                                        <Plus size={18} />
+                                                                                    </button>
+                                                                                </div>
+                                                                            </div>
+                                                                        );
+                                                                    })}
                                                                 </div>
                                                             </div>
+                                                        )}
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
 
-                                                            {/* Class Content */}
-                                                            {isExpanded && (
-                                                                <div style={{ padding: '12px 16px', borderTop: '1px solid var(--border-color)', background: 'rgba(0,0,0,0.02)' }}>
-                                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                                                                        {cls.items.filter(it => it.mon_hoc_id === parseInt(selectedMon)).map(ct => {
-                                                                            const key = `${cls.lop_id}-${ct.vat_tu_id}`;
-                                                                            const qty = exportItems[key] || 0;
-                                                                            const proposedQty = ct.so_luong || 0;
-                                                                            const stats = exportedMap[ct.vat_tu_id] || { da_xuat: 0, total_supply: 0, total_proposed: 0, so_luong_free: 999 };
-                                                                            const alreadyExported = stats.da_xuat || 0;
-                                                                            const remainingQty = Math.max(0, proposedQty - alreadyExported);
-
-                                                                            // Calculate ratio for scaling
-                                                                            const totalProposed = stats.total_proposed || proposedQty;
-                                                                            const supply = stats.total_supply || 0;
-                                                                            const ratio = (totalProposed > 0 && supply < totalProposed) ? supply / totalProposed : 1;
-                                                                            
-                                                                            // Resolve absolute Global Cap vs Usage for the Entire Teacher (across all subjects)
-                                                                            const globalQuotaRemaining = stats.fair_practical_total !== undefined 
-                                                                                ? Math.max(0, stats.fair_practical_total - (stats.teacher_global_used || 0)) 
-                                                                                : Math.max(0, Math.floor(proposedQty * ratio) - alreadyExported);
-
-                                                                            // The maximum allowance available to this material for this user now
-                                                                            const quotaRemaining = globalQuotaRemaining;
-                                                                            const physicalFree = stats.so_luong_free !== undefined ? stats.so_luong_free : quotaRemaining;
-                                                                            
-                                                                            const canXuatThucTe = Math.min(quotaRemaining, physicalFree);
-                                                                            const isCapped = ratio < 1;
-                                                                            const isPhysicallyLimited = physicalFree < quotaRemaining;
-
-                                                                            const maxQty = Math.min(remainingQty, canXuatThucTe);
-
-                                                                            return (
-                                                                                <div key={key} style={{
-                                                                                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                                                                                    padding: '10px 12px', background: qty > 0 ? 'rgba(56,189,248,0.08)' : 'white',
-                                                                                    border: qty > 0 ? '1px solid rgba(56,189,248,0.3)' : '1px solid var(--border-color)',
-                                                                                    borderRadius: 'var(--radius-md)',
-                                                                                    opacity: maxQty <= 0 ? 0.6 : 1
-                                                                                }}>
-                                                                                    <div style={{ flex: 1 }}>
-                                                                                        <h4 style={{ fontSize: 13, fontWeight: 600, marginBottom: 2 }}>{ct.ten_vat_tu}</h4>
-                                                                                        <p style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
-                                                                                            {ct.yeu_cau_ky_thuat && `${ct.yeu_cau_ky_thuat} • `}
-                                                                                            <span style={{ fontWeight: 600, color: '#f87171' }}>Đề xuất: {proposedQty} • Còn lại: <span style={{ color: remainingQty > 0 ? '#34d399' : '#ef4444' }}>{remainingQty}</span> {ct.don_vi_tinh}</span>
-                                                                                            {isCapped && <span style={{ marginLeft: 8, color: '#f59e0b', fontWeight: 600 }}>(Tỉ lệ cấp: {Math.round(ratio * 100)}%)</span>}
-                                                                                            <span style={{ marginLeft: 8, color: 'var(--text-accent)', fontWeight: 700 }}>• Có thể xuất thực tế: <span style={{ color: canXuatThucTe > 0 ? 'var(--text-accent)' : '#ef4444' }}>{canXuatThucTe}</span> {ct.don_vi_tinh}</span>
-                                                                                            {isPhysicallyLimited && <span style={{ marginLeft: 8, color: '#ef4444', fontWeight: 600 }}>(Giới hạn kho thực tế: {physicalFree})</span>}
-                                                                                        </p>
-                                                                                    </div>
-                                                                                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                                                                        <button
-                                                                                            className="btn-icon"
-                                                                                            onClick={() => updateExportQty(cls.lop_id, ct.vat_tu_id, -1, maxQty)}
-                                                                                            disabled={qty === 0}
-                                                                                            style={{ opacity: qty === 0 ? 0.5 : 1 }}
-                                                                                        >
-                                                                                            <Minus size={14} />
-                                                                                        </button>
-                                                                                        <input
-                                                                                            type="number"
-                                                                                            className="form-input"
-                                                                                            style={{ width: 60, textAlign: 'center', padding: '6px', fontSize: 13 }}
-                                                                                            value={qty === '' ? '' : qty}
-                                                                                            onChange={e => setExportQty(cls.lop_id, ct.vat_tu_id, e.target.value, maxQty)}
-                                                                                            onBlur={() => handleQtyBlur(cls.lop_id, ct.vat_tu_id, maxQty)}
-                                                                                            min="0"
-                                                                                            max={maxQty}
-                                                                                        />
-                                                                                        <button
-                                                                                            className="btn-icon"
-                                                                                            onClick={() => updateExportQty(cls.lop_id, ct.vat_tu_id, 1, maxQty)}
-                                                                                            disabled={qty >= maxQty}
-                                                                                            style={{ opacity: qty >= maxQty ? 0.5 : 1 }}
-                                                                                        >
-                                                                                            <Plus size={14} />
-                                                                                        </button>
-                                                                                    </div>
-                                                                                </div>
-                                                                            );
-                                                                        })}
-                                                                    </div>
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                    );
-                                                })}
-                                            </div>
-                                        );
-                                    })()}
-
-                                    <div style={{ display: 'flex', gap: 12, marginTop: 24 }}>
-                                        <button className="btn btn-secondary" onClick={() => setMode('view')}>Hủy</button>
-                                        <button className="btn btn-primary btn-full" onClick={handleSubmitPhieu} disabled={submitting}>
-                                            {submitting ? <div className="spinner" /> : <><Send size={18} /> Tạo phiếu xuất</>}
+                            {/* Success */}
+                            {submitted && (
+                                <div className="card tx-success">
+                                    <div className="tx-success-icon"><CheckCircle size={44} /></div>
+                                    <h2>Đã gửi phiếu xuất!</h2>
+                                    <p>{createdCount > 1 ? `${createdCount} phiếu` : 'Phiếu'} đã được gửi đến quản lý kho để ký duyệt. Bạn sẽ tải được phiếu in sau khi được duyệt.</p>
+                                    <div className="tx-success-actions">
+                                        <button className="btn btn-secondary" onClick={() => { setSubmitted(false); setMode('view'); }}>
+                                            Xem phiếu đã gửi
+                                        </button>
+                                        <button className="btn btn-primary" onClick={handleCreatePhieu}>
+                                            <Plus size={16} /> Tạo phiếu mới
                                         </button>
                                     </div>
                                 </div>
-                            </div>
-                        )}
+                            )}
+                        </>
+                    )}
+                </>
+            )}
 
-                        {submitted && (
-                            <div className="card" style={{ textAlign: 'center', marginBottom: 24 }}>
-                                <div className="card-body" style={{ padding: 40 }}>
-                                    <CheckCircle size={48} color="#34d399" style={{ marginBottom: 16 }} />
-                                    <h2 style={{ marginBottom: 8 }}>Tạo phiếu xuất thành công!</h2>
-                                    <p style={{ color: 'var(--text-secondary)', marginBottom: 20 }}>Phiếu xuất đã được gửi đến quản lý kho để ký duyệt.</p>
-                                    <button className="btn btn-primary" onClick={handleCreatePhieu}>Tạo phiếu mới</button>
-                                </div>
-                            </div>
-                        )}
-                    </>
-                )}
-            </div>
+            {/* Sticky bottom action bar (create mode) */}
+            {selectedGv && mode === 'create' && !submitted && (
+                <div className="tx-actionbar">
+                    <div className="tx-actionbar-info">
+                        <strong>{totalSelectedQty}</strong> đơn vị
+                        <span>{totalSelectedItems} vật tư được chọn</span>
+                    </div>
+                    <button
+                        className="btn btn-primary tx-actionbar-btn"
+                        onClick={handleSubmitPhieu}
+                        disabled={submitting || totalSelectedItems === 0}
+                    >
+                        {submitting ? <div className="spinner" /> : <><Send size={18} /> Trình phiếu</>}
+                    </button>
+                </div>
+            )}
+
+            {/* Local toast */}
+            {toast && (
+                <div className={`tx-toast ${toast.type}`}>
+                    {toast.type === 'success' ? <CheckCircle size={18} /> : <AlertCircle size={18} />}
+                    {toast.message}
+                </div>
+            )}
         </div>
     );
 }

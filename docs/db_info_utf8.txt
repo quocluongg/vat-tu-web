@@ -1,0 +1,952 @@
+﻿[dotenv@17.3.1] injecting env (4) from .env.local -- tip: ÔÜÖ´©Å  suppress all logs with { quiet: true }
+FOUND 23 TABLES
+
+====================================================
+TABLE: chi_tiet_de_xuat
+DDL: CREATE TABLE chi_tiet_de_xuat (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                de_xuat_id INTEGER,
+                vat_tu_id INTEGER,
+                so_luong INTEGER NOT NULL,
+                FOREIGN KEY (de_xuat_id) REFERENCES de_xuat(id),
+                FOREIGN KEY (vat_tu_id) REFERENCES "vat_tu_old"(id)
+            )
+ROW COUNT: 0
+COLUMNS:
+  - id (INTEGER) [PK]
+  - de_xuat_id (INTEGER)
+  - vat_tu_id (INTEGER)
+  - so_luong (INTEGER) NOT NULL
+FOREIGN KEYS:
+  - vat_tu_id -> vat_tu_old(id) [ON UPDATE NO ACTION, ON DELETE NO ACTION]
+  - de_xuat_id -> de_xuat(id) [ON UPDATE NO ACTION, ON DELETE NO ACTION]
+
+
+====================================================
+TABLE: chi_tiet_mua_sam
+DDL: CREATE TABLE chi_tiet_mua_sam (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                phieu_mua_sam_id INTEGER,
+                vat_tu_id INTEGER,
+                so_luong_mua INTEGER NOT NULL,
+                de_xuat_id INTEGER,
+                FOREIGN KEY (phieu_mua_sam_id) REFERENCES phieu_mua_sam(id),
+                FOREIGN KEY (vat_tu_id) REFERENCES "vat_tu_old"(id),
+                FOREIGN KEY (de_xuat_id) REFERENCES de_xuat(id)
+            )
+ROW COUNT: 0
+COLUMNS:
+  - id (INTEGER) [PK]
+  - phieu_mua_sam_id (INTEGER)
+  - vat_tu_id (INTEGER)
+  - so_luong_mua (INTEGER) NOT NULL
+  - de_xuat_id (INTEGER)
+FOREIGN KEYS:
+  - de_xuat_id -> de_xuat(id) [ON UPDATE NO ACTION, ON DELETE NO ACTION]
+  - vat_tu_id -> vat_tu_old(id) [ON UPDATE NO ACTION, ON DELETE NO ACTION]
+  - phieu_mua_sam_id -> phieu_mua_sam(id) [ON UPDATE NO ACTION, ON DELETE NO ACTION]
+
+
+====================================================
+TABLE: chi_tiet_phieu_xuat
+DDL: CREATE TABLE chi_tiet_phieu_xuat (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                phieu_xuat_id INTEGER,
+                vat_tu_id INTEGER,
+                so_luong INTEGER NOT NULL,
+                FOREIGN KEY (phieu_xuat_id) REFERENCES phieu_xuat_kho(id),
+                FOREIGN KEY (vat_tu_id) REFERENCES "vat_tu_old"(id)
+            )
+ROW COUNT: 0
+COLUMNS:
+  - id (INTEGER) [PK]
+  - phieu_xuat_id (INTEGER)
+  - vat_tu_id (INTEGER)
+  - so_luong (INTEGER) NOT NULL
+FOREIGN KEYS:
+  - vat_tu_id -> vat_tu_old(id) [ON UPDATE NO ACTION, ON DELETE NO ACTION]
+  - phieu_xuat_id -> phieu_xuat_kho(id) [ON UPDATE NO ACTION, ON DELETE NO ACTION]
+
+
+====================================================
+TABLE: de_xuat
+DDL: CREATE TABLE de_xuat (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                giao_vien_id INTEGER NOT NULL,
+                ki_id INTEGER NOT NULL,
+                trang_thai TEXT DEFAULT 'dang_lam' CHECK(trang_thai IN ('dang_lam', 'da_nop', 'duyet', 'tu_choi')),
+                ghi_chu TEXT,
+                ngay_nop DATETIME,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (giao_vien_id) REFERENCES giao_vien(id) ON DELETE CASCADE,
+                FOREIGN KEY (ki_id) REFERENCES ki_hoc(id) ON DELETE CASCADE
+            )
+ROW COUNT: 197
+COLUMNS:
+  - id (INTEGER) [PK]
+  - giao_vien_id (INTEGER) NOT NULL
+  - ki_id (INTEGER) NOT NULL
+  - trang_thai (TEXT) DEFAULT 'dang_lam'
+  - ghi_chu (TEXT)
+  - ngay_nop (DATETIME)
+  - created_at (DATETIME) DEFAULT CURRENT_TIMESTAMP
+FOREIGN KEYS:
+  - ki_id -> ki_hoc(id) [ON UPDATE NO ACTION, ON DELETE CASCADE]
+  - giao_vien_id -> giao_vien(id) [ON UPDATE NO ACTION, ON DELETE CASCADE]
+SAMPLE DATA (up to 3):
+[
+  {
+    "id": 1,
+    "giao_vien_id": 15,
+    "ki_id": 2,
+    "trang_thai": "da_nop",
+    "ghi_chu": "",
+    "ngay_nop": "2026-03-14 15:15:00",
+    "created_at": "2026-03-08 13:28:50"
+  },
+  {
+    "id": 2,
+    "giao_vien_id": 1,
+    "ki_id": 3,
+    "trang_thai": "da_nop",
+    "ghi_chu": null,
+    "ngay_nop": "2026-03-14 15:16:35",
+    "created_at": "2026-03-11 11:03:10"
+  },
+  {
+    "id": 3,
+    "giao_vien_id": 15,
+    "ki_id": 4,
+    "trang_thai": "da_nop",
+    "ghi_chu": "",
+    "ngay_nop": "2026-03-14 15:15:06",
+    "created_at": "2026-03-11 16:13:01"
+  }
+]
+
+
+====================================================
+TABLE: de_xuat_chi_tiet
+DDL: CREATE TABLE de_xuat_chi_tiet (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                de_xuat_id INTEGER NOT NULL,
+                mon_hoc_id INTEGER NOT NULL,
+                lop_id INTEGER NOT NULL DEFAULT 0,
+                vat_tu_id INTEGER, -- Now Nullable
+                vat_tu_tam_id INTEGER, -- Added
+                so_luong INTEGER NOT NULL DEFAULT 0,
+                ghi_chu TEXT,
+                FOREIGN KEY (de_xuat_id) REFERENCES de_xuat(id) ON DELETE CASCADE,
+                FOREIGN KEY (mon_hoc_id) REFERENCES mon_hoc(id) ON DELETE CASCADE,
+                FOREIGN KEY (lop_id) REFERENCES lop(id) ON DELETE CASCADE,
+                FOREIGN KEY (vat_tu_id) REFERENCES vat_tu(id) ON DELETE CASCADE,
+                FOREIGN KEY (vat_tu_tam_id) REFERENCES vat_tu_tam(id) ON DELETE SET NULL
+            )
+ROW COUNT: 5392
+COLUMNS:
+  - id (INTEGER) [PK]
+  - de_xuat_id (INTEGER) NOT NULL
+  - mon_hoc_id (INTEGER) NOT NULL
+  - lop_id (INTEGER) NOT NULL DEFAULT 0
+  - vat_tu_id (INTEGER)
+  - vat_tu_tam_id (INTEGER)
+  - so_luong (INTEGER) NOT NULL DEFAULT 0
+  - ghi_chu (TEXT)
+FOREIGN KEYS:
+  - vat_tu_tam_id -> vat_tu_tam(id) [ON UPDATE NO ACTION, ON DELETE SET NULL]
+  - vat_tu_id -> vat_tu(id) [ON UPDATE NO ACTION, ON DELETE CASCADE]
+  - lop_id -> lop(id) [ON UPDATE NO ACTION, ON DELETE CASCADE]
+  - mon_hoc_id -> mon_hoc(id) [ON UPDATE NO ACTION, ON DELETE CASCADE]
+  - de_xuat_id -> de_xuat(id) [ON UPDATE NO ACTION, ON DELETE CASCADE]
+SAMPLE DATA (up to 3):
+[
+  {
+    "id": 23933,
+    "de_xuat_id": 7,
+    "mon_hoc_id": 15,
+    "lop_id": 50,
+    "vat_tu_id": 1360,
+    "vat_tu_tam_id": null,
+    "so_luong": 5,
+    "ghi_chu": null
+  },
+  {
+    "id": 23934,
+    "de_xuat_id": 7,
+    "mon_hoc_id": 15,
+    "lop_id": 50,
+    "vat_tu_id": 828,
+    "vat_tu_tam_id": null,
+    "so_luong": 5,
+    "ghi_chu": null
+  },
+  {
+    "id": 23935,
+    "de_xuat_id": 7,
+    "mon_hoc_id": 15,
+    "lop_id": 50,
+    "vat_tu_id": 564,
+    "vat_tu_tam_id": null,
+    "so_luong": 5,
+    "ghi_chu": null
+  }
+]
+
+
+====================================================
+TABLE: giao_vien
+DDL: CREATE TABLE giao_vien (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                ho_ten TEXT NOT NULL,
+                email TEXT,
+                so_dien_thoai TEXT,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+ROW COUNT: 37
+COLUMNS:
+  - id (INTEGER) [PK]
+  - ho_ten (TEXT) NOT NULL
+  - email (TEXT)
+  - so_dien_thoai (TEXT)
+  - created_at (DATETIME) DEFAULT CURRENT_TIMESTAMP
+SAMPLE DATA (up to 3):
+[
+  {
+    "id": 1,
+    "ho_ten": "L├¬ Minh Tß║Ñn",
+    "email": null,
+    "so_dien_thoai": null,
+    "created_at": "2026-03-08 11:57:04"
+  },
+  {
+    "id": 2,
+    "ho_ten": "Trß║ºn Thß╗ï Hß╗ông Lan",
+    "email": null,
+    "so_dien_thoai": null,
+    "created_at": "2026-03-08 11:57:06"
+  },
+  {
+    "id": 3,
+    "ho_ten": "Phß║ím Minh Pha",
+    "email": null,
+    "so_dien_thoai": null,
+    "created_at": "2026-03-08 11:57:08"
+  }
+]
+
+
+====================================================
+TABLE: he_dao_tao
+DDL: CREATE TABLE he_dao_tao (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                nganh_id INTEGER NOT NULL,
+                ten_he TEXT NOT NULL,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (nganh_id) REFERENCES nganh(id) ON DELETE CASCADE
+            )
+ROW COUNT: 0
+COLUMNS:
+  - id (INTEGER) [PK]
+  - nganh_id (INTEGER) NOT NULL
+  - ten_he (TEXT) NOT NULL
+  - created_at (DATETIME) DEFAULT CURRENT_TIMESTAMP
+FOREIGN KEYS:
+  - nganh_id -> nganh(id) [ON UPDATE NO ACTION, ON DELETE CASCADE]
+
+
+====================================================
+TABLE: ki_hoc
+DDL: CREATE TABLE ki_hoc (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                ten_ki TEXT NOT NULL,
+                nam_hoc TEXT NOT NULL,
+                ngay_bat_dau DATE,
+                ngay_ket_thuc DATE,
+                trang_thai TEXT DEFAULT 'setup' CHECK(trang_thai IN ('setup', 'de_xuat', 'mua_sam', 'hoat_dong', 'dong')),
+                han_de_xuat DATETIME,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+ROW COUNT: 7
+COLUMNS:
+  - id (INTEGER) [PK]
+  - ten_ki (TEXT) NOT NULL
+  - nam_hoc (TEXT) NOT NULL
+  - ngay_bat_dau (DATE)
+  - ngay_ket_thuc (DATE)
+  - trang_thai (TEXT) DEFAULT 'setup'
+  - han_de_xuat (DATETIME)
+  - created_at (DATETIME) DEFAULT CURRENT_TIMESTAMP
+SAMPLE DATA (up to 3):
+[
+  {
+    "id": 2,
+    "ten_ki": "HK2_2025-2026",
+    "nam_hoc": "2025-2026",
+    "ngay_bat_dau": "2026-03-02",
+    "ngay_ket_thuc": "2026-07-27",
+    "trang_thai": "dong",
+    "han_de_xuat": "2026-04-01T20:16",
+    "created_at": "2026-03-08 13:16:18"
+  },
+  {
+    "id": 3,
+    "ten_ki": "HK2_2025-2026",
+    "nam_hoc": "2025-2026",
+    "ngay_bat_dau": "2026-03-11",
+    "ngay_ket_thuc": "2026-03-20",
+    "trang_thai": "dong",
+    "han_de_xuat": "2026-03-18T14:30",
+    "created_at": "2026-03-11 07:30:08"
+  },
+  {
+    "id": 4,
+    "ten_ki": "HK2_2025-2026",
+    "nam_hoc": "2025-2026",
+    "ngay_bat_dau": "2026-03-02",
+    "ngay_ket_thuc": "2026-07-27",
+    "trang_thai": "dong",
+    "han_de_xuat": "2026-03-18T22:28",
+    "created_at": "2026-03-11 15:28:44"
+  }
+]
+
+
+====================================================
+TABLE: lop
+DDL: CREATE TABLE lop (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                ten_lop TEXT NOT NULL UNIQUE,
+                loai_he TEXT NOT NULL CHECK(loai_he IN ('T', 'C', 'L')),
+                si_so INTEGER DEFAULT 0,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+ROW COUNT: 116
+COLUMNS:
+  - id (INTEGER) [PK]
+  - ten_lop (TEXT) NOT NULL
+  - loai_he (TEXT) NOT NULL
+  - si_so (INTEGER) DEFAULT 0
+  - created_at (DATETIME) DEFAULT CURRENT_TIMESTAMP
+SAMPLE DATA (up to 3):
+[
+  {
+    "id": 1,
+    "ten_lop": "T24CD3DA-N2",
+    "loai_he": "T",
+    "si_so": 15,
+    "created_at": "2026-03-08 11:57:04"
+  },
+  {
+    "id": 2,
+    "ten_lop": "C24DC1-N1",
+    "loai_he": "C",
+    "si_so": 21,
+    "created_at": "2026-03-08 11:57:05"
+  },
+  {
+    "id": 3,
+    "ten_lop": "LC25DT2-N2",
+    "loai_he": "L",
+    "si_so": 21,
+    "created_at": "2026-03-08 11:57:05"
+  }
+]
+
+
+====================================================
+TABLE: mon_hoc
+DDL: CREATE TABLE mon_hoc (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                ten_mon TEXT NOT NULL UNIQUE,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+ROW COUNT: 45
+COLUMNS:
+  - id (INTEGER) [PK]
+  - ten_mon (TEXT) NOT NULL
+  - created_at (DATETIME) DEFAULT CURRENT_TIMESTAMP
+SAMPLE DATA (up to 3):
+[
+  {
+    "id": 1,
+    "ten_mon": "TH ─Éiß╗üu khiß╗ân kh├¡ n├®n, ─æiß╗çn kh├¡ n├®n",
+    "created_at": "2026-03-08 11:57:04"
+  },
+  {
+    "id": 2,
+    "ten_mon": "TH ─Éiß╗üu khiß╗ân ─æiß╗çn kh├¡ n├®n ÔÇô thß╗ºy lß╗▒c",
+    "created_at": "2026-03-08 11:57:05"
+  },
+  {
+    "id": 3,
+    "ten_mon": "TH Kß╗╣ thuß║¡t lß║»p ─æß║Àt ─æiß╗çn",
+    "created_at": "2026-03-08 11:57:09"
+  }
+]
+
+
+====================================================
+TABLE: mua_sam
+DDL: CREATE TABLE mua_sam (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                ki_id INTEGER NOT NULL,
+                vat_tu_id INTEGER NOT NULL,
+                so_luong_de_xuat INTEGER DEFAULT 0,
+                so_luong_duyet INTEGER DEFAULT 0,
+                don_gia REAL DEFAULT 0,
+                thanh_tien REAL DEFAULT 0,
+                trang_thai TEXT DEFAULT 'cho_mua' CHECK(trang_thai IN ('cho_mua', 'da_mua')),
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (ki_id) REFERENCES ki_hoc(id) ON DELETE CASCADE,
+                FOREIGN KEY (vat_tu_id) REFERENCES vat_tu(id) ON DELETE CASCADE,
+                UNIQUE(ki_id, vat_tu_id)
+            )
+ROW COUNT: 72
+COLUMNS:
+  - id (INTEGER) [PK]
+  - ki_id (INTEGER) NOT NULL
+  - vat_tu_id (INTEGER) NOT NULL
+  - so_luong_de_xuat (INTEGER) DEFAULT 0
+  - so_luong_duyet (INTEGER) DEFAULT 0
+  - don_gia (REAL) DEFAULT 0
+  - thanh_tien (REAL) DEFAULT 0
+  - trang_thai (TEXT) DEFAULT 'cho_mua'
+  - created_at (DATETIME) DEFAULT CURRENT_TIMESTAMP
+FOREIGN KEYS:
+  - vat_tu_id -> vat_tu(id) [ON UPDATE NO ACTION, ON DELETE CASCADE]
+  - ki_id -> ki_hoc(id) [ON UPDATE NO ACTION, ON DELETE CASCADE]
+SAMPLE DATA (up to 3):
+[
+  {
+    "id": 1,
+    "ki_id": 6,
+    "vat_tu_id": 68,
+    "so_luong_de_xuat": 7,
+    "so_luong_duyet": 4,
+    "don_gia": 0,
+    "thanh_tien": 0,
+    "trang_thai": "cho_mua",
+    "created_at": "2026-03-14 15:42:37"
+  },
+  {
+    "id": 3,
+    "ki_id": 6,
+    "vat_tu_id": 26,
+    "so_luong_de_xuat": 6,
+    "so_luong_duyet": 5,
+    "don_gia": 0,
+    "thanh_tien": 0,
+    "trang_thai": "cho_mua",
+    "created_at": "2026-03-14 15:43:15"
+  },
+  {
+    "id": 4,
+    "ki_id": 6,
+    "vat_tu_id": 12,
+    "so_luong_de_xuat": 4,
+    "so_luong_duyet": 2,
+    "don_gia": 0,
+    "thanh_tien": 0,
+    "trang_thai": "cho_mua",
+    "created_at": "2026-03-14 15:43:15"
+  }
+]
+
+
+====================================================
+TABLE: nganh
+DDL: CREATE TABLE nganh (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                ten_nganh TEXT NOT NULL,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+ROW COUNT: 4
+COLUMNS:
+  - id (INTEGER) [PK]
+  - ten_nganh (TEXT) NOT NULL
+  - created_at (DATETIME) DEFAULT CURRENT_TIMESTAMP
+SAMPLE DATA (up to 3):
+[
+  {
+    "id": 1,
+    "ten_nganh": "─Éiß╗çn c├┤ng nghiß╗çp",
+    "created_at": "2026-03-10 08:08:10"
+  },
+  {
+    "id": 2,
+    "ten_nganh": "─Éiß╗çn tß╗¡",
+    "created_at": "2026-03-11 07:38:47"
+  },
+  {
+    "id": 3,
+    "ten_nganh": "Cãí ─æiß╗çn tß╗¡",
+    "created_at": "2026-03-11 15:39:03"
+  }
+]
+
+
+====================================================
+TABLE: nganh_dao_tao
+DDL: CREATE TABLE nganh_dao_tao (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                ten_nganh TEXT NOT NULL
+            )
+ROW COUNT: 0
+COLUMNS:
+  - id (INTEGER) [PK]
+  - ten_nganh (TEXT) NOT NULL
+
+
+====================================================
+TABLE: phan_cong
+DDL: CREATE TABLE phan_cong (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                giao_vien_id INTEGER NOT NULL,
+                mon_hoc_id INTEGER NOT NULL,
+                lop_id INTEGER NOT NULL,
+                ki_id INTEGER NOT NULL,
+                FOREIGN KEY (giao_vien_id) REFERENCES giao_vien(id) ON DELETE CASCADE,
+                FOREIGN KEY (mon_hoc_id) REFERENCES mon_hoc(id) ON DELETE CASCADE,
+                FOREIGN KEY (lop_id) REFERENCES lop(id) ON DELETE CASCADE,
+                FOREIGN KEY (ki_id) REFERENCES ki_hoc(id) ON DELETE CASCADE,
+                UNIQUE(giao_vien_id, mon_hoc_id, lop_id, ki_id)
+            )
+ROW COUNT: 784
+COLUMNS:
+  - id (INTEGER) [PK]
+  - giao_vien_id (INTEGER) NOT NULL
+  - mon_hoc_id (INTEGER) NOT NULL
+  - lop_id (INTEGER) NOT NULL
+  - ki_id (INTEGER) NOT NULL
+FOREIGN KEYS:
+  - ki_id -> ki_hoc(id) [ON UPDATE NO ACTION, ON DELETE CASCADE]
+  - lop_id -> lop(id) [ON UPDATE NO ACTION, ON DELETE CASCADE]
+  - mon_hoc_id -> mon_hoc(id) [ON UPDATE NO ACTION, ON DELETE CASCADE]
+  - giao_vien_id -> giao_vien(id) [ON UPDATE NO ACTION, ON DELETE CASCADE]
+SAMPLE DATA (up to 3):
+[
+  {
+    "id": 138,
+    "giao_vien_id": 1,
+    "mon_hoc_id": 1,
+    "lop_id": 1,
+    "ki_id": 2
+  },
+  {
+    "id": 139,
+    "giao_vien_id": 1,
+    "mon_hoc_id": 1,
+    "lop_id": 2,
+    "ki_id": 2
+  },
+  {
+    "id": 140,
+    "giao_vien_id": 1,
+    "mon_hoc_id": 2,
+    "lop_id": 3,
+    "ki_id": 2
+  }
+]
+
+
+====================================================
+TABLE: phan_cong_giang_day
+DDL: CREATE TABLE phan_cong_giang_day (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                giao_vien_id INTEGER,
+                mon_hoc_id INTEGER,
+                lop_id INTEGER,
+                ki_id INTEGER,
+                FOREIGN KEY (giao_vien_id) REFERENCES users(id),
+                FOREIGN KEY (mon_hoc_id) REFERENCES mon_hoc(id),
+                FOREIGN KEY (lop_id) REFERENCES lop(id),
+                FOREIGN KEY (ki_id) REFERENCES ki_hoc(id)
+            )
+ROW COUNT: 0
+COLUMNS:
+  - id (INTEGER) [PK]
+  - giao_vien_id (INTEGER)
+  - mon_hoc_id (INTEGER)
+  - lop_id (INTEGER)
+  - ki_id (INTEGER)
+FOREIGN KEYS:
+  - ki_id -> ki_hoc(id) [ON UPDATE NO ACTION, ON DELETE NO ACTION]
+  - lop_id -> lop(id) [ON UPDATE NO ACTION, ON DELETE NO ACTION]
+  - mon_hoc_id -> mon_hoc(id) [ON UPDATE NO ACTION, ON DELETE NO ACTION]
+  - giao_vien_id -> users(id) [ON UPDATE NO ACTION, ON DELETE NO ACTION]
+
+
+====================================================
+TABLE: phieu_mua_sam
+DDL: CREATE TABLE phieu_mua_sam (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                ngay_tao DATETIME DEFAULT CURRENT_TIMESTAMP,
+                trang_thai TEXT DEFAULT 'hoan_thanh' CHECK(trang_thai IN ('hoan_thanh', 'da_huy')),
+                nguoi_tao_id INTEGER,
+                ghi_chu TEXT,
+                giao_vien_id INTEGER,
+                FOREIGN KEY (nguoi_tao_id) REFERENCES users(id),
+                FOREIGN KEY (giao_vien_id) REFERENCES users(id)
+            )
+ROW COUNT: 0
+COLUMNS:
+  - id (INTEGER) [PK]
+  - ngay_tao (DATETIME) DEFAULT CURRENT_TIMESTAMP
+  - trang_thai (TEXT) DEFAULT 'hoan_thanh'
+  - nguoi_tao_id (INTEGER)
+  - ghi_chu (TEXT)
+  - giao_vien_id (INTEGER)
+FOREIGN KEYS:
+  - giao_vien_id -> users(id) [ON UPDATE NO ACTION, ON DELETE NO ACTION]
+  - nguoi_tao_id -> users(id) [ON UPDATE NO ACTION, ON DELETE NO ACTION]
+
+
+====================================================
+TABLE: phieu_xuat
+DDL: CREATE TABLE phieu_xuat (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                giao_vien_id INTEGER NOT NULL,
+                ki_id INTEGER NOT NULL,
+                mon_hoc_id INTEGER NOT NULL,
+                lop_id INTEGER,
+                trang_thai TEXT DEFAULT 'cho_duyet' CHECK(trang_thai IN ('cho_duyet', 'da_ky', 'da_xuat', 'tu_choi')),
+                ngay_tao DATETIME DEFAULT CURRENT_TIMESTAMP,
+                ngay_duyet DATETIME,
+                ghi_chu TEXT,
+                FOREIGN KEY (giao_vien_id) REFERENCES giao_vien(id) ON DELETE CASCADE,
+                FOREIGN KEY (ki_id) REFERENCES ki_hoc(id) ON DELETE CASCADE,
+                FOREIGN KEY (mon_hoc_id) REFERENCES mon_hoc(id) ON DELETE CASCADE,
+                FOREIGN KEY (lop_id) REFERENCES lop(id) ON DELETE SET NULL
+            )
+ROW COUNT: 92
+COLUMNS:
+  - id (INTEGER) [PK]
+  - giao_vien_id (INTEGER) NOT NULL
+  - ki_id (INTEGER) NOT NULL
+  - mon_hoc_id (INTEGER) NOT NULL
+  - lop_id (INTEGER)
+  - trang_thai (TEXT) DEFAULT 'cho_duyet'
+  - ngay_tao (DATETIME) DEFAULT CURRENT_TIMESTAMP
+  - ngay_duyet (DATETIME)
+  - ghi_chu (TEXT)
+FOREIGN KEYS:
+  - lop_id -> lop(id) [ON UPDATE NO ACTION, ON DELETE SET NULL]
+  - mon_hoc_id -> mon_hoc(id) [ON UPDATE NO ACTION, ON DELETE CASCADE]
+  - ki_id -> ki_hoc(id) [ON UPDATE NO ACTION, ON DELETE CASCADE]
+  - giao_vien_id -> giao_vien(id) [ON UPDATE NO ACTION, ON DELETE CASCADE]
+SAMPLE DATA (up to 3):
+[
+  {
+    "id": 1,
+    "giao_vien_id": 15,
+    "ki_id": 2,
+    "mon_hoc_id": 19,
+    "lop_id": 38,
+    "trang_thai": "da_xuat",
+    "ngay_tao": "2026-03-08 13:31:58",
+    "ngay_duyet": "2026-03-11 07:21:45",
+    "ghi_chu": null
+  },
+  {
+    "id": 2,
+    "giao_vien_id": 15,
+    "ki_id": 4,
+    "mon_hoc_id": 19,
+    "lop_id": 38,
+    "trang_thai": "tu_choi",
+    "ngay_tao": "2026-03-14 09:05:52",
+    "ngay_duyet": null,
+    "ghi_chu": null
+  },
+  {
+    "id": 3,
+    "giao_vien_id": 15,
+    "ki_id": 4,
+    "mon_hoc_id": 19,
+    "lop_id": 38,
+    "trang_thai": "tu_choi",
+    "ngay_tao": "2026-03-14 09:05:55",
+    "ngay_duyet": null,
+    "ghi_chu": null
+  }
+]
+
+
+====================================================
+TABLE: phieu_xuat_chi_tiet
+DDL: CREATE TABLE phieu_xuat_chi_tiet (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                phieu_xuat_id INTEGER NOT NULL,
+                vat_tu_id INTEGER NOT NULL,
+                so_luong INTEGER NOT NULL DEFAULT 0,
+                FOREIGN KEY (phieu_xuat_id) REFERENCES phieu_xuat(id) ON DELETE CASCADE,
+                FOREIGN KEY (vat_tu_id) REFERENCES vat_tu(id) ON DELETE CASCADE
+            )
+ROW COUNT: 405
+COLUMNS:
+  - id (INTEGER) [PK]
+  - phieu_xuat_id (INTEGER) NOT NULL
+  - vat_tu_id (INTEGER) NOT NULL
+  - so_luong (INTEGER) NOT NULL DEFAULT 0
+FOREIGN KEYS:
+  - vat_tu_id -> vat_tu(id) [ON UPDATE NO ACTION, ON DELETE CASCADE]
+  - phieu_xuat_id -> phieu_xuat(id) [ON UPDATE NO ACTION, ON DELETE CASCADE]
+SAMPLE DATA (up to 3):
+[
+  {
+    "id": 1,
+    "phieu_xuat_id": 1,
+    "vat_tu_id": 66,
+    "so_luong": 7
+  },
+  {
+    "id": 2,
+    "phieu_xuat_id": 22,
+    "vat_tu_id": 66,
+    "so_luong": 3
+  },
+  {
+    "id": 3,
+    "phieu_xuat_id": 23,
+    "vat_tu_id": 1,
+    "so_luong": 3
+  }
+]
+
+
+====================================================
+TABLE: phieu_xuat_kho
+DDL: CREATE TABLE phieu_xuat_kho (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                nguoi_nhan_id INTEGER,
+                ngay_xuat DATETIME DEFAULT CURRENT_TIMESTAMP,
+                muc_dich TEXT,
+                tong_so_luong INTEGER,
+                phan_cong_id INTEGER,
+                trang_thai TEXT DEFAULT 'hoan_thanh' CHECK(trang_thai IN ('hoan_thanh', 'da_huy')),
+                nguoi_duyet_id INTEGER,
+                FOREIGN KEY (nguoi_nhan_id) REFERENCES users(id),
+                FOREIGN KEY (phan_cong_id) REFERENCES phan_cong_giang_day(id),
+                FOREIGN KEY (nguoi_duyet_id) REFERENCES users(id)
+            )
+ROW COUNT: 0
+COLUMNS:
+  - id (INTEGER) [PK]
+  - nguoi_nhan_id (INTEGER)
+  - ngay_xuat (DATETIME) DEFAULT CURRENT_TIMESTAMP
+  - muc_dich (TEXT)
+  - tong_so_luong (INTEGER)
+  - phan_cong_id (INTEGER)
+  - trang_thai (TEXT) DEFAULT 'hoan_thanh'
+  - nguoi_duyet_id (INTEGER)
+FOREIGN KEYS:
+  - nguoi_duyet_id -> users(id) [ON UPDATE NO ACTION, ON DELETE NO ACTION]
+  - phan_cong_id -> phan_cong_giang_day(id) [ON UPDATE NO ACTION, ON DELETE NO ACTION]
+  - nguoi_nhan_id -> users(id) [ON UPDATE NO ACTION, ON DELETE NO ACTION]
+
+
+====================================================
+TABLE: users
+DDL: CREATE TABLE users (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                username TEXT UNIQUE NOT NULL,
+                password_hash TEXT NOT NULL,
+                ho_ten TEXT NOT NULL,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+ROW COUNT: 1
+COLUMNS:
+  - id (INTEGER) [PK]
+  - username (TEXT) NOT NULL
+  - password_hash (TEXT) NOT NULL
+  - ho_ten (TEXT) NOT NULL
+  - created_at (DATETIME) DEFAULT CURRENT_TIMESTAMP
+SAMPLE DATA (up to 3):
+[
+  {
+    "id": 1,
+    "username": "admin",
+    "password_hash": "$2b$10$l6pRP7AevudTNH211NzexuVunv0FkaQp3uB/Ek/ehGRAL1zi.1UIe",
+    "ho_ten": "Quß║ún trß╗ï vi├¬n",
+    "created_at": "2026-03-08 03:02:44"
+  }
+]
+
+
+====================================================
+TABLE: vat_tu
+DDL: CREATE TABLE vat_tu (id INTEGER PRIMARY KEY AUTOINCREMENT, ten_vat_tu TEXT NOT NULL, yeu_cau_ky_thuat TEXT, don_vi_tinh TEXT NOT NULL, so_luong_kho INTEGER DEFAULT 0, ki_id INTEGER NOT NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP, nganh_id INTEGER, FOREIGN KEY (ki_id) REFERENCES ki_hoc(id), FOREIGN KEY (nganh_id) REFERENCES nganh(id))
+ROW COUNT: 2534
+COLUMNS:
+  - id (INTEGER) [PK]
+  - ten_vat_tu (TEXT) NOT NULL
+  - yeu_cau_ky_thuat (TEXT)
+  - don_vi_tinh (TEXT) NOT NULL
+  - so_luong_kho (INTEGER) DEFAULT 0
+  - ki_id (INTEGER) NOT NULL
+  - created_at (DATETIME) DEFAULT CURRENT_TIMESTAMP
+  - nganh_id (INTEGER)
+FOREIGN KEYS:
+  - nganh_id -> nganh(id) [ON UPDATE NO ACTION, ON DELETE NO ACTION]
+  - ki_id -> ki_hoc(id) [ON UPDATE NO ACTION, ON DELETE NO ACTION]
+SAMPLE DATA (up to 3):
+[
+  {
+    "id": 1,
+    "ten_vat_tu": "B─âng keo c├ích ─æiß╗çn",
+    "yeu_cau_ky_thuat": "0,12mm x 18mm x 20m",
+    "don_vi_tinh": "Cuß╗Ön",
+    "so_luong_kho": 0,
+    "ki_id": 2,
+    "created_at": "2026-03-08 13:22:02",
+    "nganh_id": null
+  },
+  {
+    "id": 2,
+    "ten_vat_tu": "B─âng vß║úi",
+    "yeu_cau_ky_thuat": "Ceramic 1mm, 10mm x 10m",
+    "don_vi_tinh": "Cuß╗Ön",
+    "so_luong_kho": 0,
+    "ki_id": 2,
+    "created_at": "2026-03-08 13:22:02",
+    "nganh_id": null
+  },
+  {
+    "id": 3,
+    "ten_vat_tu": "Cß║ºu ch├¼ ß╗æng",
+    "yeu_cau_ky_thuat": "300mm - 5A",
+    "don_vi_tinh": "C├íi",
+    "so_luong_kho": 0,
+    "ki_id": 2,
+    "created_at": "2026-03-08 13:22:02",
+    "nganh_id": null
+  }
+]
+
+
+====================================================
+TABLE: vat_tu_old
+DDL: CREATE TABLE "vat_tu_old" (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                ten_vat_tu TEXT NOT NULL,
+                yeu_cau_ky_thuat TEXT,
+                don_vi_tinh TEXT NOT NULL,
+                so_luong_kho INTEGER DEFAULT 0,
+                ki_id INTEGER NOT NULL,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP, nganh_id INTEGER REFERENCES nganh_dao_tao(id),
+                FOREIGN KEY (ki_id) REFERENCES ki_hoc(id) ON DELETE CASCADE
+            )
+ROW COUNT: 116
+COLUMNS:
+  - id (INTEGER) [PK]
+  - ten_vat_tu (TEXT) NOT NULL
+  - yeu_cau_ky_thuat (TEXT)
+  - don_vi_tinh (TEXT) NOT NULL
+  - so_luong_kho (INTEGER) DEFAULT 0
+  - ki_id (INTEGER) NOT NULL
+  - created_at (DATETIME) DEFAULT CURRENT_TIMESTAMP
+  - nganh_id (INTEGER)
+FOREIGN KEYS:
+  - ki_id -> ki_hoc(id) [ON UPDATE NO ACTION, ON DELETE CASCADE]
+  - nganh_id -> nganh_dao_tao(id) [ON UPDATE NO ACTION, ON DELETE NO ACTION]
+SAMPLE DATA (up to 3):
+[
+  {
+    "id": 1,
+    "ten_vat_tu": "B─âng keo c├ích ─æiß╗çn",
+    "yeu_cau_ky_thuat": "0,12mm x 18mm x 20m",
+    "don_vi_tinh": "Cuß╗Ön",
+    "so_luong_kho": 0,
+    "ki_id": 2,
+    "created_at": "2026-03-08 13:22:02",
+    "nganh_id": null
+  },
+  {
+    "id": 2,
+    "ten_vat_tu": "B─âng vß║úi",
+    "yeu_cau_ky_thuat": "Ceramic 1mm, 10mm x 10m",
+    "don_vi_tinh": "Cuß╗Ön",
+    "so_luong_kho": 0,
+    "ki_id": 2,
+    "created_at": "2026-03-08 13:22:02",
+    "nganh_id": null
+  },
+  {
+    "id": 3,
+    "ten_vat_tu": "Cß║ºu ch├¼ ß╗æng",
+    "yeu_cau_ky_thuat": "300mm - 5A",
+    "don_vi_tinh": "C├íi",
+    "so_luong_kho": 0,
+    "ki_id": 2,
+    "created_at": "2026-03-08 13:22:02",
+    "nganh_id": null
+  }
+]
+
+
+====================================================
+TABLE: vat_tu_tam
+DDL: CREATE TABLE vat_tu_tam (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            ten_vat_tu TEXT NOT NULL,
+            yeu_cau_ky_thuat TEXT,
+            don_vi_tinh TEXT NOT NULL,
+            ki_id INTEGER NOT NULL,
+            giao_vien_id INTEGER NOT NULL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP, trang_thai TEXT DEFAULT 'cho_duyet' CHECK(trang_thai IN ('cho_duyet', 'da_duyet', 'tu_choi')), nganh_id INTEGER REFERENCES nganh(id) ON DELETE SET NULL,
+            FOREIGN KEY (ki_id) REFERENCES ki_hoc(id) ON DELETE CASCADE,
+            FOREIGN KEY (giao_vien_id) REFERENCES giao_vien(id) ON DELETE CASCADE
+        )
+ROW COUNT: 447
+COLUMNS:
+  - id (INTEGER) [PK]
+  - ten_vat_tu (TEXT) NOT NULL
+  - yeu_cau_ky_thuat (TEXT)
+  - don_vi_tinh (TEXT) NOT NULL
+  - ki_id (INTEGER) NOT NULL
+  - giao_vien_id (INTEGER) NOT NULL
+  - created_at (DATETIME) DEFAULT CURRENT_TIMESTAMP
+  - trang_thai (TEXT) DEFAULT 'cho_duyet'
+  - nganh_id (INTEGER)
+FOREIGN KEYS:
+  - giao_vien_id -> giao_vien(id) [ON UPDATE NO ACTION, ON DELETE CASCADE]
+  - ki_id -> ki_hoc(id) [ON UPDATE NO ACTION, ON DELETE CASCADE]
+  - nganh_id -> nganh(id) [ON UPDATE NO ACTION, ON DELETE SET NULL]
+SAMPLE DATA (up to 3):
+[
+  {
+    "id": 5,
+    "ten_vat_tu": "Cß║ºu ch├¼ ß╗æng",
+    "yeu_cau_ky_thuat": "300mm - 5A",
+    "don_vi_tinh": "Hß╗Öp",
+    "ki_id": 7,
+    "giao_vien_id": 10,
+    "created_at": "2026-03-17 06:34:41",
+    "trang_thai": "da_duyet",
+    "nganh_id": null
+  },
+  {
+    "id": 6,
+    "ten_vat_tu": "─Éß║┐ timer ",
+    "yeu_cau_ky_thuat": "8 ch├ón tr├▓n",
+    "don_vi_tinh": "C├íi",
+    "ki_id": 7,
+    "giao_vien_id": 10,
+    "created_at": "2026-03-17 06:36:32",
+    "trang_thai": "da_duyet",
+    "nganh_id": null
+  },
+  {
+    "id": 7,
+    "ten_vat_tu": "rß║»c cß║»m nhanh 3.5mm",
+    "yeu_cau_ky_thuat": "3.5",
+    "don_vi_tinh": "c├íi",
+    "ki_id": 7,
+    "giao_vien_id": 8,
+    "created_at": "2026-03-17 08:46:05",
+    "trang_thai": "da_duyet",
+    "nganh_id": null
+  }
+]
+
+
