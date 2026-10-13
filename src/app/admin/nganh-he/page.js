@@ -2,6 +2,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { GraduationCap, Plus, Edit3, Trash2, BookOpen, UserPlus, X, Search, School, Upload, CheckCircle2, AlertCircle, ChevronDown, FolderOpen, Calendar, Settings, FileText } from 'lucide-react';
 import { useToast } from '@/components/Toast';
+import { detectNganhId } from '@/lib/nganh-code';
 
 const LOAI_HE_MAP = { T: 'Trung cấp', C: 'Cao đẳng', L: 'Liên thông' };
 const LOAI_HE_COLOR = { T: '#f59e0b', C: '#38bdf8', L: '#a78bfa' };
@@ -38,6 +39,8 @@ export default function NganhHePage() {
     const [showOnlyTH, setShowOnlyTH] = useState(true);
     const [selectedMons, setSelectedMons] = useState(new Set());
     const [selectedLops, setSelectedLops] = useState(new Set());
+    const [showBulkNganhModal, setShowBulkNganhModal] = useState(false);
+    const [bulkNganhId, setBulkNganhId] = useState('');
     const [csvText, setCsvText] = useState('');
     const [excludeLT, setExcludeLT] = useState(true);
     const [importResult, setImportResult] = useState(null);
@@ -81,7 +84,17 @@ export default function NganhHePage() {
     useEffect(() => { if (selectedKi) fetchPhanCong(); }, [selectedKi, fetchPhanCong]);
 
     /* ---- helpers ---- */
-    const openModal = (type, item = null) => { setEditing(item); setForm(item ? { ...item } : {}); setShowModal(type); };
+    const openModal = (type, item = null) => {
+        setEditing(item);
+        let nextForm = item ? { ...item } : {};
+        // Mở sửa lớp chưa gán ngành → hiện sẵn gợi ý theo mã lớp (admin thấy trước khi lưu)
+        if (type === 'lop' && item && !item.nganh_id) {
+            const sugId = detectNganhId(item.ten_lop, nganhs);
+            if (sugId) nextForm.nganh_id = String(sugId);
+        }
+        setForm(nextForm);
+        setShowModal(type);
+    };
 
     const submitNganh = async e => {
         e.preventDefault();
@@ -106,7 +119,11 @@ export default function NganhHePage() {
     const submitLop = async e => {
         e.preventDefault();
         const method = editing ? 'PUT' : 'POST';
-        const body = { ten_lop: form.ten_lop, si_so: parseInt(form.si_so) || 0 };
+        const body = {
+            ten_lop: form.ten_lop,
+            si_so: parseInt(form.si_so) || 0,
+            nganh_id: form.nganh_id ? parseInt(form.nganh_id) : null
+        };
         if (editing) body.id = editing.id;
         const res = await fetch('/api/lop', { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
         const data = await res.json();
@@ -186,6 +203,31 @@ export default function NganhHePage() {
         await Promise.all([...selectedLops].map(id => fetch('/api/lop?id=' + id, { method: 'DELETE' })));
         addToast('Đã xóa ' + selectedLops.size + ' lớp'); setSelectedLops(new Set()); fetchAll();
     };
+
+    const bulkAssignNganh = async () => {
+        if (!bulkNganhId) { addToast('Vui lòng chọn ngành', 'error'); return; }
+        const ids = [...selectedLops];
+        await Promise.all(ids.map(id => fetch('/api/lop', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id, nganh_id: parseInt(bulkNganhId) })
+        })));
+        addToast(`Đã gán ngành cho ${ids.length} lớp`);
+        setShowBulkNganhModal(false); setBulkNganhId(''); setSelectedLops(new Set()); fetchAll();
+    };
+
+    const suggestNganhForAll = async () => {
+        const targets = lops.filter(l => !l.nganh_id && detectNganhId(l.ten_lop, nganhs));
+        if (targets.length === 0) { addToast('Không còn lớp chưa gán ngành nào khớp mã gợi ý'); return; }
+        if (!confirm(`Gợi ý ngành (bộ vật tư) cho ${targets.length} lớp chưa gán theo mã lớp?\nLớp có mã lạ (BT, OT, MT...) sẽ bỏ qua, bạn tự gán tay.`)) return;
+        await Promise.all(targets.map(l => fetch('/api/lop', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: l.id, nganh_id: detectNganhId(l.ten_lop, nganhs) })
+        })));
+        addToast(`Đã gợi ý ngành cho ${targets.length} lớp`);
+        fetchAll();
+    };
     const filteredPC = phanCongs.filter(pc => !search || pc.ten_gv?.toLowerCase().includes(search.toLowerCase()) || pc.ten_mon?.toLowerCase().includes(search.toLowerCase()) || pc.ten_lop?.toLowerCase().includes(search.toLowerCase()));
 
     const selectedKiObj = kiHocs?.find(k => k.id.toString() === selectedKi);
@@ -205,12 +247,12 @@ export default function NganhHePage() {
             {/* ── HEADER ── */}
             <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 24, gap: 16, flexWrap: 'wrap' }}>
                 <div>
-                    <h1 style={{ fontSize: 22, fontWeight: 700, marginBottom: 4, display: 'flex', alignItems: 'center', gap: 8 }}><GraduationCap size={28} className="text-accent" /> Quản lý giảng dạy</h1>
+                    <h1 style={{ fontSize: 22, fontWeight: 700, marginBottom: 4, display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}><GraduationCap size={28} className="text-accent" /> Quản lý giảng dạy</h1>
                     <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>Phân công môn học — lớp học — giáo viên</p>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}><Calendar size={14} /> {selectedKiObj?.ten_ki} — {selectedKiObj?.nam_hoc}</div>
-                    <select className="form-select" style={{ width: 200, height: 36, fontSize: 13 }} value={selectedKi} onChange={e => setSelectedKi(e.target.value)}>
+                    <select className="form-select" style={{ width: '100%', maxWidth: 200, height: 36, fontSize: 13 }} value={selectedKi} onChange={e => setSelectedKi(e.target.value)}>
                         <option value="">Chọn kỳ học</option>
                         {kiHocs.map(k => <option key={k.id} value={k.id}>{k.ten_ki} - {k.nam_hoc}</option>)}
                     </select>
@@ -229,15 +271,15 @@ export default function NganhHePage() {
                         transition: 'all 0.15s', display: 'flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap',
                     }}>
                         {tab.icon} {tab.label}
-                        {tab.count !== null && <span style={{ fontSize: 11, padding: '1px 6px', borderRadius: 100, background: activeTab === tab.key ? 'rgba(14,165,233,0.15)' : 'var(--bg-glass)', color: activeTab === tab.key ? 'var(--text-accent)' : 'var(--text-muted)', fontWeight: 600 }}>{tab.count}</span>}
+                        {tab.count !== null && <span style={{ fontSize: 11, padding: '1px 6px', borderRadius: 100, background: activeTab === tab.key ? 'rgba(28,110,245,0.15)' : 'var(--bg-glass)', color: activeTab === tab.key ? 'var(--text-accent)' : 'var(--text-muted)', fontWeight: 600 }}>{tab.count}</span>}
                     </button>
                 ))}
             </div>
 
             {/* ── SEARCH BAR (shared) ── */}
             {['phan_cong', 'mon', 'lop'].includes(activeTab) && (
-                <div style={{ display: 'flex', gap: 10, marginBottom: 16, alignItems: 'center' }}>
-                    <div className="search-input-wrapper" style={{ flex: 1, maxWidth: 380 }}>
+                <div style={{ display: 'flex', gap: 10, marginBottom: 16, alignItems: 'center', flexWrap: 'wrap' }}>
+                    <div className="search-input-wrapper" style={{ flex: '1 1 220px', maxWidth: 380, minWidth: 0 }}>
                         <Search size={14} />
                         <input className="search-input" placeholder="Tìm kiếm..." value={search} onChange={e => setSearch(e.target.value)} />
                     </div>
@@ -258,8 +300,8 @@ export default function NganhHePage() {
                                 {selectedKiObj ? selectedKiObj?.ten_ki + ' — ' + selectedKiObj?.nam_hoc : 'Chọn kỳ học để xem'} · {filteredPC.length} phân công
                             </p>
                         </div>
-                        <div style={{ display: 'flex', gap: 8 }}>
-                            <div className="search-input-wrapper" style={{ width: 220 }}>
+                        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                            <div className="search-input-wrapper" style={{ width: '100%', maxWidth: 220, flex: '1 1 160px', minWidth: 0 }}>
                                 <Search size={13} />
                                 <input className="search-input" placeholder="Lọc GV / Môn / Lớp..." value={search} onChange={e => setSearch(e.target.value)} style={{ fontSize: 13 }} />
                             </div>
@@ -285,7 +327,7 @@ export default function NganhHePage() {
                                         <th>Môn học</th>
                                         <th>Lớp</th>
                                         <th style={{ width: 80, textAlign: 'center' }}>Sĩ số</th>
-                                        <th style={{ width: 60, textAlign: 'right' }}></th>
+                                        <th style={{ width: 80, textAlign: 'right' }}></th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -367,7 +409,7 @@ export default function NganhHePage() {
                                         <th style={{ width: 36 }}>#</th>
                                         <th>Tên môn học</th>
                                         <th>GV giảng dạy kỳ này</th>
-                                        <th style={{ width: 100, textAlign: 'right' }}></th>
+                                        <th style={{ width: 120, textAlign: 'right' }}></th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -375,7 +417,7 @@ export default function NganhHePage() {
                                         const pcList = phanCongs.filter(pc => pc.mon_hoc_id === mon.id);
                                         const isSelected = selectedMons.has(mon.id);
                                         return (
-                                            <tr key={mon.id} style={{ background: isSelected ? 'rgba(14,165,233,0.04)' : undefined }}>
+                                            <tr key={mon.id} style={{ background: isSelected ? 'rgba(28,110,245,0.04)' : undefined }}>
                                                 <td>
                                                     <input type="checkbox" checked={isSelected} onChange={() => toggleSelectMon(mon.id)} style={{ width: 14, height: 14, accentColor: 'var(--text-accent)', cursor: 'pointer' }} />
                                                 </td>
@@ -397,13 +439,13 @@ export default function NganhHePage() {
                                                                 return acc;
                                                             }, {});
                                                             return Object.entries(byGv).map(([gv, lops]) => (
-                                                                <span key={gv} style={{ fontSize: 11, background: 'rgba(52,211,153,0.08)', color: '#10b981', padding: '2px 10px', borderRadius: 100, border: '1px solid rgba(52,211,153,0.2)', whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+                                                                <span key={gv} style={{ fontSize: 11, background: 'rgba(52,211,153,0.08)', color: '#10b981', padding: '2px 10px', borderRadius: 100, border: '1px solid rgba(52,211,153,0.2)', display: 'inline-flex', alignItems: 'center', gap: 5, maxWidth: '100%' }}>
                                                                     <span style={{ fontWeight: 600 }}>{gv}</span>
-                                                                    <span style={{ opacity: 0.55, borderLeft: '1px solid rgba(52,211,153,0.4)', paddingLeft: 5 }}>{lops.join(', ')}</span>
+                                                                    <span style={{ opacity: 0.55, borderLeft: '1px solid rgba(52,211,153,0.4)', paddingLeft: 5, overflowWrap: 'anywhere', minWidth: 0 }}>{lops.join(', ')}</span>
                                                                 </span>
                                                             ));
                                                         })() : <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>Chưa phân công</span>}
-                                                        <button onClick={() => openPhanCongModal(mon)} style={{ display: 'inline-flex', alignItems: 'center', gap: 3, padding: '2px 9px', fontSize: 11, borderRadius: 100, border: '1px dashed rgba(14,165,233,0.5)', background: 'rgba(14,165,233,0.05)', color: '#0ea5e9', cursor: 'pointer' }}>
+                                                        <button onClick={() => openPhanCongModal(mon)} style={{ display: 'inline-flex', alignItems: 'center', gap: 3, padding: '2px 9px', fontSize: 11, borderRadius: 100, border: '1px dashed rgba(28,110,245,0.5)', background: 'rgba(28,110,245,0.05)', color: '#0ea5e9', cursor: 'pointer' }}>
                                                             <Plus size={11} /> PC
                                                         </button>
                                                     </div>
@@ -439,12 +481,20 @@ export default function NganhHePage() {
                                 <button className="btn" style={{ padding: '4px 12px', fontSize: 12, background: 'rgba(239,68,68,0.1)', color: '#f87171', border: '1px solid rgba(239,68,68,0.25)' }} onClick={deleteSelectedLops}>
                                     <Trash2 size={12} /> Xóa đã chọn
                                 </button>
+                                <button className="btn" style={{ padding: '4px 12px', fontSize: 12, background: 'rgba(28,110,245,0.1)', color: '#0ea5e9', border: '1px solid rgba(28,110,245,0.25)' }} onClick={() => { setBulkNganhId(''); setShowBulkNganhModal(true); }}>
+                                    <GraduationCap size={12} /> Gán ngành (bộ vật tư)
+                                </button>
                                 <button className="btn btn-secondary" style={{ padding: '4px 10px', fontSize: 12 }} onClick={() => setSelectedLops(new Set())}>
                                     <X size={12} /> Bỏ chọn
                                 </button>
                             </>
                         ) : (
-                            <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Tích checkbox để chọn nhiều lớp</span>
+                            <>
+                                <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Tích checkbox để chọn nhiều lớp</span>
+                                <button className="btn btn-secondary" style={{ padding: '4px 12px', fontSize: 12 }} onClick={suggestNganhForAll} title="Tự gợi ý ngành cho lớp chưa gán, theo 2 chữ cái trong mã lớp (DC, DT, CD, DL)">
+                                    <CheckCircle2 size={12} /> Gợi ý ngành theo mã lớp
+                                </button>
+                            </>
                         )}
                         <span style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--text-muted)' }}>{filteredLop.length} lớp</span>
                     </div>
@@ -464,9 +514,10 @@ export default function NganhHePage() {
                                         <th style={{ width: 36 }}>#</th>
                                         <th>Tên lớp</th>
                                         <th style={{ width: 120 }}>Hệ</th>
+                                        <th style={{ minWidth: 160 }}>Ngành (bộ vật tư)</th>
                                         <th style={{ width: 80, textAlign: 'center' }}>Sĩ số</th>
                                         <th>Môn học kỳ này</th>
-                                        <th style={{ width: 80, textAlign: 'right' }}></th>
+                                        <th style={{ width: 120, textAlign: 'right' }}></th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -474,7 +525,7 @@ export default function NganhHePage() {
                                         const monList = phanCongs.filter(pc => pc.lop_id === lop.id);
                                         const isSelected = selectedLops.has(lop.id);
                                         return (
-                                            <tr key={lop.id} style={{ background: isSelected ? 'rgba(14,165,233,0.04)' : undefined }}>
+                                            <tr key={lop.id} style={{ background: isSelected ? 'rgba(28,110,245,0.04)' : undefined }}>
                                                 <td>
                                                     <input type="checkbox" checked={isSelected} onChange={() => toggleSelectLop(lop.id)}
                                                         style={{ width: 14, height: 14, accentColor: 'var(--text-accent)', cursor: 'pointer' }} />
@@ -482,12 +533,17 @@ export default function NganhHePage() {
                                                 <td style={{ color: 'var(--text-muted)', fontSize: 12 }}>{idx + 1}</td>
                                                 <td><span style={{ fontWeight: 600, fontSize: 13 }}>{lop.ten_lop}</span></td>
                                                 <td><HeBadge loai={lop.loai_he} /></td>
+                                                <td>
+                                                    {lop.nganh_id
+                                                        ? <span className="badge badge-primary" style={{ fontSize: 11 }}>{lop.ten_nganh}</span>
+                                                        : <span className="badge badge-warning" style={{ fontSize: 11 }} title="Chưa gán ngành — bên đề xuất sẽ chỉ hiện vật tư Dùng chung">Chưa gán ngành</span>}
+                                                </td>
                                                 <td style={{ textAlign: 'center', fontWeight: 600, fontSize: 13 }}>{lop.si_so}</td>
                                                 <td>
                                                     {monList.length > 0 ? (
                                                         <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
                                                             {monList.map(pc => (
-                                                                <span key={pc.id} style={{ fontSize: 11, background: 'rgba(14,165,233,0.08)', color: '#0ea5e9', padding: '2px 8px', borderRadius: 100, border: '1px solid rgba(14,165,233,0.2)', whiteSpace: 'nowrap' }}>
+                                                                <span key={pc.id} style={{ fontSize: 11, background: 'rgba(28,110,245,0.08)', color: '#0ea5e9', padding: '2px 8px', borderRadius: 100, border: '1px solid rgba(28,110,245,0.2)', whiteSpace: 'nowrap' }}>
                                                                     {pc.ten_mon}
                                                                 </span>
                                                             ))}
@@ -514,13 +570,13 @@ export default function NganhHePage() {
             {/* TAB: IMPORT                             */}
             {/* ══════════════════════════════════════ */}
             {activeTab === 'import' && (
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 380px', gap: 20, alignItems: 'start' }}>
+                <div className="ngrid ngrid-side">
                     <div className="card">
                         <div className="card-header">
                             <h2 style={{ fontSize: 15, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 8 }}><Upload size={18} style={{ color: 'var(--text-accent)' }} /> Import phân công từ Excel / CSV</h2>
                         </div>
                         <div className="card-body">
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(220px, 100%), 1fr))', gap: 12, marginBottom: 16 }}>
                                 <div className="form-group" style={{ margin: 0 }}>
                                     <label className="form-label" style={{ fontWeight: 600 }}>Kỳ học <span style={{ color: '#f87171' }}>*</span></label>
                                     <select className="form-select" value={selectedKi} onChange={e => setSelectedKi(e.target.value)} required>
@@ -528,7 +584,7 @@ export default function NganhHePage() {
                                         {kiHocs.map(k => <option key={k.id} value={k.id}>{k.ten_ki} - {k.nam_hoc}</option>)}
                                     </select>
                                 </div>
-                                <div style={{ background: 'rgba(14,165,233,0.05)', border: '1px dashed rgba(14,165,233,0.3)', borderRadius: 'var(--radius-md)', padding: '10px 14px', fontSize: 12 }}>
+                                <div style={{ background: 'rgba(28,110,245,0.05)', border: '1px dashed rgba(28,110,245,0.3)', borderRadius: 'var(--radius-md)', padding: '10px 14px', fontSize: 12 }}>
                                     <p style={{ fontWeight: 600, color: 'var(--text-accent)', marginBottom: 6 }}>Thứ tự 4 cột:</p>
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
                                         {['1. Họ tên giáo viên', '2. Tên môn học', '3. Tên lớp', '4. Sĩ số'].map(c => <span key={c} style={{ color: 'var(--text-secondary)' }}>→ {c}</span>)}
@@ -615,7 +671,7 @@ export default function NganhHePage() {
             {/* TAB: CÀI ĐẶT (Ngành & Hệ)             */}
             {/* ══════════════════════════════════════ */}
             {activeTab === 'cai_dat' && (
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+                <div className="ngrid ngrid-half">
                     <div className="card">
                         <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                             <h2 style={{ fontSize: 15, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}><GraduationCap size={18} /> Ngành đào tạo</h2>
@@ -629,12 +685,12 @@ export default function NganhHePage() {
                                 const nganhHes = hes.filter(h => h.nganh_id === nganh.id);
                                 return (
                                     <div key={nganh.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
-                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 20px', cursor: 'pointer' }} onClick={() => setExpandedNganh(p => ({ ...p, [nganh.id]: !p[nganh.id] }))}>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                                                <div style={{ transition: 'transform 0.2s', transform: expanded ? 'rotate(0)' : 'rotate(-90deg)' }}><ChevronDown size={15} /></div>
-                                                <FolderOpen size={15} style={{ color: '#38bdf8' }} />
-                                                <div>
-                                                    <div style={{ fontWeight: 600, fontSize: 13 }}>{nganh.ten_nganh}</div>
+                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8, padding: '12px 20px', cursor: 'pointer' }} onClick={() => setExpandedNganh(p => ({ ...p, [nganh.id]: !p[nganh.id] }))}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0, flex: 1 }}>
+                                                <div style={{ transition: 'transform 0.2s', transform: expanded ? 'rotate(0)' : 'rotate(-90deg)', flexShrink: 0 }}><ChevronDown size={15} /></div>
+                                                <FolderOpen size={15} style={{ color: '#1c6ef5', flexShrink: 0 }} />
+                                                <div style={{ minWidth: 0 }}>
+                                                    <div style={{ fontWeight: 600, fontSize: 13, overflowWrap: 'anywhere' }}>{nganh.ten_nganh}</div>
                                                     <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{nganhHes.length} hệ</div>
                                                 </div>
                                             </div>
@@ -729,13 +785,69 @@ export default function NganhHePage() {
                             <div className="modal-body">
                                 <div className="form-group">
                                     <label className="form-label">Tên lớp *</label>
-                                    <input className="form-input" value={form.ten_lop || ''} onChange={e => setForm({ ...form, ten_lop: e.target.value })} required placeholder="VD: T24CD3DA-N2" autoFocus />
+                                    <input
+                                        className="form-input"
+                                        value={form.ten_lop || ''}
+                                        onChange={e => {
+                                            const ten_lop = e.target.value;
+                                            setForm(prev => {
+                                                const next = { ...prev, ten_lop };
+                                                // Gợi ý ngành theo mã lớp nếu admin chưa tự chọn ngành
+                                                if (!prev.nganh_touched && !prev.nganh_id) {
+                                                    const sugId = detectNganhId(ten_lop, nganhs);
+                                                    next.nganh_id = sugId ? String(sugId) : '';
+                                                }
+                                                return next;
+                                            });
+                                        }}
+                                        required
+                                        placeholder="VD: T24CD3DA-N2"
+                                        autoFocus
+                                    />
                                     <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}><strong style={{ color: '#38bdf8' }}>C</strong> = Cao đẳng &nbsp; <strong style={{ color: '#f59e0b' }}>T</strong> = Trung cấp &nbsp; <strong style={{ color: '#a78bfa' }}>L</strong> = Liên thông</p>
+                                </div>
+                                <div className="form-group">
+                                    <label className="form-label">Ngành (bộ vật tư)</label>
+                                    <select
+                                        className="form-select"
+                                        value={form.nganh_id || ''}
+                                        onChange={e => setForm(prev => ({ ...prev, nganh_id: e.target.value, nganh_touched: true }))}
+                                    >
+                                        <option value="">-- Chưa gán ngành --</option>
+                                        {nganhs.map(n => <option key={n.id} value={n.id}>{n.ten_nganh}</option>)}
+                                    </select>
+                                    <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
+                                        Bên đề xuất chỉ cho chọn vật tư thuộc ngành này (+ vật tư Dùng chung).
+                                        Mã lớp có <strong>DC</strong> = Điện công nghiệp, <strong>DT</strong> = Điện tử, <strong>CD</strong> = Cơ điện tử, <strong>DL</strong> = Máy lạnh.
+                                    </p>
                                 </div>
                                 <div className="form-group"><label className="form-label">Sĩ số</label><input className="form-input" type="number" min="0" value={form.si_so || ''} onChange={e => setForm({ ...form, si_so: e.target.value })} placeholder="Số học viên" /></div>
                             </div>
                             <div className="modal-footer"><button type="button" className="btn btn-secondary" onClick={() => setShowModal(null)}>Hủy</button><button type="submit" className="btn btn-primary">{editing ? 'Cập nhật' : 'Thêm'}</button></div>
                         </form>
+                    </div>
+                </div>
+            )}
+            {showBulkNganhModal && (
+                <div className="modal-overlay" onClick={() => setShowBulkNganhModal(false)}>
+                    <div className="modal" onClick={e => e.stopPropagation()}>
+                        <div className="modal-header"><h2>Gán ngành (bộ vật tư) cho {selectedLops.size} lớp</h2><button className="btn-ghost" onClick={() => setShowBulkNganhModal(false)}>✕</button></div>
+                        <div className="modal-body">
+                            <div className="form-group">
+                                <label className="form-label">Chọn ngành *</label>
+                                <select className="form-select" value={bulkNganhId} onChange={e => setBulkNganhId(e.target.value)} autoFocus>
+                                    <option value="">-- Chọn ngành --</option>
+                                    {nganhs.map(n => <option key={n.id} value={n.id}>{n.ten_nganh}</option>)}
+                                </select>
+                            </div>
+                            <p style={{ fontSize: 12, color: 'var(--text-muted)', fontStyle: 'italic', overflowWrap: 'break-word' }}>
+                                Các lớp: {[...selectedLops].map(id => lops.find(l => l.id === id)?.ten_lop).filter(Boolean).join(', ')}
+                            </p>
+                        </div>
+                        <div className="modal-footer">
+                            <button className="btn btn-secondary" onClick={() => setShowBulkNganhModal(false)}>Hủy</button>
+                            <button className="btn btn-primary" onClick={bulkAssignNganh}>Gán ngành</button>
+                        </div>
                     </div>
                 </div>
             )}

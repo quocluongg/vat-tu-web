@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import getDb from '@/lib/db';
+import { detectNganhId } from '@/lib/nganh-code';
 
 /**
  * API Import Phân Công Nhanh
@@ -57,6 +58,8 @@ export async function POST(request) {
             loi: []
         };
 
+        const nganhList = (await db.execute('SELECT id, ten_nganh FROM nganh')).rows;
+
         for (const row of rows) {
             const { giao_vien: tenGV, mon_hoc: tenMon, ten_lop: tenLop, si_so: siSo } = row;
 
@@ -96,7 +99,8 @@ export async function POST(request) {
                     summary.loi.push(`Không xác định được hệ đào tạo từ lớp "${tenLop}". Chữ đầu phải là T, C, hoặc L.`);
                     continue;
                 }
-                const r = await db.execute({ sql: 'INSERT INTO lop (ten_lop, loai_he, si_so) VALUES (?, ?, ?)', args: [tenLop.trim(), loaiHe, siSo || 0] });
+                const nganhId = detectNganhId(tenLop, nganhList);
+                const r = await db.execute({ sql: 'INSERT INTO lop (ten_lop, loai_he, si_so, nganh_id) VALUES (?, ?, ?, ?)', args: [tenLop.trim(), loaiHe, siSo || 0, nganhId] });
                 lopId = Number(r.lastInsertRowid);
                 summary.lop_them_moi.push({ ten_lop: tenLop.trim(), si_so: siSo || 0 });
             } else {

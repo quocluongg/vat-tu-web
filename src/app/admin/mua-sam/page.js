@@ -9,6 +9,7 @@ export default function MuaSamPage() {
     const [selectedKi, setSelectedKi] = useState('');
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
+    const [showAll, setShowAll] = useState(false); // false = gọn (chỉ hàng cần mua), true = hiện tất cả
     const addToast = useToast();
 
     useEffect(() => {
@@ -79,6 +80,9 @@ export default function MuaSamPage() {
 
     const totalCost = items.reduce((sum, item) => sum + ((item.so_luong_duyet || 0) * (item.don_gia || 0)), 0);
     const itemsNeedBuy = items.filter(i => i.tong_de_xuat > 0);
+    const visibleRows = items
+        .map((item, idx) => ({ item, idx }))
+        .filter(({ item }) => showAll || item.tong_de_xuat > 0 || (item.so_luong_duyet || 0) > 0);
 
     if (loading) return <div className="loading-overlay"><div className="spinner" /></div>;
 
@@ -86,11 +90,11 @@ export default function MuaSamPage() {
         <div>
             <div className="page-header">
                 <div className="page-header-left">
-                    <h1 style={{ display: 'flex', alignItems: 'center', gap: 8 }}><ShoppingCart size={28} className="text-accent" /> Mua sắm vật tư</h1>
+                    <h1 style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}><ShoppingCart size={28} className="text-accent" /> Mua sắm vật tư</h1>
                     <p>Tổng hợp và quản lý mua sắm vật tư theo đề xuất</p>
                 </div>
                 <div className="page-header-actions">
-                    <select className="form-select" style={{ width: 220 }} value={selectedKi} onChange={e => setSelectedKi(e.target.value)}>
+                    <select className="form-select" style={{ width: '100%', maxWidth: 220 }} value={selectedKi} onChange={e => setSelectedKi(e.target.value)}>
                         {kiHocs.map(k => <option key={k.id} value={k.id}>{k.ten_ki} - {k.nam_hoc}</option>)}
                     </select>
                     <button className="btn btn-secondary" onClick={autoRound}>
@@ -103,7 +107,7 @@ export default function MuaSamPage() {
             </div>
 
             {/* Summary */}
-            <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)', marginBottom: 24 }}>
+            <div className="stats-grid" style={{ marginBottom: 24 }}>
                 <div className="stat-card primary">
                     <div className="stat-icon primary"><Package size={24} /></div>
                     <div className="stat-info">
@@ -121,16 +125,24 @@ export default function MuaSamPage() {
                 <div className="stat-card warning">
                     <div className="stat-icon warning"><DollarSign size={24} /></div>
                     <div className="stat-info">
-                        <h3>{totalCost.toLocaleString('vi-VN')}đ</h3>
+                        <h3 style={{ overflowWrap: 'anywhere' }}>{totalCost.toLocaleString('vi-VN')}đ</h3>
                         <p>Tổng chi phí</p>
                     </div>
                 </div>
             </div>
 
             <div className="card">
-                <div className="table-container">
+                <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 10, padding: '10px 16px', borderBottom: '1px solid var(--border-color)' }}>
+                    <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>
+                        Đang hiện <b style={{ color: 'var(--text-primary)' }}>{visibleRows.length}</b>/{items.length} vật tư
+                    </span>
+                    <button className="btn btn-secondary" style={{ fontSize: 12, padding: '4px 12px', marginLeft: 'auto' }} onClick={() => setShowAll(v => !v)}>
+                        {showAll ? `Gọn lại (chỉ ${itemsNeedBuy.length} cần mua)` : `Hiện tất cả (${items.length})`}
+                    </button>
+                </div>
+                <div className="table-container" style={{ maxHeight: '62vh', overflowY: 'auto' }}>
                     <table className="data-table">
-                        <thead>
+                        <thead style={{ background: 'var(--bg-card)', position: 'sticky', top: 0, zIndex: 10, boxShadow: '0 1px 0 var(--border-color)' }}>
                             <tr>
                                 <th>#</th>
                                 <th>Vật tư</th>
@@ -138,18 +150,18 @@ export default function MuaSamPage() {
                                 <th>ĐVT</th>
                                 <th>Kho</th>
                                 <th>SL đề xuất</th>
-                                <th style={{ width: 110 }}>SL duyệt</th>
+                                <th style={{ width: 120 }}>SL duyệt</th>
                                 <th style={{ width: 130 }}>Đơn giá</th>
                                 <th>Thành tiền</th>
                                 <th>Trạng thái</th>
                             </tr>
                         </thead>
                         <tbody>
-                            {items.length === 0 ? (
-                                <tr><td colSpan={10}><div className="empty-state"><ShoppingCart size={48} /><h3>Chưa có dữ liệu</h3></div></td></tr>
-                            ) : items.map((item, idx) => (
+                            {visibleRows.length === 0 ? (
+                                <tr><td colSpan={10}><div className="empty-state"><ShoppingCart size={48} /><h3>{showAll ? 'Chưa có dữ liệu' : 'Không có vật tư cần mua'}</h3></div></td></tr>
+                            ) : visibleRows.map(({ item, idx }, n) => (
                                 <tr key={item.vat_tu_id} style={{ background: item.tong_de_xuat > 0 ? 'transparent' : 'var(--bg-glass)' }}>
-                                    <td>{idx + 1}</td>
+                                    <td>{n + 1}</td>
                                     <td style={{ fontWeight: 500, color: 'var(--text-primary)' }}>{item.ten_vat_tu}</td>
                                     <td style={{ fontSize: 13 }}>{item.yeu_cau_ky_thuat || '—'}</td>
                                     <td><span className="badge badge-info">{item.don_vi_tinh}</span></td>
@@ -161,7 +173,7 @@ export default function MuaSamPage() {
                                         <input
                                             type="number"
                                             className="form-input"
-                                            style={{ padding: '6px 10px', fontSize: 13, textAlign: 'right' }}
+                                            style={{ padding: '6px 10px', fontSize: 13, textAlign: 'right', minWidth: 80 }}
                                             value={item.so_luong_duyet}
                                             onChange={e => updateItem(idx, 'so_luong_duyet', parseInt(e.target.value) || 0)}
                                             min="0"
@@ -171,7 +183,7 @@ export default function MuaSamPage() {
                                         <input
                                             type="number"
                                             className="form-input"
-                                            style={{ padding: '6px 10px', fontSize: 13, textAlign: 'right' }}
+                                            style={{ padding: '6px 10px', fontSize: 13, textAlign: 'right', minWidth: 90 }}
                                             value={item.don_gia}
                                             onChange={e => updateItem(idx, 'don_gia', parseFloat(e.target.value) || 0)}
                                             min="0"
@@ -198,7 +210,7 @@ export default function MuaSamPage() {
                 </div>
                 {items.length > 0 && (
                     <div className="card-footer">
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 20, rowGap: 8 }}>
                             <span style={{ color: 'var(--text-secondary)', fontSize: 14 }}>Tổng cộng:</span>
                             <span style={{ fontSize: 20, fontWeight: 700, color: 'var(--text-primary)' }}>
                                 {totalCost.toLocaleString('vi-VN')}đ

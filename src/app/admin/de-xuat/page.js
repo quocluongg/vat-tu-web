@@ -1,6 +1,6 @@
 'use client';
 import { useState, useEffect, useRef, Fragment } from 'react';
-import { FileText, Eye, Check, X, Clock, CheckCircle, XCircle, AlertCircle, RefreshCw, Users, Package, ChevronRight, List, ChevronDown, Plus, Minus, Send, BookOpen, Search, Printer, Edit2, Download, Ban, Zap, ArrowLeftRight, Trash2, ArrowRight, UserRoundX } from 'lucide-react';
+import { FileText, Eye, Check, X, Clock, CheckCircle, XCircle, AlertCircle, RefreshCw, Users, Package, ChevronRight, List, ChevronDown, Plus, Minus, Send, BookOpen, Search, Printer, Edit2, Download, Ban, Zap, ArrowLeftRight, Trash2, ArrowRight, UserRoundX, GraduationCap } from 'lucide-react';
 import { useToast } from '@/components/Toast';
 import { exportExcelTheoNganh, exportExcelMultiNganh } from '@/lib/exportExcel';
 
@@ -31,19 +31,30 @@ function findSimilar(item, allVatTus, vatTuTams) {
     return results.sort((a, b) => b.score - a.score).slice(0, 5);
 }
 
-// Floating popover shown when clicking the duplicate badge
-function DupPopover({ items, onClose }) {
+// Floating popover shown when clicking the duplicate badge (fixed-positioned
+// so table scroll containers can't clip it; anchored from the click target)
+function DupPopover({ items, anchor, onClose }) {
     const ref = useRef(null);
     useEffect(() => {
         const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) onClose(); };
-        setTimeout(() => document.addEventListener('mousedown', handler), 0);
-        return () => document.removeEventListener('mousedown', handler);
+        const t = setTimeout(() => document.addEventListener('mousedown', handler), 0);
+        window.addEventListener('scroll', onClose, true);
+        window.addEventListener('resize', onClose);
+        return () => {
+            document.removeEventListener('mousedown', handler);
+            window.removeEventListener('scroll', onClose, true);
+            window.removeEventListener('resize', onClose);
+            clearTimeout(t);
+        };
     }, [onClose]);
+    const width = Math.min(340, window.innerWidth - 16);
+    const left = Math.max(8, Math.min(anchor?.left ?? 8, window.innerWidth - width - 8));
+    const top = Math.max(8, Math.min(anchor?.top ?? 8, window.innerHeight - 140));
     return (
         <div ref={ref} style={{
-            position: 'absolute', top: '100%', left: 0, zIndex: 200, minWidth: 320, maxWidth: 420,
+            position: 'fixed', top, left, width, maxHeight: 300, overflowY: 'auto', zIndex: 1200,
             background: 'var(--bg-card)', border: '1px solid var(--border-color)',
-            borderRadius: 12, boxShadow: 'var(--shadow-lg)', padding: 12, marginTop: 4,
+            borderRadius: 12, boxShadow: 'var(--shadow-lg)', padding: 12,
         }}>
             <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
                 <Zap size={12} style={{ color: '#f59e0b' }} /> GỢI Ý CÓ THỂ TRÙNG
@@ -94,7 +105,10 @@ export default function DeXuatAdminPage() {
     const [nganhs, setNganhs] = useState([]);
     const [suggestSearch, setSuggestSearch] = useState('');
     const [suggestFilter, setSuggestFilter] = useState('all'); // all, cho_duyet, da_duyet, tu_choi
+    const [listSearch, setListSearch] = useState('');
+    const [tabLoading, setTabLoading] = useState(false);
     const [openDupId, setOpenDupId] = useState(null); // which row's dup popover is open
+    const [dupAnchor, setDupAnchor] = useState(null); // viewport coords for the popover
     const [approvalModal, setApprovalModal] = useState({ show: false, item: null, type: 'new', mergeWithId: '', nganh_id: '' });
     // Modal để đổi vật tư trong dòng chi tiết đề xuất
     const [changeVtModal, setChangeVtModal] = useState({ show: false, row: null, search: '', selectedId: '' });
@@ -164,7 +178,7 @@ export default function DeXuatAdminPage() {
         const res = await fetch(`/api/de-xuat?ki_id=${selectedKi}`);
         const data = await res.json();
         setDeXuats(data);
-        fetchStats();
+        await fetchStats();
     };
 
     const fetchStats = async () => {
@@ -195,9 +209,10 @@ export default function DeXuatAdminPage() {
     useEffect(() => { fetchKiHoc(); fetchNganhs(); fetchGiaoViens(); }, []);
     useEffect(() => {
         if (selectedKi) {
-            fetchDeXuat();
-            fetchVatTuTam();
-            fetchAllVatTus();
+            setTabLoading(true);
+            Promise.all([fetchDeXuat(), fetchVatTuTam(), fetchAllVatTus()])
+                .catch(() => {})
+                .finally(() => setTabLoading(false));
         }
     }, [selectedKi]);
 
@@ -549,6 +564,15 @@ export default function DeXuatAdminPage() {
 
     if (loading) return <div className="loading-overlay"><div className="spinner" /></div>;
 
+    const tabLoader = (
+        <div className="card">
+            <div className="card-body" style={{ textAlign: 'center', padding: '56px 20px' }}>
+                <div className="spinner" style={{ margin: '0 auto 12px' }} />
+                <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>Đang tải dữ liệu...</div>
+            </div>
+        </div>
+    );
+
     const kiNameObj = kiHocs.find(k => k.id.toString() === selectedKi);
 
     const getAggregatedMaterials = () => {
@@ -565,7 +589,7 @@ export default function DeXuatAdminPage() {
                 };
             }
             map[key].tong_so_luong += ct.so_luong || 0;
-            map[key].rows.push({ id: ct.id, mon_hoc_id: ct.mon_hoc_id, lop_id: ct.lop_id, ten_mon: ct.ten_mon, ten_lop: ct.ten_lop, so_luong: ct.so_luong });
+            map[key].rows.push({ id: ct.id, mon_hoc_id: ct.mon_hoc_id, lop_id: ct.lop_id, ten_mon: ct.ten_mon, ten_lop: ct.ten_lop, so_luong: ct.so_luong, ten_nganh: ct.ten_nganh, lop_nganh_id: ct.lop_nganh_id });
             if (!map[key].subjects.find(s => s.id === ct.mon_hoc_id && s.ten_lop === ct.ten_lop)) {
                 map[key].subjects.push({ id: ct.mon_hoc_id, ten_mon: ct.ten_mon, ten_lop: ct.ten_lop });
             }
@@ -600,7 +624,7 @@ export default function DeXuatAdminPage() {
                     <p>Ghi nhận và tổng hợp đề xuất vật tư để mua sắm</p>
                 </div>
                 <div className="page-header-actions">
-                    <select className="form-select" style={{ width: 220 }} value={selectedKi} onChange={e => setSelectedKi(e.target.value)}>
+                    <select className="form-select" style={{ width: '100%', maxWidth: 220 }} value={selectedKi} onChange={e => setSelectedKi(e.target.value)}>
                         {kiHocs.map(k => <option key={k.id} value={k.id}>{k.ten_ki} - {k.nam_hoc}</option>)}
                     </select>
                     <button className="btn btn-secondary" onClick={fetchDeXuat}>
@@ -609,84 +633,115 @@ export default function DeXuatAdminPage() {
                 </div>
             </div>
 
-            {/* Tabs Navigation */}
-            <div className="tabs mb-6" style={{ display: 'flex', gap: 4, borderBottom: '1px solid var(--border-color)', marginBottom: 24 }}>
+            {/* Tabs Navigation — theo đúng luồng: xem nộp → duyệt mới → chốt mua */}
+            <div className="uline-tabs">
                 <button
-                    className={`tab-item ${activeTab === 'overview' ? 'active' : ''}`}
+                    type="button"
+                    className={`uline-tab ${activeTab === 'overview' ? 'active' : ''}`}
                     onClick={() => setActiveTab('overview')}
-                    style={{ padding: '12px 24px', borderBottom: activeTab === 'overview' ? '2px solid var(--text-accent)' : 'none', fontWeight: 600, color: activeTab === 'overview' ? 'var(--text-accent)' : 'var(--text-secondary)' }}
                 >
-                    <Users size={18} style={{ display: 'inline', marginRight: 8, verticalAlign: 'text-bottom' }} />
+                    <Users size={16} />
                     Tổng quan nộp phiếu
+                    {(stats?.gvStats?.tong_gv ?? 0) > 0 && (
+                        <span className="uline-tab-count">{stats.gvStats.da_nop}/{stats.gvStats.tong_gv}</span>
+                    )}
                 </button>
                 <button
-                    className={`tab-item ${activeTab === 'materials' ? 'active' : ''}`}
-                    onClick={() => setActiveTab('materials')}
-                    style={{ padding: '12px 24px', borderBottom: activeTab === 'materials' ? '2px solid var(--text-accent)' : 'none', fontWeight: 600, color: activeTab === 'materials' ? 'var(--text-accent)' : 'var(--text-secondary)' }}
-                >
-                    <Package size={18} style={{ display: 'inline', marginRight: 8, verticalAlign: 'text-bottom' }} />
-                    Tổng hợp vật tư theo ngành
-                </button>
-                <button
-                    className={`tab-item ${activeTab === 'list' ? 'active' : ''}`}
+                    type="button"
+                    className={`uline-tab ${activeTab === 'list' ? 'active' : ''}`}
                     onClick={() => setActiveTab('list')}
-                    style={{ padding: '12px 24px', borderBottom: activeTab === 'list' ? '2px solid var(--text-accent)' : 'none', fontWeight: 600, color: activeTab === 'list' ? 'var(--text-accent)' : 'var(--text-secondary)' }}
                 >
-                    <List size={18} style={{ display: 'inline', marginRight: 8, verticalAlign: 'text-bottom' }} />
-                    Danh sách đề xuất chi tiết
+                    <List size={16} />
+                    Danh sách đề xuất
+                    {deXuats.length > 0 && (
+                        <span className="uline-tab-count">{deXuats.length}</span>
+                    )}
                 </button>
                 <button
-                    className={`tab-item ${activeTab === 'suggestions' ? 'active' : ''}`}
+                    type="button"
+                    className={`uline-tab ${activeTab === 'suggestions' ? 'active' : ''}`}
                     onClick={() => setActiveTab('suggestions')}
-                    style={{ padding: '12px 24px', borderBottom: activeTab === 'suggestions' ? '2px solid var(--text-accent)' : 'none', fontWeight: 600, color: activeTab === 'suggestions' ? 'var(--text-accent)' : 'var(--text-secondary)' }}
                 >
-                    <AlertCircle size={18} style={{ display: 'inline', marginRight: 8, verticalAlign: 'text-bottom' }} />
+                    <AlertCircle size={16} />
                     Vật tư mới chờ duyệt
                     {vatTuTams.filter(v => v.trang_thai === 'cho_duyet' || !v.trang_thai).length > 0 && (
-                        <span className="badge badge-danger" style={{ marginLeft: 8 }}>{vatTuTams.filter(v => v.trang_thai === 'cho_duyet' || !v.trang_thai).length}</span>
+                        <span className="uline-tab-count">{vatTuTams.filter(v => v.trang_thai === 'cho_duyet' || !v.trang_thai).length}</span>
+                    )}
+                </button>
+                <button
+                    type="button"
+                    className={`uline-tab ${activeTab === 'materials' ? 'active' : ''}`}
+                    onClick={() => setActiveTab('materials')}
+                >
+                    <Package size={16} />
+                    Tổng hợp mua sắm
+                    {(stats?.nganhStats?.length ?? 0) > 0 && (
+                        <span className="uline-tab-count">{stats.nganhStats.length}</span>
                     )}
                 </button>
             </div>
 
             {/* Tab 1: Overview */}
             {activeTab === 'overview' && (
-                <div className="tab-content fade-in">
+                <div className="fade-in">
+                    {tabLoading ? tabLoader : (
+                    <>
                     {stats && (
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 20, marginBottom: 24 }}>
-                            <div className="card" style={{ padding: 24, display: 'flex', alignItems: 'center', gap: 20 }}>
-                                <div style={{ padding: 16, background: 'rgba(14,165,233,0.1)', borderRadius: 16, color: 'var(--text-accent)' }}>
-                                    <Users size={32} />
+                        <>
+                            <div className="stats-grid">
+                                <div className="stat-card">
+                                    <div className="stat-icon primary"><Users size={24} /></div>
+                                    <div className="stat-info">
+                                        <h3>{stats.gvStats.tong_gv}</h3>
+                                        <p>Tổng GV được phân công</p>
+                                    </div>
                                 </div>
-                                <div>
-                                    <div style={{ fontSize: 32, fontWeight: 800 }}>{stats.gvStats.tong_gv}</div>
-                                    <div style={{ fontSize: 14, color: 'var(--text-secondary)' }}>Tổng GV được phân công</div>
+                                <div
+                                    className="stat-card"
+                                    onClick={() => setActiveTab('list')}
+                                    title="Xem danh sách đề xuất đã nộp"
+                                    style={{ cursor: 'pointer' }}
+                                >
+                                    <div className="stat-icon success"><CheckCircle size={24} /></div>
+                                    <div className="stat-info">
+                                        <h3>{stats.gvStats.da_nop}</h3>
+                                        <p>Số giảng viên đã nộp phiếu</p>
+                                    </div>
+                                </div>
+                                <div className="stat-card">
+                                    <div className="stat-icon warning"><AlertCircle size={24} /></div>
+                                    <div className="stat-info">
+                                        <h3>{stats.gvStats.tong_gv - stats.gvStats.da_nop}</h3>
+                                        <p>Số giảng viên chưa nộp</p>
+                                    </div>
                                 </div>
                             </div>
-                            <div className="card" style={{ padding: 24, display: 'flex', alignItems: 'center', gap: 20 }}>
-                                <div style={{ padding: 16, background: 'rgba(16,185,129,0.1)', borderRadius: 16, color: '#10b981' }}>
-                                    <CheckCircle size={32} />
+                            <div className="card" style={{ padding: '20px 24px', marginBottom: 32 }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', fontSize: 13, marginBottom: 10 }}>
+                                    <span style={{ color: 'var(--text-secondary)', fontWeight: 500 }}>
+                                        Tiến độ nộp phiếu ({stats.gvStats.da_nop}/{stats.gvStats.tong_gv} GV)
+                                    </span>
+                                    <span style={{ fontWeight: 700, fontSize: 15 }}>
+                                        {stats.gvStats.tong_gv > 0 ? Math.round((stats.gvStats.da_nop / stats.gvStats.tong_gv) * 100) : 0}%
+                                    </span>
                                 </div>
-                                <div>
-                                    <div style={{ fontSize: 32, fontWeight: 800 }}>{stats.gvStats.da_nop}</div>
-                                    <div style={{ fontSize: 14, color: 'var(--text-secondary)' }}>Số giảng viên đã nộp phiếu</div>
+                                <div className="progress-bar" style={{ height: 8 }}>
+                                    <div
+                                        className="progress-bar-fill"
+                                        style={{
+                                            width: `${stats.gvStats.tong_gv > 0 ? (stats.gvStats.da_nop / stats.gvStats.tong_gv) * 100 : 0}%`,
+                                            background: 'var(--brand)',
+                                        }}
+                                    />
                                 </div>
                             </div>
-                            <div className="card" style={{ padding: 24, display: 'flex', alignItems: 'center', gap: 20 }}>
-                                <div style={{ padding: 16, background: 'rgba(239,68,68,0.1)', borderRadius: 16, color: '#ef4444' }}>
-                                    <AlertCircle size={32} />
-                                </div>
-                                <div>
-                                    <div style={{ fontSize: 32, fontWeight: 800 }}>{stats.gvStats.tong_gv - stats.gvStats.da_nop}</div>
-                                    <div style={{ fontSize: 14, color: 'var(--text-secondary)' }}>Số giảng viên chưa nộp</div>
-                                </div>
-                            </div>
-                        </div>
+                        </>
                     )}
 
                     {stats?.gvStats.ds_chua_nop ? (
-                        <div className="alert alert-warning flex-col" style={{ padding: 20, borderRadius: 'var(--radius-lg)' }}>
+                        <div className="alert alert-warning" style={{ padding: 20, borderRadius: 'var(--radius-lg)', flexDirection: 'column', alignItems: 'stretch' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
-                                <AlertCircle size={24} style={{ color: '#d97706' }} />
+                                <AlertCircle size={24} style={{ color: '#d97706', flexShrink: 0 }} />
                                 <strong style={{ fontSize: 16 }}>Danh sách giảng viên chưa hoàn thành nộp đề xuất:</strong>
                             </div>
                             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
@@ -696,70 +751,64 @@ export default function DeXuatAdminPage() {
                             </div>
                         </div>
                     ) : (
-                        <div className="alert alert-success" style={{ padding: 24, textAlign: 'center', borderRadius: 'var(--radius-lg)' }}>
-                            <CheckCircle size={48} style={{ margin: '0 auto 16px', color: '#10b981' }} />
+                        <div className="alert alert-success" style={{ padding: 24, borderRadius: 'var(--radius-lg)', flexDirection: 'column', textAlign: 'center' }}>
+                            <CheckCircle size={40} style={{ color: '#10b981' }} />
                             <h3 style={{ fontSize: 18, fontWeight: 700 }}>Tuyệt vời!</h3>
                             <p>Tất cả giảng viên được phân công đã hoàn thành nộp đề xuất cho học kỳ này.</p>
                         </div>
                     )}
+                    </>
+                    )}
                 </div>
             )}
 
-            {/* Tab 2: Materials Aggregation */}
+            {/* Tab 4: Materials Aggregation */}
             {activeTab === 'materials' && (
-                <div className="tab-content fade-in">
-                    <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 20 }}>
-                        <button className="btn btn-primary" onClick={handleExportAllNganh} disabled={!stats || stats.nganhStats.length === 0}>
-                            <Download size={18} /> Xuất tất cả các ngành
-                        </button>
-                    </div>
-                    {stats && stats.nganhStats.length > 0 ? (
-                        <>
-                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))', gap: 20 }}>
-                                {stats.nganhStats.map(nganh => (
-                                    <div key={nganh.id || 'all'} className="card h-full" style={{ display: 'flex', flexDirection: 'column' }}>
-                                        <div className="card-header" style={{ background: 'rgba(0,0,0,0.02)', padding: '16px 20px' }}>
-                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                                <div>
-                                                    <h3 style={{ fontSize: 18, fontWeight: 700 }}>{nganh.ten_nganh}</h3>
-                                                    <p style={{ fontSize: 13, color: 'var(--text-muted)' }}>{nganh.materialList.length} vật tư đề xuất</p>
-                                                </div>
-                                                <button className="btn-icon btn-ghost btn-primary" onClick={() => handleExportSingleNganh(nganh)} title="Xuất Excel ngành này">
-                                                    <Download size={18} />
+                <div className="fade-in">
+                    {tabLoading ? tabLoader : stats && stats.nganhStats.length > 0 ? (
+                        <div className="card">
+                            <div className="card-header">
+                                <h2 style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                    <Package size={18} className="text-muted" /> Tổng hợp mua sắm theo ngành
+                                </h2>
+                                <button className="btn btn-primary btn-sm" onClick={handleExportAllNganh} disabled={!stats || stats.nganhStats.length === 0}>
+                                    <Download size={15} /> Xuất tất cả
+                                </button>
+                            </div>
+                            <div className="card-body" style={{ padding: 0 }}>
+                                <div className="agg-grid">
+                                    {stats.nganhStats.map(nganh => (
+                                        <div className="agg-col" key={nganh.id || 'all'}>
+                                            <div className="agg-col-head">
+                                                <span className="agg-col-icon"><GraduationCap size={16} /></span>
+                                                <h4 title={nganh.ten_nganh}>{nganh.ten_nganh}</h4>
+                                                <button
+                                                    type="button"
+                                                    className="btn btn-ghost btn-icon"
+                                                    style={{ width: 28, height: 28 }}
+                                                    onClick={() => handleExportSingleNganh(nganh)}
+                                                    title={`Xuất Excel ${nganh.ten_nganh}`}
+                                                >
+                                                    <Download size={14} />
                                                 </button>
                                             </div>
+                                            <div className="agg-col-sub">
+                                                {nganh.materialList.length} vật tư • Tổng {nganh.materialList.reduce((s, m) => s + (m.tong_de_xuat || 0), 0)} đơn vị
+                                            </div>
+                                            {nganh.materialList.map((m, idx) => (
+                                                <div className="agg-row" key={idx} title={`${m.ten_vat_tu}${m.yeu_cau_ky_thuat ? ` — ${m.yeu_cau_ky_thuat}` : ''}`}>
+                                                    <div className="agg-info">
+                                                        <div className="agg-name">{m.ten_vat_tu}</div>
+                                                        <div className="agg-meta">{m.don_vi_tinh} • Kho: {m.so_luong_kho || 0}</div>
+                                                    </div>
+                                                    <div className="agg-qty">{m.tong_de_xuat}</div>
+                                                </div>
+                                            ))}
                                         </div>
-                                        <div className="card-body" style={{ flex: 1, maxHeight: 400, overflowY: 'auto' }}>
-                                            <table className="data-table">
-                                                <thead>
-                                                    <tr>
-                                                        <th style={{ fontSize: 11 }}>Tên vật tư</th>
-                                                        <th style={{ textAlign: 'center', fontSize: 11 }}>ĐVT</th>
-                                                        <th style={{ textAlign: 'right', fontSize: 11 }}>SL hiện tại</th>
-                                                        <th style={{ textAlign: 'right', fontSize: 11 }}>Tổng SL</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody>
-                                                    {nganh.materialList.map((m, idx) => (
-                                                        <tr key={idx}>
-                                                            <td style={{ fontSize: 13 }}>
-                                                                <div style={{ fontWeight: 600 }}>{m.ten_vat_tu}</div>
-                                                                <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{m.yeu_cau_ky_thuat || ''}</div>
-                                                            </td>
-                                                            <td style={{ textAlign: 'center' }}><span className="badge badge-info" style={{ fontSize: 10 }}>{m.don_vi_tinh}</span></td>
-                                                            <td style={{ textAlign: 'right', fontWeight: 600, color: m.so_luong_kho > 0 ? '#2563eb' : 'var(--text-main)' }}>
-                                                                {m.so_luong_kho || 0}
-                                                            </td>
-                                                            <td style={{ textAlign: 'right', fontWeight: 700, color: 'var(--text-accent)' }}>{m.tong_de_xuat}</td>
-                                                        </tr>
-                                                    ))}
-                                                </tbody>
-                                            </table>
-                                        </div>
-                                    </div>
-                                ))}
+                                    ))}
+                                </div>
                             </div>
-                        </>
+                        </div>
                     ) : (
                         <div className="empty-state">
                             <Package size={60} style={{ color: 'var(--text-muted)', marginBottom: 20 }} />
@@ -770,9 +819,24 @@ export default function DeXuatAdminPage() {
                 </div>
             )}
 
-            {/* Tab 3: Proposal List */}
-            {activeTab === 'list' && (
-                <div className="tab-content fade-in">
+            {/* Tab 2: Proposal List */}
+            {activeTab === 'list' && (() => {
+                const q = listSearch.toLowerCase().trim();
+                const filteredDx = deXuats.filter(dx =>
+                    !q ||
+                    (dx.ten_gv || '').toLowerCase().includes(q) ||
+                    (dx.email || '').toLowerCase().includes(q)
+                );
+                if (tabLoading) return tabLoader;
+                return (
+                <div className="fade-in">
+                    <div className="search-bar">
+                        <div className="search-input-wrapper">
+                            <Search size={14} />
+                            <input className="search-input" placeholder="Tìm theo tên GV, email..." value={listSearch} onChange={e => setListSearch(e.target.value)} style={{ fontSize: 13 }} />
+                        </div>
+                        <span style={{ color: 'var(--text-muted)', fontSize: 13 }}>{filteredDx.length}/{deXuats.length} đề xuất</span>
+                    </div>
                     <div className="table-container">
                         <table className="data-table">
                             <thead>
@@ -787,7 +851,7 @@ export default function DeXuatAdminPage() {
                                 </tr>
                             </thead>
                             <tbody>
-                                {deXuats.map((dx, idx) => (
+                                {filteredDx.map((dx, idx) => (
                                     <tr key={dx.id}>
                                         <td>{idx + 1}</td>
                                         <td>
@@ -799,24 +863,25 @@ export default function DeXuatAdminPage() {
                                         <td style={{ textAlign: 'center', fontWeight: 600 }}>{dx.tong_so_luong || 0}</td>
                                         <td>{dx.ngay_nop ? new Date(dx.ngay_nop).toLocaleDateString('vi-VN') : '—'}</td>
                                         <td style={{ textAlign: 'right' }}>
-                                            <button className="btn-icon btn-ghost" onClick={() => viewDetail(dx)} title="Xem chi tiết">
+                                            <button className="btn-icon" onClick={() => viewDetail(dx)} title="Xem chi tiết">
                                                 <Eye size={18} />
                                             </button>
                                         </td>
                                     </tr>
                                 ))}
-                                {deXuats.length === 0 && (
+                                {filteredDx.length === 0 && (
                                     <tr>
-                                        <td colSpan="7" style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)' }}>Chưa có giáo viên nào nộp đề xuất</td>
+                                        <td colSpan="7" style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)' }}>{listSearch ? 'Không tìm thấy đề xuất phù hợp' : 'Chưa có giáo viên nào nộp đề xuất'}</td>
                                     </tr>
                                 )}
                             </tbody>
                         </table>
                     </div>
                 </div>
-            )}
+                );
+            })()}
 
-            {/* Tab 4: Suggested Materials */}
+            {/* Tab 3: Suggested Materials */}
             {activeTab === 'suggestions' && (() => {
                 // Apply search + status filter
                 const filtered = vatTuTams.filter(v => {
@@ -826,8 +891,9 @@ export default function DeXuatAdminPage() {
                     return nameMatch && statusMatch;
                 });
                 const pendingCount = vatTuTams.filter(v => !v.trang_thai || v.trang_thai === 'cho_duyet').length;
+                if (tabLoading) return tabLoader;
                 return (
-                    <div className="tab-content fade-in">
+                    <div className="fade-in">
                         {/* Filter bar */}
                         <div style={{ display: 'flex', gap: 12, marginBottom: 16, alignItems: 'center', flexWrap: 'wrap' }}>
                             <div style={{ position: 'relative', flex: '1 1 220px', minWidth: 180 }}>
@@ -881,18 +947,23 @@ export default function DeXuatAdminPage() {
                                                 <td>{idx + 1}</td>
                                                 <td style={{ fontSize: 13 }}>{v.ten_gv}</td>
                                                 <td style={{ fontWeight: 600 }}>
-                                                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, position: 'relative' }}>
+                                                    <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 6, position: 'relative', minWidth: 0 }}>
                                                         {v.ten_vat_tu}
                                                         {hasDup && (
                                                             <>
                                                                 <button
-                                                                    onClick={() => setOpenDupId(isDupOpen ? null : v.id)}
+                                                                    onClick={(e) => {
+                                                                        if (isDupOpen) { setOpenDupId(null); return; }
+                                                                        const r = e.currentTarget.getBoundingClientRect();
+                                                                        setDupAnchor({ top: r.bottom + 6, left: r.left });
+                                                                        setOpenDupId(v.id);
+                                                                    }}
                                                                     style={{ background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.35)', borderRadius: 6, padding: '1px 6px', fontSize: 11, color: '#d97706', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 3, flexShrink: 0 }}
                                                                     title="Có thể trùng với vật tư khác"
                                                                 >
                                                                     <AlertCircle size={11} /> {dupList.length} trùng
                                                                 </button>
-                                                                {isDupOpen && <DupPopover items={dupList} onClose={() => setOpenDupId(null)} />}
+                                                                {isDupOpen && <DupPopover items={dupList} anchor={dupAnchor} onClose={() => setOpenDupId(null)} />}
                                                             </>
                                                         )}
                                                     </div>
@@ -901,7 +972,7 @@ export default function DeXuatAdminPage() {
                                                 <td><span className="badge badge-info">{v.don_vi_tinh}</span></td>
                                                 <td>
                                                     {v.ten_nganh
-                                                        ? <span className="badge badge-primary" style={{ fontSize: 11 }}>{v.ten_nganh}</span>
+                                                        ? <span className="badge badge-primary" title={v.ten_nganh} style={{ fontSize: 11 }}>{v.ten_nganh}</span>
                                                         : <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Dùng chung</span>
                                                     }
                                                 </td>
@@ -916,7 +987,7 @@ export default function DeXuatAdminPage() {
                                                 </td>
                                                 <td style={{ textAlign: 'right' }}>
                                                     {(!v.trang_thai || v.trang_thai === 'cho_duyet') && (
-                                                        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                                                        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
                                                             <button
                                                                 className="btn btn-sm btn-primary"
                                                                 onClick={() => setApprovalModal({ show: true, item: v, type: 'new', mergeWithId: '', nganh_id: v.nganh_id?.toString() || '' })}
@@ -960,14 +1031,14 @@ export default function DeXuatAdminPage() {
             {/* Detail Modal */}
             {selectedDx && detailData && (
                 <div className="modal-overlay" onClick={() => { setSelectedDx(null); setDetailData(null); }}>
-                    <div className="modal modal-lg" onClick={e => e.stopPropagation()} style={{ maxWidth: '1000px' }}>
-                        <div className="modal-header" style={{ padding: '24px 32px', borderBottom: '1px solid var(--border-color)', background: 'var(--bg-card)' }}>
-                            <div style={{ flex: 1 }}>
+                    <div className="modal modal-lg" onClick={e => e.stopPropagation()} style={{ maxWidth: 'min(1000px, calc(100vw - 40px))' }}>
+                        <div className="modal-header" style={{ padding: '24px clamp(16px, 4vw, 32px)', borderBottom: '1px solid var(--border-color)', background: 'var(--bg-card)', flexWrap: 'wrap', gap: 12 }}>
+                            <div style={{ flex: 1, minWidth: 0 }}>
                                 <h2 style={{ fontSize: 22, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 12 }}>
                                     <FileText className="text-accent" size={24} />
                                     Chi tiết đề xuất
                                 </h2>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginTop: 8 }}>
+                                <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 16, rowGap: 6, marginTop: 8 }}>
                                     <div style={{ fontWeight: 600, fontSize: 15 }}>{detailData.ten_gv}</div>
                                     <div style={{ width: 1, height: 14, background: 'var(--border-color)' }}></div>
                                     <div style={{ color: 'var(--text-secondary)', fontSize: 13 }}>{detailData.email}</div>
@@ -979,7 +1050,7 @@ export default function DeXuatAdminPage() {
                                     )}
                                 </div>
                             </div>
-                            <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+                            <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
                                 <div style={{ display: 'flex', background: 'var(--bg-glass)', padding: 4, borderRadius: 10, border: '1px solid var(--border-color)', boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.05)' }}>
                                     <button
                                         className={`btn btn-sm ${detailViewMode === 'material' ? 'btn-primary' : 'btn-ghost'}`}
@@ -1003,12 +1074,12 @@ export default function DeXuatAdminPage() {
                                 >
                                     <Printer size={14} style={{ marginRight: 6 }} /> In phiếu đề xuất
                                 </button>
-                                <button className="btn-icon btn-ghost" onClick={() => { setSelectedDx(null); setDetailData(null); }} style={{ borderRadius: '50%' }}>✕</button>
+                                <button className="btn-icon" onClick={() => { setSelectedDx(null); setDetailData(null); }} style={{ borderRadius: '50%' }}>✕</button>
                             </div>
                         </div>
                         <div className="modal-body" style={{ padding: '0', background: 'var(--bg-glass)' }}>
                             {detailData.chi_tiet && detailData.chi_tiet.length > 0 ? (
-                                <div style={{ padding: '24px 32px' }}>
+                                <div style={{ padding: 'clamp(16px, 4vw, 32px)' }}>
                                     {detailViewMode === 'material' ? (
                                         <div className="table-container" style={{ border: '1px solid var(--border-color)', borderRadius: 12, overflowX: 'auto', overflowY: 'auto', maxHeight: '60vh', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)' }}>
                                             <table className="data-table" style={{ minWidth: 800 }}>
@@ -1020,7 +1091,7 @@ export default function DeXuatAdminPage() {
                                                         <th style={{ padding: '16px 20px', textAlign: 'center', width: 100 }}>ĐVT</th>
                                                         <th style={{ padding: '16px 20px', textAlign: 'right', width: 100 }}>SL hiện tại</th>
                                                         <th style={{ padding: '16px 20px', textAlign: 'right', width: 100 }}>Số lượng</th>
-                                                        <th style={{ padding: '16px 20px', textAlign: 'center', width: 110 }}>Thao tác</th>
+                                                        <th style={{ padding: '16px 20px', textAlign: 'center', width: 170 }}>Thao tác</th>
                                                     </tr>
                                                 </thead>
                                                 <tbody>
@@ -1029,7 +1100,7 @@ export default function DeXuatAdminPage() {
                                                         <tr style={{ borderBottom: '1px solid var(--border-color)' }}>
                                                             <td style={{ padding: '12px 20px', color: 'var(--text-muted)' }}>{i + 1}</td>
                                                             <td style={{ padding: '12px 20px' }}>
-                                                                <div style={{ fontWeight: 600, color: 'var(--text-main)', fontSize: 15, display: 'flex', alignItems: 'center', gap: 8 }}>
+                                                                <div style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: 15, display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8, minWidth: 0 }}>
                                                                     {m.ten_vat_tu}
                                                                     {m.vat_tu_tam_id && <span className="badge badge-warning" style={{ fontSize: 10 }}>Mới (Chờ duyệt)</span>}
                                                                 </div>
@@ -1038,7 +1109,7 @@ export default function DeXuatAdminPage() {
                                                             <td style={{ padding: '12px 20px' }}>
                                                                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                                                                     {m.subjects.map((s, idx) => (
-                                                                        <span key={idx} className="badge" style={{ fontSize: 11, background: 'rgba(14, 165, 233, 0.08)', color: 'var(--text-accent)', fontWeight: 500, padding: '4px 10px' }}>
+                                                                        <span key={idx} className="badge" title={`${s.ten_mon} (${s.ten_lop})`} style={{ fontSize: 11, background: 'rgba(28, 110, 245, 0.08)', color: 'var(--text-accent)', fontWeight: 500, padding: '4px 10px' }}>
                                                                             {s.ten_mon} ({s.ten_lop})
                                                                         </span>
                                                                     ))}
@@ -1047,7 +1118,7 @@ export default function DeXuatAdminPage() {
                                                             <td style={{ padding: '12px 20px', textAlign: 'center' }}>
                                                                 <span className="badge badge-info" style={{ minWidth: 50, fontWeight: 600 }}>{m.don_vi_tinh}</span>
                                                             </td>
-                                                            <td style={{ padding: '12px 20px', textAlign: 'right', fontWeight: 600, color: m.so_luong_kho > 0 ? '#2563eb' : 'var(--text-main)' }}>
+                                                            <td style={{ padding: '12px 20px', textAlign: 'right', fontWeight: 600, color: m.so_luong_kho > 0 ? '#2563eb' : 'var(--text-primary)' }}>
                                                                 {m.so_luong_kho || 0}
                                                             </td>
                                                             <td style={{ padding: '12px 20px', textAlign: 'right' }}>
@@ -1065,7 +1136,7 @@ export default function DeXuatAdminPage() {
                                                                         <input
                                                                             type="number"
                                                                             className="form-input"
-                                                                            style={{ width: 65, padding: '3px 6px', textAlign: 'center', fontSize: 12, fontWeight: 700, border: editedDxQty[m.rows[0].id] !== undefined ? '1.5px solid rgba(14,165,233,0.6)' : '1px solid var(--border-color)', borderRadius: 6, background: editedDxQty[m.rows[0].id] !== undefined ? 'rgba(14,165,233,0.05)' : 'transparent' }}
+                                                                            style={{ width: 65, padding: '3px 6px', textAlign: 'center', fontSize: 12, fontWeight: 700, border: editedDxQty[m.rows[0].id] !== undefined ? '1.5px solid rgba(28,110,245,0.6)' : '1px solid var(--border-color)', borderRadius: 6, background: editedDxQty[m.rows[0].id] !== undefined ? 'rgba(28,110,245,0.05)' : 'transparent' }}
                                                                             min="1"
                                                                             value={editedDxQty[m.rows[0].id] !== undefined ? editedDxQty[m.rows[0].id] : m.rows[0].so_luong}
                                                                             onChange={e => {
@@ -1088,13 +1159,13 @@ export default function DeXuatAdminPage() {
                                                                 )}
                                                             </td>
                                                             <td style={{ padding: '12px 16px', textAlign: 'center' }}>
-                                                                <div style={{ display: 'flex', gap: 6, justifyContent: 'center' }}>
+                                                                <div style={{ display: 'flex', gap: 6, justifyContent: 'center', flexWrap: 'wrap' }}>
                                                                     <button
                                                                         title="Thay đổi vật tư này sang vật tư trong kho"
                                                                         onClick={() => setChangeVtModal({ show: true, row: m, search: m.ten_vat_tu, selectedId: m.vat_tu_id?.toString() || '' })}
-                                                                        style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 12px', fontSize: 12, fontWeight: 600, borderRadius: 8, border: '1px solid rgba(14,165,233,0.35)', background: 'rgba(14,165,233,0.07)', color: 'var(--text-accent)', cursor: 'pointer', whiteSpace: 'nowrap', transition: 'all 0.15s' }}
-                                                                        onMouseEnter={e => { e.currentTarget.style.background = 'rgba(14,165,233,0.15)'; }}
-                                                                        onMouseLeave={e => { e.currentTarget.style.background = 'rgba(14,165,233,0.07)'; }}
+                                                                        style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 12px', fontSize: 12, fontWeight: 600, borderRadius: 8, border: '1px solid rgba(28,110,245,0.35)', background: 'rgba(28,110,245,0.07)', color: 'var(--text-accent)', cursor: 'pointer', whiteSpace: 'nowrap', transition: 'all 0.15s' }}
+                                                                        onMouseEnter={e => { e.currentTarget.style.background = 'rgba(28,110,245,0.15)'; }}
+                                                                        onMouseLeave={e => { e.currentTarget.style.background = 'rgba(28,110,245,0.07)'; }}
                                                                     >
                                                                         <ArrowLeftRight size={13} /> Đổi VT
                                                                     </button>
@@ -1112,13 +1183,16 @@ export default function DeXuatAdminPage() {
                                                         </tr>
                                                         {/* Expanded per-class rows for editing */}
                                                         {expandMtQty[i] && m.rows.map((row, rIdx) => (
-                                                            <tr key={`exp_${row.id}`} style={{ background: 'rgba(14,165,233,0.03)', borderBottom: rIdx === m.rows.length - 1 ? '2px solid var(--border-color)' : '1px solid rgba(14,165,233,0.1)' }}>
+                                                            <tr key={`exp_${row.id}`} style={{ background: 'rgba(28,110,245,0.03)', borderBottom: rIdx === m.rows.length - 1 ? '2px solid var(--border-color)' : '1px solid rgba(28,110,245,0.1)' }}>
                                                                 <td></td>
                                                                 <td colSpan="2" style={{ padding: '8px 20px', fontSize: 12, color: 'var(--text-secondary)' }}>
                                                                     <span style={{ marginRight: 8 }}>↳</span>
                                                                     <span style={{ fontWeight: 600 }}>{row.ten_mon}</span>
                                                                     <span style={{ margin: '0 6px', color: 'var(--text-muted)' }}>•</span>
                                                                     <span>{row.ten_lop}</span>
+                                                                    <span className={`badge ${row.lop_nganh_id ? 'badge-primary' : 'badge-warning'}`} style={{ fontSize: 10, marginLeft: 8 }}>
+                                                                        {row.ten_nganh || 'Chưa gán ngành'}
+                                                                    </span>
                                                                 </td>
                                                                 <td></td>
                                                                 <td></td>
@@ -1127,7 +1201,7 @@ export default function DeXuatAdminPage() {
                                                                         <input
                                                                             type="number"
                                                                             className="form-input"
-                                                                            style={{ width: 65, padding: '3px 6px', textAlign: 'center', fontSize: 12, fontWeight: 700, border: editedDxQty[row.id] !== undefined ? '1.5px solid rgba(14,165,233,0.6)' : '1px solid var(--border-color)', borderRadius: 6, background: editedDxQty[row.id] !== undefined ? 'rgba(14,165,233,0.05)' : 'transparent' }}
+                                                                            style={{ width: 65, padding: '3px 6px', textAlign: 'center', fontSize: 12, fontWeight: 700, border: editedDxQty[row.id] !== undefined ? '1.5px solid rgba(28,110,245,0.6)' : '1px solid var(--border-color)', borderRadius: 6, background: editedDxQty[row.id] !== undefined ? 'rgba(28,110,245,0.05)' : 'transparent' }}
                                                                             min="1"
                                                                             value={editedDxQty[row.id] !== undefined ? editedDxQty[row.id] : row.so_luong}
                                                                             onChange={e => {
@@ -1159,7 +1233,7 @@ export default function DeXuatAdminPage() {
                                             {getGroupedBySubject().map((subject, sIdx) => (
                                                 <div key={sIdx} className="card" style={{ border: '1px solid var(--border-color)', borderRadius: 16, overflow: 'hidden', transition: 'all 0.3s ease' }}>
                                                     <div style={{ background: 'var(--bg-card)', padding: '16px 24px', borderBottom: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', gap: 12 }}>
-                                                        <div style={{ padding: 8, background: 'rgba(14,165,233,0.1)', borderRadius: 10, color: 'var(--text-accent)' }}>
+                                                        <div style={{ padding: 8, background: 'rgba(28,110,245,0.1)', borderRadius: 10, color: 'var(--text-accent)' }}>
                                                             <FileText size={18} />
                                                         </div>
                                                         <div>
@@ -1170,7 +1244,7 @@ export default function DeXuatAdminPage() {
                                                     <div style={{ padding: '16px 24px' }}>
                                                         {subject.classes.map((cls, cIdx) => (
                                                             <div key={cIdx} style={{ marginBottom: cIdx === subject.classes.length - 1 ? 0 : 20 }}>
-                                                                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+                                                                <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 10, marginBottom: 12 }}>
                                                                     <Users size={14} className="text-secondary" />
                                                                     <span style={{ fontWeight: 600, fontSize: 14 }}>Lớp: {cls.name}</span>
                                                                     <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>(Sĩ số: {cls.si_so})</span>
@@ -1205,7 +1279,7 @@ export default function DeXuatAdminPage() {
                                                                                 <th style={{ width: 80, textAlign: 'center', fontSize: 11, padding: '10px 16px' }}>ĐVT</th>
                                                                                 <th style={{ width: 90, textAlign: 'right', fontSize: 11, padding: '10px 16px' }}>SL hiện tại</th>
                                                                                 <th style={{ width: 90, textAlign: 'right', fontSize: 11, padding: '10px 16px' }}>Số lượng</th>
-                                                                                <th style={{ width: 110, textAlign: 'center', fontSize: 11, padding: '10px 16px' }}>Thao tác</th>
+                                                                                <th style={{ width: 140, textAlign: 'center', fontSize: 11, padding: '10px 16px' }}>Thao tác</th>
                                                                             </tr>
                                                                         </thead>
                                                                         <tbody>
@@ -1217,7 +1291,7 @@ export default function DeXuatAdminPage() {
                                                                                     <td style={{ textAlign: 'center', padding: '8px 16px' }}>
                                                                                         <span className="badge" style={{ fontSize: 10, background: 'rgba(0,0,0,0.04)' }}>{item.don_vi_tinh}</span>
                                                                                     </td>
-                                                                                    <td style={{ textAlign: 'right', padding: '8px 16px', fontWeight: 600, color: item.so_luong_kho > 0 ? '#2563eb' : 'var(--text-main)' }}>
+                                                                                    <td style={{ textAlign: 'right', padding: '8px 16px', fontWeight: 600, color: item.so_luong_kho > 0 ? '#2563eb' : 'var(--text-primary)' }}>
                                                                                         {item.so_luong_kho || 0}
                                                                                     </td>
                                                                                     <td style={{ textAlign: 'right', padding: '8px 16px' }}>
@@ -1225,7 +1299,7 @@ export default function DeXuatAdminPage() {
                                                                                             <input
                                                                                                 type="number"
                                                                                                 className="form-input"
-                                                                                                style={{ width: 65, padding: '3px 6px', textAlign: 'center', fontSize: 13, fontWeight: 700, border: editedDxQty[item.id] !== undefined ? '1.5px solid rgba(14,165,233,0.6)' : '1px solid var(--border-color)', borderRadius: 6, background: editedDxQty[item.id] !== undefined ? 'rgba(14,165,233,0.05)' : 'transparent' }}
+                                                                                                style={{ width: 65, padding: '3px 6px', textAlign: 'center', fontSize: 13, fontWeight: 700, border: editedDxQty[item.id] !== undefined ? '1.5px solid rgba(28,110,245,0.6)' : '1px solid var(--border-color)', borderRadius: 6, background: editedDxQty[item.id] !== undefined ? 'rgba(28,110,245,0.05)' : 'transparent' }}
                                                                                                 min="1"
                                                                                                 value={editedDxQty[item.id] !== undefined ? editedDxQty[item.id] : item.so_luong}
                                                                                                 onChange={e => {
@@ -1250,13 +1324,13 @@ export default function DeXuatAdminPage() {
                                                                                         </div>
                                                                                     </td>
                                                                                     <td style={{ textAlign: 'center', padding: '8px 12px' }}>
-                                                                                        <div style={{ display: 'flex', gap: 4, justifyContent: 'center' }}>
+                                                                                        <div style={{ display: 'flex', gap: 4, justifyContent: 'center', flexWrap: 'wrap' }}>
                                                                                             <button
                                                                                                 title="Đổi vật tư"
                                                                                                 onClick={() => setChangeVtModal({ show: true, row: item, search: item.ten_vat_tu, selectedId: item.vat_tu_id?.toString() || '' })}
-                                                                                                style={{ display: 'inline-flex', alignItems: 'center', gap: 3, padding: '3px 8px', fontSize: 11, fontWeight: 600, borderRadius: 6, border: '1px solid rgba(14,165,233,0.3)', background: 'rgba(14,165,233,0.06)', color: 'var(--text-accent)', cursor: 'pointer', whiteSpace: 'nowrap', transition: 'all 0.15s' }}
-                                                                                                onMouseEnter={e => { e.currentTarget.style.background = 'rgba(14,165,233,0.15)'; }}
-                                                                                                onMouseLeave={e => { e.currentTarget.style.background = 'rgba(14,165,233,0.06)'; }}
+                                                                                                style={{ display: 'inline-flex', alignItems: 'center', gap: 3, padding: '3px 8px', fontSize: 11, fontWeight: 600, borderRadius: 6, border: '1px solid rgba(28,110,245,0.3)', background: 'rgba(28,110,245,0.06)', color: 'var(--text-accent)', cursor: 'pointer', whiteSpace: 'nowrap', transition: 'all 0.15s' }}
+                                                                                                onMouseEnter={e => { e.currentTarget.style.background = 'rgba(28,110,245,0.15)'; }}
+                                                                                                onMouseLeave={e => { e.currentTarget.style.background = 'rgba(28,110,245,0.06)'; }}
                                                                                             >
                                                                                                 <ArrowLeftRight size={11} /> Đổi
                                                                                             </button>
@@ -1291,7 +1365,7 @@ export default function DeXuatAdminPage() {
                                 </div>
                             )}
                         </div>
-                        <div className="modal-footer" style={{ padding: '16px 32px', borderTop: '1px solid var(--border-color)', background: 'var(--bg-card)', justifyContent: 'space-between', borderRadius: '0 0 20px 20px' }}>
+                        <div className="modal-footer" style={{ padding: '16px clamp(16px, 4vw, 32px)', borderTop: '1px solid var(--border-color)', background: 'var(--bg-card)', justifyContent: 'space-between', flexWrap: 'wrap', borderRadius: '0 0 20px 20px' }}>
                             <button
                                 className="btn btn-secondary"
                                 style={{ padding: '8px 20px', borderRadius: 10, gap: 6 }}
@@ -1314,30 +1388,35 @@ export default function DeXuatAdminPage() {
                     const key = `${ct.mon_hoc_id}-${ct.lop_id}`;
                     if (!seen.has(key)) {
                         seen.add(key);
-                        monLopOptions.push({ key, mon_hoc_id: ct.mon_hoc_id, lop_id: ct.lop_id, ten_mon: ct.ten_mon, ten_lop: ct.ten_lop });
+                        monLopOptions.push({ key, mon_hoc_id: ct.mon_hoc_id, lop_id: ct.lop_id, ten_mon: ct.ten_mon, ten_lop: ct.ten_lop, ten_nganh: ct.ten_nganh, lop_nganh_id: ct.lop_nganh_id || null });
                     }
                 });
+                const selectedMonLop = monLopOptions.find(o => o.key === addDxVtMonLop) || null;
+                const selNganhId = selectedMonLop?.lop_nganh_id || null;
+                const isSameNganhDx = (vt) => !vt.nganh_id || (selNganhId && vt.nganh_id === selNganhId);
                 const searchQ = addDxVtSearch.toLowerCase().trim();
                 const filtered = allVatTus
-                    .filter(vt => !searchQ || vt.ten_vat_tu.toLowerCase().includes(searchQ) || (vt.yeu_cau_ky_thuat || '').toLowerCase().includes(searchQ));
+                    .filter(vt => !searchQ || vt.ten_vat_tu.toLowerCase().includes(searchQ) || (vt.yeu_cau_ky_thuat || '').toLowerCase().includes(searchQ))
+                    .filter(vt => searchQ ? true : isSameNganhDx(vt))
+                    .sort((a, b) => (isSameNganhDx(a) ? 0 : 1) - (isSameNganhDx(b) ? 0 : 1));
                 const selectedCount = Object.values(addDxVtItems).filter(q => q > 0).length;
                 return (
                     <div className="modal-overlay" style={{ zIndex: 1200 }} onClick={() => setAddDxVtModal(false)}>
-                        <div className="modal" style={{ maxWidth: 620, maxHeight: '90vh', display: 'flex', flexDirection: 'column' }} onClick={e => e.stopPropagation()}>
-                            <div className="modal-header" style={{ padding: '20px 24px' }}>
+                        <div className="modal" style={{ maxWidth: 'min(620px, calc(100vw - 48px))', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }} onClick={e => e.stopPropagation()}>
+                            <div className="modal-header" style={{ padding: '20px clamp(16px, 4vw, 24px)' }}>
                                 <div>
                                     <h2 style={{ fontSize: 18, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8 }}>
                                         <Plus size={18} style={{ color: 'var(--text-accent)' }} /> Thêm vật tư vào đề xuất
                                     </h2>
                                     <p style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>{detailData?.ten_gv}</p>
                                 </div>
-                                <button className="btn-icon btn-ghost" onClick={() => setAddDxVtModal(false)}>✕</button>
+                                <button className="btn-icon" onClick={() => setAddDxVtModal(false)}>✕</button>
                             </div>
                             <div style={{ padding: '0 24px 12px' }}>
                                 <label className="form-label" style={{ fontSize: 13, fontWeight: 600, marginBottom: 6, display: 'block' }}>Chọn môn + lớp:</label>
                                 <select className="form-select" style={{ width: '100%', fontSize: 14 }} value={addDxVtMonLop} onChange={e => setAddDxVtMonLop(e.target.value)}>
                                     <option value="">-- Chọn môn học và lớp --</option>
-                                    {monLopOptions.map(o => <option key={o.key} value={o.key}>{o.ten_mon} - {o.ten_lop}</option>)}
+                                    {monLopOptions.map(o => <option key={o.key} value={o.key}>{o.ten_mon} - {o.ten_lop} ({o.ten_nganh || 'chưa gán ngành'})</option>)}
                                 </select>
                             </div>
                             {addDxVtMonLop && (
@@ -1348,20 +1427,26 @@ export default function DeXuatAdminPage() {
                                     </div>
                                     <div style={{ flex: 1, overflowY: 'auto', padding: '0 24px 16px' }}>
                                         <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 8, fontWeight: 600 }}>
-                                            {filtered.length} vật tư {selectedCount > 0 && `• Đã chọn: ${selectedCount}`}
+                                            {filtered.length} vật tư{selectedMonLop ? ` ngành ${selectedMonLop.ten_nganh || 'dùng chung'}` : ''} {searchQ ? '(gõ để thấy cả ngành khác — bị khóa)' : ''} {selectedCount > 0 && `• Đã chọn: ${selectedCount}`}
                                         </div>
                                         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                                             {filtered.slice(0, 50).map(vt => {
                                                 const qty = addDxVtItems[vt.id] || 0;
+                                                const disabled = !isSameNganhDx(vt);
+                                                const isSuaChe = (vt.loai_vat_tu || 'tieu_hao') === 'sua_che';
                                                 return (
-                                                    <div key={vt.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 12px', borderRadius: 10, border: qty > 0 ? '1.5px solid rgba(14,165,233,0.5)' : '1px solid var(--border-color)', background: qty > 0 ? 'rgba(14,165,233,0.05)' : 'var(--bg-glass)' }}>
+                                                    <div key={vt.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 12px', borderRadius: 10, border: qty > 0 ? '1.5px solid rgba(28,110,245,0.5)' : '1px solid var(--border-color)', background: qty > 0 ? 'rgba(28,110,245,0.05)' : disabled ? 'rgba(0,0,0,0.08)' : 'var(--bg-glass)', opacity: disabled ? 0.55 : 1 }}>
                                                         <div style={{ flex: 1, minWidth: 0 }}>
-                                                            <div style={{ fontWeight: 600, fontSize: 13 }}>{vt.ten_vat_tu}</div>
+                                                            <div style={{ fontWeight: 600, fontSize: 13, display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                                                                {vt.ten_vat_tu}
+                                                                <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 4, background: isSuaChe ? 'rgba(249,115,22,0.15)' : 'rgba(16,185,129,0.15)', color: isSuaChe ? '#ea580c' : '#059669' }}>{isSuaChe ? 'Sửa chữa' : 'Tiêu hao'}</span>
+                                                                {disabled && <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 4, background: 'rgba(107,114,128,0.2)', color: 'var(--text-muted)' }}>🔒 {vt.ten_nganh || 'Ngành khác'}</span>}
+                                                            </div>
                                                             <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 1 }}>
                                                                 {vt.yeu_cau_ky_thuat || '—'} • {vt.don_vi_tinh} • Kho: <span style={{ color: vt.so_luong_kho > 0 ? '#34d399' : '#f87171', fontWeight: 600 }}>{vt.so_luong_kho}</span>
                                                             </div>
                                                         </div>
-                                                        <input type="number" className="form-input" style={{ width: 70, padding: '4px 8px', textAlign: 'center', fontSize: 13 }} placeholder="SL" min="0" value={qty || ''} onChange={e => { const v = Math.max(0, parseInt(e.target.value) || 0); setAddDxVtItems(prev => { if (v === 0) { const { [vt.id]: _, ...rest } = prev; return rest; } return { ...prev, [vt.id]: v }; }); }} />
+                                                        <input type="number" className="form-input" style={{ width: 70, padding: '4px 8px', textAlign: 'center', fontSize: 13 }} placeholder="SL" min="0" value={qty || ''} disabled={disabled} title={disabled ? `Thuộc ngành ${vt.ten_nganh || 'khác'} — không thêm được cho lớp này` : ''} onChange={e => { const v = Math.max(0, parseInt(e.target.value) || 0); setAddDxVtItems(prev => { if (v === 0) { const { [vt.id]: _, ...rest } = prev; return rest; } return { ...prev, [vt.id]: v }; }); }} />
                                                     </div>
                                                 );
                                             })}
@@ -1404,8 +1489,8 @@ export default function DeXuatAdminPage() {
 
                 return (
                     <div className="modal-overlay" style={{ zIndex: 1200 }} onClick={() => setChangeVtModal({ show: false, row: null, search: '', selectedId: '' })}>
-                        <div className="modal" style={{ maxWidth: 580, maxHeight: '90vh', display: 'flex', flexDirection: 'column' }} onClick={e => e.stopPropagation()}>
-                            <div className="modal-header" style={{ padding: '20px 24px' }}>
+                        <div className="modal" style={{ maxWidth: 'min(580px, calc(100vw - 48px))', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }} onClick={e => e.stopPropagation()}>
+                            <div className="modal-header" style={{ padding: '20px clamp(16px, 4vw, 24px)' }}>
                                 <div>
                                     <h2 style={{ fontSize: 18, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8 }}>
                                         <ArrowLeftRight size={18} className="text-accent" /> Thay đổi vật tư
@@ -1414,7 +1499,7 @@ export default function DeXuatAdminPage() {
                                         Đang đổi: <strong style={{ color: 'var(--text-primary)' }}>{changeVtModal.row?.ten_vat_tu}</strong>
                                     </p>
                                 </div>
-                                <button className="btn-icon btn-ghost" onClick={() => setChangeVtModal({ show: false, row: null, search: '', selectedId: '' })}>✕</button>
+                                <button className="btn-icon" onClick={() => setChangeVtModal({ show: false, row: null, search: '', selectedId: '' })}>✕</button>
                             </div>
 
                             <div className="modal-body" style={{ padding: '0 24px 16px', overflowY: 'auto', flex: 1 }}>
@@ -1469,8 +1554,8 @@ export default function DeXuatAdminPage() {
                                                 onClick={() => setChangeVtModal(prev => ({ ...prev, selectedId: vt.id.toString() }))}
                                                 style={{
                                                     padding: '10px 14px', borderRadius: 10, cursor: 'pointer', transition: 'all 0.15s',
-                                                    border: isSelected ? '1.5px solid rgba(14,165,233,0.6)' : '1px solid var(--border-color)',
-                                                    background: isSelected ? 'rgba(14,165,233,0.08)' : isCurrent ? 'rgba(99,102,241,0.05)' : 'var(--bg-glass)',
+                                                    border: isSelected ? '1.5px solid rgba(28,110,245,0.6)' : '1px solid var(--border-color)',
+                                                    background: isSelected ? 'rgba(28,110,245,0.08)' : isCurrent ? 'rgba(99,102,241,0.05)' : 'var(--bg-glass)',
                                                     display: 'flex', alignItems: 'center', gap: 12
                                                 }}
                                             >
@@ -1485,7 +1570,7 @@ export default function DeXuatAdminPage() {
                                                     )}
                                                 </div>
                                                 <div style={{ flex: 1, minWidth: 0 }}>
-                                                    <div style={{ fontWeight: 600, fontSize: 13, color: isSelected ? 'var(--text-accent)' : 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                                                    <div style={{ fontWeight: 600, fontSize: 13, color: isSelected ? 'var(--text-accent)' : 'var(--text-primary)', display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 6, minWidth: 0 }}>
                                                         {vt.ten_vat_tu}
                                                         {isCurrent && <span style={{ fontSize: 10, padding: '1px 5px', borderRadius: 4, background: 'rgba(99,102,241,0.12)', color: '#818cf8' }}>Hiện tại</span>}
                                                     </div>
@@ -1520,8 +1605,8 @@ export default function DeXuatAdminPage() {
             {/* Transfer Modal - Chuyển dự trù sang GV khác */}
             {transferModal.show && (
                 <div className="modal-overlay" style={{ zIndex: 1200 }} onClick={() => { setTransferModal({ show: false, subjectName: '', className: '', monHocId: null, lopId: null, items: [] }); setTransferTargetGv(''); }}>
-                    <div className="modal" style={{ maxWidth: 560 }} onClick={e => e.stopPropagation()}>
-                        <div className="modal-header" style={{ padding: '24px 28px' }}>
+                    <div className="modal" style={{ maxWidth: 'min(560px, calc(100vw - 48px))' }} onClick={e => e.stopPropagation()}>
+                        <div className="modal-header" style={{ padding: '24px clamp(16px, 4vw, 28px)' }}>
                             <div>
                                 <h2 style={{ fontSize: 18, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 10 }}>
                                     <div style={{ padding: 6, background: 'rgba(168,85,247,0.1)', borderRadius: 8, color: '#a855f7', display: 'flex' }}>
@@ -1533,9 +1618,9 @@ export default function DeXuatAdminPage() {
                                     Chuyển toàn bộ vật tư của lớp này sang giáo viên được chọn
                                 </p>
                             </div>
-                            <button className="btn-icon btn-ghost" onClick={() => { setTransferModal({ show: false, subjectName: '', className: '', monHocId: null, lopId: null, items: [] }); setTransferTargetGv(''); }}>✕</button>
+                            <button className="btn-icon" onClick={() => { setTransferModal({ show: false, subjectName: '', className: '', monHocId: null, lopId: null, items: [] }); setTransferTargetGv(''); }}>✕</button>
                         </div>
-                        <div className="modal-body" style={{ padding: '0 28px 24px' }}>
+                        <div className="modal-body" style={{ padding: '0 clamp(16px, 4vw, 28px) 24px' }}>
                             {/* Source info */}
                             <div style={{ padding: '16px 18px', borderRadius: 12, background: 'rgba(168,85,247,0.05)', border: '1px solid rgba(168,85,247,0.15)', marginBottom: 20 }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
@@ -1543,7 +1628,7 @@ export default function DeXuatAdminPage() {
                                 </div>
                                 <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--text-primary)', marginBottom: 6 }}>{detailData?.ten_gv}</div>
                                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                                    <span className="badge" style={{ background: 'rgba(14,165,233,0.1)', color: 'var(--text-accent)', fontSize: 12, padding: '4px 10px' }}>
+                                    <span className="badge" style={{ background: 'rgba(28,110,245,0.1)', color: 'var(--text-accent)', fontSize: 12, padding: '4px 10px' }}>
                                         📚 {transferModal.subjectName}
                                     </span>
                                     <span className="badge" style={{ background: 'rgba(16,185,129,0.1)', color: '#10b981', fontSize: 12, padding: '4px 10px' }}>
@@ -1623,14 +1708,14 @@ export default function DeXuatAdminPage() {
             {/* Approval / Merge Modal */}
             {approvalModal.show && (
                 <div className="modal-overlay" style={{ zIndex: 1100 }}>
-                    <div className="modal" style={{ maxWidth: 520 }}>
+                    <div className="modal" style={{ maxWidth: 'min(520px, calc(100vw - 48px))' }}>
                         <div className="modal-header">
                             <h2 style={{ fontSize: 18, fontWeight: 700 }}>
                                 {approvalModal.type === 'new' ? 'Duyệt thêm vật tư mới' : 'Gộp vào vật tư hiện có'}
                             </h2>
-                            <button className="btn-icon btn-ghost" onClick={() => setApprovalModal({ show: false, item: null, type: 'new', mergeWithId: '', nganh_id: '' })}>✕</button>
+                            <button className="btn-icon" onClick={() => setApprovalModal({ show: false, item: null, type: 'new', mergeWithId: '', nganh_id: '' })}>✕</button>
                         </div>
-                        <div className="modal-body" style={{ padding: 24 }}>
+                        <div className="modal-body" style={{ padding: 'clamp(16px, 4vw, 24px)' }}>
                             <div className="alert alert-info mb-4" style={{ borderRadius: 12 }}>
                                 <div style={{ fontSize: 12, opacity: 0.8, marginBottom: 4 }}>Vật tư đề xuất bởi {approvalModal.item.ten_gv}:</div>
                                 <div style={{ fontWeight: 700, fontSize: 16, color: 'var(--text-accent)' }}>{approvalModal.item.ten_vat_tu}</div>
@@ -1673,7 +1758,7 @@ export default function DeXuatAdminPage() {
                                             style={{ width: '100%' }}
                                         >
                                             <option value="">— Dùng chung (không thuộc ngành cụ thể) —</option>
-                                            {nganhs.map(n => (
+                                            {nganhs?.map(n => (
                                                 <option key={n.id} value={n.id.toString()}>{n.ten_nganh}</option>
                                             ))}
                                         </select>
@@ -1708,29 +1793,6 @@ export default function DeXuatAdminPage() {
                     </div>
                 </div>
             )}
-
-            <style jsx>{`
-                .fade-in {
-                    animation: fadeIn 0.3s ease-in;
-                }
-                @keyframes fadeIn {
-                    from { opacity: 0; transform: translateY(10px); }
-                    to { opacity: 1; transform: translateY(0); }
-                }
-                .tab-item {
-                    background: transparent;
-                    border: none;
-                    cursor: pointer;
-                    transition: all 0.2s;
-                    font-size: 15px;
-                }
-                .tab-item:hover {
-                    background: rgba(0,0,0,0.02);
-                }
-                .tab-item.active {
-                    background: transparent;
-                }
-            `}</style>
 
 
         </div>

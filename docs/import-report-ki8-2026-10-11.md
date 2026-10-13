@@ -1,0 +1,491 @@
+# Báo cáo import phân loại vật tư — Kỳ #8 Kỳ 1
+
+- Thời gian: 2026-10-11T11:03:35.397Z
+- Excel: `D:\WorkSpace\VIQTeam\QuanLyVatTu\vat-tu-web\data\KIỂM KÊ VẬT TƯ_HK2_2025_2026 (2).xlsx`
+- Mode: **APPLY**
+
+| | Số lượng |
+|---|---|
+| Dòng Excel / mục duy nhất | 728 / 521 |
+| Vật tư hiện có kỳ 8 | 807 |
+| Đổi loại | 0 |
+| Giữ nguyên | 435 |
+| Thêm mới | 0 |
+| Review (gần trùng) | 86 |
+| DB không có trong Excel | 373 |
+| Conflict | 4 |
+
+## Conflict (mặc định → tiêu hao, cần review tay)
+- **Máng xương cá PVC** ((25x45x1700)mm) — sheets: Vật tư Điện công nghiệp, Thiết bị Điện công nghiệp
+- **Vỏ cầu chì ống 20mm** (20mm) — sheets: Vật tư Điện công nghiệp, Thiết bị Điện công nghiệp
+- **Vỏ cầu chì ống 30mm** (30mm) — sheets: Vật tư Điện công nghiệp, Thiết bị Điện công nghiệp
+- **Bộ lọc đôi khí nén, xả tự động** (STNC, TC2010-01) — sheets: Thiết bị Điện công nghiệp, Thiết bị Điện tử, Thiết bị Cơ điện tử, Dùng chung
+
+## Review — gần trùng, cần xem tay
+- [sua_che] **Bóng đèn sợi dốt** (220V, 25W, đuôi xoay) — 3 ứng viên trùng tên trong DB (qc khác nhau)
+- [sua_che] **Domino** (6 cực - 20A) — 2 ứng viên trùng tên trong DB (qc khác nhau)
+- [sua_che] **Domino** (10 cực - 20A) — 2 ứng viên trùng tên trong DB (qc khác nhau)
+- [sua_che] **Domino** (12 cực, 20A) — 2 ứng viên trùng tên trong DB (qc khác nhau)
+- [tieu_hao] **Điện trở** (10 Ohm; 1/4W) — 32 ứng viên trùng tên trong DB (qc khác nhau)
+- [tieu_hao] **Điện trở** (100 Ohm; 1/4W) — 32 ứng viên trùng tên trong DB (qc khác nhau)
+- [tieu_hao] **Điện trở** (100 Ohm; 1W) — 32 ứng viên trùng tên trong DB (qc khác nhau)
+- [tieu_hao] **Điện trở** (220 Ohm; 1/4W) — 32 ứng viên trùng tên trong DB (qc khác nhau)
+- [tieu_hao] **Điện trở** (330 Ohm; 1/4W) — 32 ứng viên trùng tên trong DB (qc khác nhau)
+- [tieu_hao] **Điện trở** (390 Ohm; 1/4W) — 32 ứng viên trùng tên trong DB (qc khác nhau)
+- [tieu_hao] **Điện trở** (470 Ohm; 1/4W) — 32 ứng viên trùng tên trong DB (qc khác nhau)
+- [tieu_hao] **Điện trở** (560 Ohm; 1/4W) — 32 ứng viên trùng tên trong DB (qc khác nhau)
+- [tieu_hao] **Điện trở** (820 Ohm; 1/4W) — 32 ứng viên trùng tên trong DB (qc khác nhau)
+- [tieu_hao] **Điện trở** (1K; 1/4W) — 32 ứng viên trùng tên trong DB (qc khác nhau)
+- [tieu_hao] **Điện trở** (1,2K; 1/4W) — 32 ứng viên trùng tên trong DB (qc khác nhau)
+- [tieu_hao] **Điện trở** (1,5K; 1/4W) — 32 ứng viên trùng tên trong DB (qc khác nhau)
+- [tieu_hao] **Điện trở** (2,2K; 1/4W) — 32 ứng viên trùng tên trong DB (qc khác nhau)
+- [tieu_hao] **Điện trở** (2,7K; 1/4W) — 32 ứng viên trùng tên trong DB (qc khác nhau)
+- [tieu_hao] **Điện trở** (3,3K; 1/4W) — 32 ứng viên trùng tên trong DB (qc khác nhau)
+- [tieu_hao] **Điện trở** (4,7K; 1/4W) — 32 ứng viên trùng tên trong DB (qc khác nhau)
+- [tieu_hao] **Điện trở** (5,6K; 1/4W) — 32 ứng viên trùng tên trong DB (qc khác nhau)
+- [tieu_hao] **Điện trở** (6,8K; 1/4W) — 32 ứng viên trùng tên trong DB (qc khác nhau)
+- [tieu_hao] **Điện trở** (8,2K; 1/4W) — 32 ứng viên trùng tên trong DB (qc khác nhau)
+- [tieu_hao] **Điện trở** (10K; 1/4W) — 32 ứng viên trùng tên trong DB (qc khác nhau)
+- [tieu_hao] **Điện trở** (15K; 1/4W) — 32 ứng viên trùng tên trong DB (qc khác nhau)
+- [tieu_hao] **Điện trở** (22K; 1/4W) — 32 ứng viên trùng tên trong DB (qc khác nhau)
+- [tieu_hao] **Điện trở** (27K; 1/4W) — 32 ứng viên trùng tên trong DB (qc khác nhau)
+- [tieu_hao] **Điện trở** (33K; 1/4W) — 32 ứng viên trùng tên trong DB (qc khác nhau)
+- [tieu_hao] **Điện trở** (39K; 1/4W) — 32 ứng viên trùng tên trong DB (qc khác nhau)
+- [tieu_hao] **Điện trở** (47K; 1/4W) — 32 ứng viên trùng tên trong DB (qc khác nhau)
+- [tieu_hao] **Điện trở** (56K; 1/4W) — 32 ứng viên trùng tên trong DB (qc khác nhau)
+- [tieu_hao] **Điện trở** (68K; 1/4W) — 32 ứng viên trùng tên trong DB (qc khác nhau)
+- [tieu_hao] **Điện trở** (82K; 1/4W) — 32 ứng viên trùng tên trong DB (qc khác nhau)
+- [tieu_hao] **Điện trở** (100K; 1/4W) — 32 ứng viên trùng tên trong DB (qc khác nhau)
+- [tieu_hao] **Điện trở** (470K; 1/4W) — 32 ứng viên trùng tên trong DB (qc khác nhau)
+- [tieu_hao] **Điện trở** (1M; 1/4W) — 32 ứng viên trùng tên trong DB (qc khác nhau)
+- [tieu_hao] **Điện trở** (470Ohm; SMD-0805) — 32 ứng viên trùng tên trong DB (qc khác nhau)
+- [tieu_hao] **Điện trở** (1K; SMD-0805) — 32 ứng viên trùng tên trong DB (qc khác nhau)
+- [tieu_hao] **Điện trở** (100K; SMD-0805) — 32 ứng viên trùng tên trong DB (qc khác nhau)
+- [tieu_hao] **Tụ điện** (101; 16V) — 4 ứng viên trùng tên trong DB (qc khác nhau)
+- [tieu_hao] **Tụ điện** (102; 16V) — 4 ứng viên trùng tên trong DB (qc khác nhau)
+- [tieu_hao] **Tụ điện** (103; 16V) — 4 ứng viên trùng tên trong DB (qc khác nhau)
+- [tieu_hao] **Tụ điện** (473; 16V) — 4 ứng viên trùng tên trong DB (qc khác nhau)
+- [tieu_hao] **Tụ điện** (1uF; 25V) — 3 ứng viên trùng tên trong DB (qc khác nhau)
+- [tieu_hao] **Tụ điện** (10uF; 25V) — 3 ứng viên trùng tên trong DB (qc khác nhau)
+- [tieu_hao] **Tụ điện** (100uF; 25V) — 2 ứng viên trùng tên trong DB (qc khác nhau)
+- [tieu_hao] **Tụ điện** (220uF; 25V) — 2 ứng viên trùng tên trong DB (qc khác nhau)
+- [tieu_hao] **Tụ điện** (470uF; 25V) — 2 ứng viên trùng tên trong DB (qc khác nhau)
+- [tieu_hao] **Tụ điện** (1000uF; 25V) — 2 ứng viên trùng tên trong DB (qc khác nhau)
+- [tieu_hao] **Tụ điện** (10uF; SMD-0805) — 2 ứng viên trùng tên trong DB (qc khác nhau)
+- [tieu_hao] **Diode** (1N5408) — 5 ứng viên trùng tên trong DB (qc khác nhau)
+- [tieu_hao] **Diode** (Cầu Diode; 3A) — 3 ứng viên trùng tên trong DB (qc khác nhau)
+- [tieu_hao] **Transistor** (C1815 (SMD-SOT95)) — 7 ứng viên trùng tên trong DB (qc khác nhau)
+- [tieu_hao] **Transistor** (TIP 41) — 3 ứng viên trùng tên trong DB (qc khác nhau)
+- [tieu_hao] **Vi mạch** (NE555 (SMD-SO8)) — 24 ứng viên trùng tên trong DB (qc khác nhau)
+- [tieu_hao] **Vi mạch** (IC 7400) — 22 ứng viên trùng tên trong DB (qc khác nhau)
+- [tieu_hao] **Vi mạch** (IC 7404) — 22 ứng viên trùng tên trong DB (qc khác nhau)
+- [tieu_hao] **Vi mạch** (IC 7402) — 22 ứng viên trùng tên trong DB (qc khác nhau)
+- [tieu_hao] **Vi mạch** (IC 7408) — 22 ứng viên trùng tên trong DB (qc khác nhau)
+- [tieu_hao] **Vi mạch** (IC 7414) — 22 ứng viên trùng tên trong DB (qc khác nhau)
+- [tieu_hao] **Vi mạch** (IC 7432) — 22 ứng viên trùng tên trong DB (qc khác nhau)
+- [tieu_hao] **Vi mạch** (IC 7447) — 22 ứng viên trùng tên trong DB (qc khác nhau)
+- [tieu_hao] **Vi mạch** (IC 7490) — 22 ứng viên trùng tên trong DB (qc khác nhau)
+- [tieu_hao] **Vi mạch** (IC 7486) — 22 ứng viên trùng tên trong DB (qc khác nhau)
+- [tieu_hao] **Vi mạch** (IC 7476) — 22 ứng viên trùng tên trong DB (qc khác nhau)
+- [tieu_hao] **Vi mạch** (IC 74112) — 22 ứng viên trùng tên trong DB (qc khác nhau)
+- [tieu_hao] **Vi mạch** (IC 74138) — 22 ứng viên trùng tên trong DB (qc khác nhau)
+- [tieu_hao] **Vi mạch** (IC 74164) — 22 ứng viên trùng tên trong DB (qc khác nhau)
+- [tieu_hao] **Vi mạch** (IC 4011) — 22 ứng viên trùng tên trong DB (qc khác nhau)
+- [tieu_hao] **Vi mạch** (IC 4013) — 22 ứng viên trùng tên trong DB (qc khác nhau)
+- [tieu_hao] **Vi mạch** (IC 4040) — 22 ứng viên trùng tên trong DB (qc khác nhau)
+- [tieu_hao] **Vi mạch** (IC 7474) — 22 ứng viên trùng tên trong DB (qc khác nhau)
+- [tieu_hao] **Vi mạch** (IC 74148) — 22 ứng viên trùng tên trong DB (qc khác nhau)
+- [tieu_hao] **Vi mạch** (IC 4528) — 22 ứng viên trùng tên trong DB (qc khác nhau)
+- [tieu_hao] **Vi mạch** (ADC0804) — 22 ứng viên trùng tên trong DB (qc khác nhau)
+- [tieu_hao] **Vi mạch** (LM35) — 22 ứng viên trùng tên trong DB (qc khác nhau)
+- [tieu_hao] **Vi mạch** (LM335) — 22 ứng viên trùng tên trong DB (qc khác nhau)
+- [tieu_hao] **Vi mạch** (IC 7912) — 19 ứng viên trùng tên trong DB (qc khác nhau)
+- [tieu_hao] **Vi mạch** (LM337) — 18 ứng viên trùng tên trong DB (qc khác nhau)
+- [tieu_hao] **Vi mạch** (TDA7297) — 18 ứng viên trùng tên trong DB (qc khác nhau)
+- [tieu_hao] **Vi mạch** (PIC 18F4550) — 18 ứng viên trùng tên trong DB (qc khác nhau)
+- [tieu_hao] **Vi mạch** (MAX232) — 18 ứng viên trùng tên trong DB (qc khác nhau)
+- [tieu_hao] **Vi mạch** (IC 9148 (hoặc 2248)) — 18 ứng viên trùng tên trong DB (qc khác nhau)
+- [tieu_hao] **Vi mạch** (IC 9149 (hoặc 2249)) — 18 ứng viên trùng tên trong DB (qc khác nhau)
+- [tieu_hao] **Vi mạch** (IC thu quang IR1838) — 18 ứng viên trùng tên trong DB (qc khác nhau)
+- [tieu_hao] **Vi mạch** (IC74192, chân cắm) — 3 ứng viên trùng tên trong DB (qc khác nhau)
+
+## Chi tiết đổi loại
+_(không có)_
+
+## Chi tiết thêm mới
+_(không có)_
+
+## DB có nhưng không khớp Excel (giữ nguyên, LOẠI MẶC ĐỊNH tieu_hao)
+- #2629 **Băng keo giấy** (20mm) — nganh=1
+- #2634 **Chì hàn** (0.8mm) — nganh=1
+- #2635 **Cos Y 1,5mm** (1,5mm2) — nganh=1
+- #2636 **Cos Y 2,5mm** (2,5mm2) — nganh=1
+- #2637 **Đầu cắm bắp chuối** (4mm) — nganh=1
+- #2638 **Đầu nối F4 chân ren lớn** (∅ 4mm) — nganh=1
+- #2639 **Đầu nối F4 chân ren nhỏ (đuôi chuột)** (∅ 2mm) — nganh=1
+- #2640 **Đầu nối F6 chân ren lớn** (∅ 8mm) — nganh=1
+- #2641 **Đầu nối F6 chân ren** (∅ 6mm) — nganh=1
+- #2642 **Đầu nối T Ф 4mm** (Ф 4mm) — nganh=1
+- #2643 **Đầu nối T Ф 6mm** (Ф 6mm) — nganh=1
+- #2644 **Dây 1.0mm** (450/750v, Cadivi) — nganh=1
+- #2645 **Dây 1.5mm** (450/750v, Cadivi) — nganh=1
+- #2646 **Dây 2.5 mm** (450/750v, Cadivi) — nganh=1
+- #2647 **Dây cáp 1,5mm** (450/750 V) — nganh=1
+- #2648 **Dây cáp 2,5mm** (450/750 V) — nganh=1
+- #2650 **Dây cáp 3Cx2.5mm** (450/750v, Cadivi) — nganh=1
+- #2651 **Dây dẫn 1,5 mm2 màu đỏ** (1,5mm2) — nganh=1
+- #2652 **Dây dẫn 1,5mm2 màu xanh** (1,5mm2) — nganh=1
+- #2653 **Dây điện chịu nhiệt** (2.5mm2) — nganh=1
+- #2654 **Dây đôi 2x32** (450/750v, Cadivi) — nganh=1
+- #2658 **Dây đơn 30/10** (VC3.0mm2) — nganh=1
+- #2661 **Giẻ lau**  — nganh=1
+- #2662 **Jack căm bắp chuối** (∅ 4mm) — nganh=1
+- #2663 **Jack cắm cái** (5A, 3.5mm2) — nganh=1
+- #2664 **Jack cắm đực** (5A, 3.5mm2) — nganh=1
+- #2666 **Máng nhựa xương cá** (25x25mm) — nganh=1
+- #2668 **Nhớt thủy lực(nhớt 10)**  — nganh=1
+- #2670 **Nối T F4** (∅ 4mm) — nganh=1
+- #2671 **Nối T F6** (∅ 6mm) — nganh=1
+- #2672 **Ốc + tán φ4** (20mm) — nganh=1
+- #2673 **Ống Khí Ф 4mm** (Ф 4mm) — nganh=1
+- #2674 **Ống Khí Ф 6mm** (Ф 6mm) — nganh=1
+- #2676 **Pin 1.5V** (1,5V) — nganh=1
+- #2677 **Pin 9V** (Maxell) — nganh=1
+- #2679 **Thanh cài thiết bị** (35mm) — nganh=1
+- #2680 **Vít bắn gỗ 5mm-2cm** (Màu đen (thép)) — nganh=1
+- #2682 **Vít bắn sắt 15mm** (Bake đầu dù) — nganh=1
+- #2684 **Am pe kế xoay chiều** (0-2DCA) — nganh=1
+- #2685 **Ampe kế một chiều** (0-2DCA) — nganh=1
+- #2686 **Bảng điện** (300x200mm, VN) — nganh=1
+- #2688 **Bóng đèn sợi dốt** (220V, 9W) — nganh=1
+- #2690 **Cảm biến từ gắn vào xy lanh**  — nganh=1
+- #2692 **CB 1 pha** (15A) — nganh=1
+- #2693 **CB 3 pha** (15A- 400V) — nganh=1
+- #2694 **Công tắc điện** (10A) — nganh=1
+- #2695 **Công tắc hành trình** (5A) — nganh=1
+- #2702 **Đế nổi** (70x110mm, Sino) — nganh=1
+- #2704 **Đèn báo pha** (D25mm, YongSung) — nganh=1
+- #2707 **Điện trở sứ** (50Ω) — nganh=1
+- #2708 **Đôminô 10 rãnh 15A** (15A) — nganh=1
+- #2709 **Đômino 12 cực** (20A) — nganh=1
+- #2710 **Đômino 4 cực** (20A) — nganh=1
+- #2711 **Đômino 6 cực** (20A) — nganh=1
+- #2712 **Động cơ** (380V, 1500W) — nganh=1
+- #2713 **Đuôi đèn sợi đốt** (Đuôi xoay) — nganh=1
+- #2717 **Mặt 1 lỗ** (Sino) — nganh=1
+- #2718 **Mặt ổ cắm 3 lỗ** (10A, Sino) — nganh=1
+- #2719 **MCCB 1 Pha** (220V/16A) — nganh=1
+- #2720 **MCCB 3 Pha** (380V/16A) — nganh=1
+- #2721 **Nút nhấn** (D25mm, YongSung) — nganh=1
+- #2722 **Nút nhấn 24V** (Ф 25mm) — nganh=1
+- #2723 **Ổ cắm 3 lỗ** (10A, VN) — nganh=1
+- #2729 **Rơle thời gian** (220V/minute) — nganh=1
+- #2731 **Timer** (60S-220V) — nganh=1
+- #2733 **Tụ điện** (22µF) — nganh=1
+- #2734 **Van áp lực 5/2 2 trạng thái** (4 bar) — nganh=1
+- #2735 **Van điện từ 5/2 2 trạng thái** (24VDC) — nganh=1
+- #2738 **VOM** (0-1000V) — nganh=1
+- #2739 **Vôn kế một chiều** (0-50DCV) — nganh=1
+- #2740 **Vôn kế xoay chiều** (0-50DCV) — nganh=1
+- #2742 **Ampe kìm** (0-1000V) — nganh=1
+- #2744 **Nút nhấn dừng khẩn cấp** (220V) — nganh=1
+- #2745 **Công tắc xoay 3 vị trí** (220V) — nganh=1
+- #2746 **Đế cầu chì ống**  — nganh=1
+- #2753 **Led vàng** (5mm) — nganh=2
+- #2754 **Led xanh** (5mm) — nganh=2
+- #2755 **Led đỏ** (5mm) — nganh=2
+- #2761 **PIN AA** (1,5V) — nganh=2
+- #2762 **PIN 9V** (9V) — nganh=2
+- #2763 **Dây cắm testboard** (1 lõi) — nganh=2
+- #2764 **Dây điện đơn mềm** (1.0 mm2) — nganh=2
+- #2766 **Dây cắm testboard đực-đực** (20 cm) — nganh=2
+- #2767 **Dây cắm testboard cái-cái** (20 cm) — nganh=2
+- #2768 **Dây nguồn (phích đúc)** (220V) — nganh=2
+- #2769 **Cầu chì ống** (0.5 A) — nganh=2
+- #2770 **Cầu chì ống (3cm)** (3A) — nganh=2
+- #2771 **Bo đồng (không linh kiện)** (50x60cm2) — nganh=2
+- #2772 **Bo nguồn DVD dùng transistor** ((4x10) cm2 - 1 lớp) — nganh=2
+- #2773 **Bo nguồn DVD dùng IC** ((4x10) cm2 - 1 lớp) — nganh=2
+- #2774 **LCD 1602** (Điện áp 5V, LCD 16x2) — nganh=2
+- #2775 **Mạch nạp Pickit 2** (Pickit 2) — nganh=2
+- #2776 **Module Mạch  Wifi ESP8266** (Thu Phát Wifi ESP8266 NodeMCU Lua - driver CP2102) — nganh=2
+- #2777 **Cảm biến nhiệt độ, độ ẩm DHT22** (3.3-5.5VDC, ngõ ra: digital,) — nganh=2
+- #2778 **Module Relay 4 Kênh** (5V) — nganh=2
+- #2779 **Testboard** (ABS, 830 Lỗ) — nganh=2
+- #2780 **Relay 5 chân** (SRD-12VDC-SL-C) — nganh=2
+- #2781 **Động Cơ DC** (GA25_370 (encoder)) — nganh=2
+- #2782 **Băng keo điện** (Đen, rộng 18mm, dài 18m) — nganh=2
+- #2785 **Đầu cắm búp chuối** (5mm) — nganh=2
+- #2786 **Nút nhấn tròn** (5mm, 2 chân) — nganh=2
+- #2787 **Ống dẫn khí** (φ4) — nganh=2
+- #2789 **Chì hàn (cuộn 100g)** (0,8mm) — nganh=2
+- #2792 **Mũi hàn 0.8mm ( Típ hàn)** (900M-T-0.8D Hakko) — nganh=2
+- #2794 **Bộ cáp nạp chương trình PLC S7-200** (USB-PPI) — nganh=2
+- #2795 **Bộ cáp nạp chương trình PLC S7-300** (USB-MPI) — nganh=2
+- #2796 **Điện trở** (0,47 Ohm; 1W) — nganh=3
+- #2797 **Biến trở volume** (10K; 1/4W) — nganh=3
+- #2798 **Tụ điện** (22pF; 16V) — nganh=3
+- #2799 **Diode** (1N4148) — nganh=3
+- #2800 **Diode zener** (12V; 1/2W) — nganh=3
+- #2801 **Led vàng** (5mm) — nganh=3
+- #2802 **Led xanh** (5mm) — nganh=3
+- #2803 **Led đỏ** (5mm) — nganh=3
+- #2804 **Led 7 đoạn** (A chung) — nganh=3
+- #2805 **Transistor** (A1015) — nganh=3
+- #2806 **SCR** (5P4M) — nganh=3
+- #2807 **Triac** (BTA10_600B) — nganh=3
+- #2808 **Vi mạch** (NE555) — nganh=3
+- #2809 **PIN AA** (1,5V) — nganh=3
+- #2810 **PIN 9V** (9V) — nganh=3
+- #2811 **Dây cắm testboard** (1 lõi) — nganh=3
+- #2812 **Dây điện đơn mềm** (1.0 mm2) — nganh=3
+- #2813 **Cáp USB** (A-B) — nganh=3
+- #2814 **Dây cắm testboard đực-đực** (20 cm) — nganh=3
+- #2815 **Dây cắm testboard cái-cái** (20 cm) — nganh=3
+- #2816 **Dây nguồn (phích đúc)** (220V) — nganh=3
+- #2817 **Cầu chì ống** (0.5 A) — nganh=3
+- #2818 **Cầu chì ống (3cm)** (3A) — nganh=3
+- #2819 **Bo đồng (không linh kiện)** (50x60cm2) — nganh=3
+- #2820 **Bo nguồn DVD dùng transistor** ((4x10) cm2 - 1 lớp) — nganh=3
+- #2821 **Bo nguồn DVD dùng IC** ((4x10) cm2 - 1 lớp) — nganh=3
+- #2822 **LCD 1602** (Điện áp 5V, LCD 16x2) — nganh=3
+- #2823 **Mạch nạp Pickit 2** (Pickit 2) — nganh=3
+- #2824 **Module Mạch  Wifi ESP8266** (Thu Phát Wifi ESP8266 NodeMCU Lua - driver CP2102) — nganh=3
+- #2825 **Cảm biến nhiệt độ, độ ẩm DHT22** (3.3-5.5VDC, ngõ ra: digital,) — nganh=3
+- #2826 **Module Relay 4 Kênh** (5V) — nganh=3
+- #2827 **Testboard** (ABS, 830 Lỗ) — nganh=3
+- #2828 **Relay 5 chân** (SRD-12VDC-SL-C) — nganh=3
+- #2829 **Động Cơ DC** (GA25_370 (encoder)) — nganh=3
+- #2830 **Băng keo điện** (Đen, rộng 18mm, dài 18m) — nganh=3
+- #2831 **Biến thế xung** (11-11Z600) — nganh=3
+- #2832 **Bóng đèn** (24 V/ 21W) — nganh=3
+- #2833 **Đầu cắm búp chuối** (5mm) — nganh=3
+- #2834 **Nút nhấn tròn** (5mm, 2 chân) — nganh=3
+- #2835 **Ống dẫn khí** (φ4) — nganh=3
+- #2836 **Thạnh anh** (20MHZ) — nganh=3
+- #2837 **Chì hàn (cuộn 100g)** (0,8mm) — nganh=3
+- #2838 **Nhựa thông**  — nganh=3
+- #2839 **Thuốc rữa mạch in** (FeCl3) — nganh=3
+- #2840 **Mũi hàn 0.8mm ( Típ hàn)** (900M-T-0.8D Hakko) — nganh=3
+- #2841 **Mũi khoan** (0.8mm) — nganh=3
+- #2842 **Bộ cáp nạp chương trình PLC S7-200** (USB-PPI) — nganh=3
+- #2843 **Bộ cáp nạp chương trình PLC S7-300** (USB-MPI) — nganh=3
+- #2844 **Relay dòng điện** (0.5 ~ 6A; 24 ~ 240VAC/DC) — nganh=4
+- #2845 **Cảm biến nhiệt độ** (-50 đến 520℃) — nganh=4
+- #2846 **Cầu chì nhiệt** (TF = 185oC, 10A-250V) — nganh=4
+- #2847 **Điện trở xả tuyết** ((200-400)W) — nganh=4
+- #2848 **Timer xả tuyết dàn lạnh** ((0-8)h) — nganh=4
+- #2849 **Băng dính cách điện** (1200C.) — nganh=4
+- #2850 **Pin 1,5VDC**  — nganh=4
+- #2851 **Pin  9 VDC**  — nganh=4
+- #2852 **ELCB 1 pha** (30 mA) — nganh=4
+- #2853 **ELCB 3 pha** (300 mA) — nganh=4
+- #2854 **Que hàn hơi** (1/16 x 18 (1,6 mm x 457 mm)) — nganh=4
+- #2855 **Băng dính bạc** (Keo Acryic; 4,8 cm; 25 m.) — nganh=4
+- #2856 **Hàn the hàn đồng** (100gram) — nganh=4
+- #2857 **Bình ga mini**  — nganh=4
+- #2858 **Ống mao** (1 mm) — nganh=4
+- #2859 **Nhớt RL68**  — nganh=4
+- #2860 **Rơ le khởi động cho tủ lạnh**  — nganh=4
+- #2861 **Ti nạp ga**  — nganh=4
+- #2862 **Ống đồng Ø 12** (Ø 11,97 mm, dày 1,2 mm) — nganh=4
+- #2863 **Ống đồng Ø 10** (Ø 9,52 mm, dày 1,1 mm) — nganh=4
+- #2864 **Băng bọc**  — nganh=4
+- #2865 **Gas R32**  — nganh=4
+- #2866 **Gas R22**  — nganh=4
+- #2867 **Gas R410**  — nganh=4
+- #2868 **Gas R134a**  — nganh=4
+- #2869 **Nở sắt 10x60 mm**  — nganh=4
+- #2870 **Nở nhựa 6mm**  — nganh=4
+- #2871 **Vít 6 mm**  — nganh=4
+- #2872 **Nở nhựa 8mm**  — nganh=4
+- #2873 **Vít 8 mm**  — nganh=4
+- #2874 **Ống thoát nước** (18 mm) — nganh=4
+- #2875 **Dây điện đôi** (2 x 2.5 mm2) — nganh=4
+- #2876 **Dây điện đơn** (1,5 mm2) — nganh=4
+- #2906 **Khuôn nhựa quấn MBA** (" (27x36x37)mm  ( 29x 36x39)mm") — nganh=1
+- #2909 **Dây cáp 3x2.5** (Dây cáp 3x2.5) — nganh=1
+- #2910 **Dây cáp 3x2.5+1x1.5** (Dây cáp 3x2.5+1x1.5) — nganh=1
+- #2911 **ray nhôm** (30x1000) — nganh=1
+- #2915 **Đầu cose Y** (2,5mm2) — nganh=1
+- #2916 **Dây đôi** (2x32) — nganh=1
+- #2917 **dây 3x2.5** (dây 3x2.5) — nganh=1
+- #2918 **dây cáp** (3x2.5+1x1.5) — nganh=1
+- #2920 **ray nhom** (30x1000) — nganh=1
+- #2921 **Đầu cốt 2.5mm**  — nganh=1
+- #2922 **Đầu cốt** (2.5mm) — nganh=1
+- #2923 **Dây điện 2x32** (450/750v, Cadivi) — nganh=1
+- #2924 **Băng keo** (20mm) — nganh=1
+- #2925 **Pin 1,5** (AAA) — nganh=1
+- #2926 **Dây rút** (15mmm) — nganh=1
+- #2927 **Dây CV 1.5mm màu trắng** (450/750v, Cadivi) — nganh=1
+- #2928 **Dây CV 1.5mm màu đỏ** (450/750v, Cadivi) — nganh=1
+- #2929 **Dây CV 2.5mm màu xanh** (450/750v, Cadivi) — nganh=1
+- #2930 **Dây CV 2.5mm màu đỏ** (450/750v, Cadivi) — nganh=1
+- #2931 **Dây điện CV** (2.5mm) — nganh=1
+- #2932 **Chĩ đai** (1mm, 200g) — nganh=1
+- #2933 **Đẩu cốt** (2.5mm) — nganh=1
+- #2934 **Cáp chuyển** (USB to RS232) — nganh=2
+- #2935 **Bo Arduino UNO R3** (Uno R3- ATmega328UNO R3) — nganh=2
+- #2936 **Cổng USB ** (Chuẩn B, loại hàn bo xuyên lỗ) — nganh=2
+- #2937 **Cổng COM** (Cổng DB9 loại Female hàn xuyên lỗ) — nganh=2
+- #2938 **Dây cắm testboard đực- cái** (20cm) — nganh=3
+- #2939 **Module 8 led 7 đoạn dùng MAX7219** (Driver MAX7219) — nganh=2
+- #2940 **Dầu thủy lực**  — nganh=3
+- #2941 **Đầu cắm bắp chuối** (2mm) — nganh=2
+- #2942 **Led thu hồng ngoại** (5mm) — nganh=2
+- #2943 **Led phát hồng ngoại** (5mm) — nganh=2
+- #2944 **Transistor thu quang** (Đen, 2 chân) — nganh=2
+- #2945 **Diode thu quang** (Đen, 2 chân) — nganh=2
+- #2946 **Điện trở thu quang** (Cds) — nganh=2
+- #2947 **Điện trở nhiệt âm** (NTC, 50k) — nganh=2
+- #2949 **Điện trở nhiệt dương** (PTC, 50k) — nganh=2
+- #2950 **IC 74192**  — nganh=2
+- #2951 **IC7447**  — nganh=2
+- #2952 **IC74164**  — nganh=2
+- #2953 **IC 7490**  — nganh=2
+- #2954 **Điện trở 1K**  — nganh=2
+- #2955 **Điện trở 100K**  — nganh=2
+- #2956 **tụ 10uf**  — nganh=2
+- #2957 **IC 555**  — nganh=2
+- #2958 **7404**  — nganh=2
+- #2959 **IC 7432**  — nganh=2
+- #2960 **IC 7408**  — nganh=2
+- #2961 **IC 7400**  — nganh=2
+- #2962 **Dây điện tử**  — nganh=2
+- #2963 **transistor A1015**  — nganh=2
+- #2964 **Diode quang**  — nganh=2
+- #2965 **Điện trở 3,3K**  — nganh=2
+- #2966 **Điện trở 2,2K**  — nganh=2
+- #2967 **Điện trở nhiệt âm 50K**  — nganh=2
+- #2968 **Điện trở nhiệt dương 50K**  — nganh=2
+- #2969 **Quang trở CDS**  — nganh=2
+- #2970 **transistor C1815**  — nganh=2
+- #2971 **điện trở trở 100k**  — nganh=2
+- #2972 **tụ 1uf**  — nganh=2
+- #2973 **led xanh dương**  — nganh=2
+- #2974 **tụ 1000uf**  — nganh=2
+- #2975 **tu 10uf**  — nganh=2
+- #2976 **lm7805**  — nganh=2
+- #2977 **lm7905**  — nganh=2
+- #2978 **LM7912**  — nganh=2
+- #2979 **LM 7812**  — nganh=2
+- #2980 **IC LM7805**  — nganh=2
+- #2981 **Bo Arduino UNO R3** (Uno R3- ATmega328UNO R3) — nganh=3
+- #2982 **Chì hàn** (0,8mm, 63% thiếc (Sn) và 37% chì (Pb), 100g) — nganh=3
+- #2983 **Cáp chuyển** (USB to RS232) — nganh=3
+- #2984 **Cổng COM** (Cổng DB9 loại Female hàn xuyên lỗ) — nganh=3
+- #2985 **Cổng USB** (Chuẩn B, loại hàn bo xuyên lỗ) — nganh=3
+- #2986 **Dây đơn mềm** (VCm-0,75mm2, màu đỏ) — nganh=3
+- #2987 **Led phát hồng ngoại** (5mm) — nganh=3
+- #2988 **Led thu hồng ngoại** (5mm) — nganh=3
+- #2989 **Led** (5mm, xanh lá) — nganh=3
+- #2990 **Module 8 led 7 đoạn dùng MAX7219** (Driver MAX7219) — nganh=3
+- #2991 **Module mạch ESP32** (ESP32 NodeMCU LuaNode32 Module Thu Phát Wifi 38 Chân) — nganh=3
+- #2992 **Nút nhấn nhả** (5mm, 2 chân, tròn) — nganh=3
+- #2993 **Quang trở CDS** (GL5528) — nganh=3
+- #2994 **Relay** (Omron, 24VDC, G2R-1-SN,  5 chân) — nganh=3
+- #2995 **Transistor thu quang** (Đen, 2 chân) — nganh=3
+- #2996 **Điện trở nhiệt dương** (PTC MZ6, 2-3K) — nganh=3
+- #2997 **Điện trở nhiệt âm** (NTC,50K, MF52E) — nganh=3
+- #2998 **Đầu cắm Banana Đực** (2mm) — nganh=3
+- #2999 **Jack cắm âm thanh** (3.5mm, 3 nấc: Ground, Right, Left) — nganh=3
+- #3060 **Pin 9VDC** (Panasonic) — nganh=3
+- #3061 **Pin 1,5VDC** (AA) — nganh=3
+- #3064 **Điện trở** (1.5K/0.25W) — nganh=2
+- #3065 **Điện trở ** (4.7K/0.25W) — nganh=2
+- #3066 **Điện trở ** (3.3K/0.25W) — nganh=2
+- #3067 **ĐIện trở** (1.2K/0.25W) — nganh=2
+- #3068 **Điện trở** (1K/0.25W) — nganh=2
+- #3070 **Hàng rào đực đơn** (Khoảng cách chân 2.54mm,40 Chân 1 Hàng, Cao 11.2mm Xuyên Lỗ) — nganh=3
+- #3071 **Vi mạch** (IC 741) — nganh=2
+- #3073 **Diode cầu** (1A/W06G, 4 chân) — nganh=2
+- #3074 **Vi mạch** (IC 4528) — nganh=chung
+- #3075 **Tụ điện phân cực** (100uF;25V) — nganh=2
+- #3076 **Tụ điện phân cực** (1000uF/25V) — nganh=2
+- #3077 **Điện trở** (100K/0.25W) — nganh=2
+- #3078 **Điện trở** (10K/0.25W) — nganh=chung
+- #3079 **Tụ điện phân cực** (10uF;25V) — nganh=2
+- #3080 **Đầu cắm bắp chuối ** (5mm) — nganh=2
+- #3081 **Đầu cắm bắp chuối ** (5mm) — nganh=2
+- #3082 **Vi mạch ** (IC 74LS00) — nganh=2
+- #3083 **Vi mạch ** (IC 74LS90) — nganh=2
+- #3084 **Vi mạch ** (IC 74LS164) — nganh=2
+- #3085 **Vi mạch ** (IC 74LS164) — nganh=2
+- #3086 **Vi mạch ** (IC 74LS112) — nganh=2
+- #3087 **Vi mạch ** (IC 74LS112) — nganh=2
+- #3088 **Vi mạch ** (IC 74LS32) — nganh=chung
+- #3089 **Vi mạch ** (IC 74LS08) — nganh=2
+- #3090 **Vi mạch ** (IC 74LS14) — nganh=2
+- #3091 **Vi mạch ** (IC 74LS02) — nganh=2
+- #3092 **VI MẠCH** (IC 74LS86) — nganh=2
+- #3093 **VI MẠCH** (IC 74LS08) — nganh=2
+- #3094 **VI MẠCH** (IC 74LS04) — nganh=chung
+- #3095 **điện trở ** (1M/0,25W) — nganh=2
+- #3096 **điện trở** (47k/0,25W) — nganh=2
+- #3097 **điện trở** (22k/0,25W) — nganh=2
+- #3098 **điện trở** (15k/0,25W) — nganh=2
+- #3099 **điện trở** (15k/0,25W) — nganh=2
+- #3100 **điện trở** (6,8k/0,25W) — nganh=2
+- #3101 **điện trở** (5,6k/0,25W) — nganh=2
+- #3102 **điện trở** (4,7k/0,25W) — nganh=2
+- #3103 **điện trở** (4,7k/0,25W) — nganh=2
+- #3104 **Điện trở** (470 Ohm/0,25W) — nganh=2
+- #3105 **Điện trở** (390 Ohm/0,25W) — nganh=2
+- #3106 **Điện trở** (220 Ohm/0,25W) — nganh=2
+- #3107 **Điện trở** (100 Ohm/0,25W) — nganh=2
+- #3108 **Vi mạch** (LM7905, Kiểu chân: TO-220 (chân cắm)) — nganh=2
+- #3109 **Vi mạch** (LM7905, Kiểu chân: TO-220 (chân cắm)) — nganh=2
+- #3110 **Vi mạch** (LM7905, Kiểu chân: TO-220 (chân cắm)) — nganh=2
+- #3111 **Điện trở** (56K; 0,25W) — nganh=2
+- #3112 **Điện trở** (47K; 0,25W) — nganh=2
+- #3113 **Điện trở** (470 Ohm; 0,25W) — nganh=2
+- #3115 **Transistor** (A1013) — nganh=2
+- #3116 **Transistor** (D718) — nganh=2
+- #3117 **Transistor** (B688) — nganh=2
+- #3118 **Vi mạch ** (IC 7905) — nganh=2
+- #3121 **Vi mạch ** (IC 741) — nganh=2
+- #3122 **Điện trở** (1.5 MOhm/0.25W) — nganh=2
+- #3123 **Điện trở** (1 MOhm/0.25W) — nganh=2
+- #3124 **Bộ bảo vệ quá tại (rơ le nhiệt)** (10-15A) — nganh=2
+- #3125 **Công tắc tơ** (cuộn dây 220v) — nganh=3
+- #3126 **Công tắc tơ** (cuộn dây 220v) — nganh=3
+- #3127 **Module HC06** (Bluetooth) — nganh=3
+- #3128 **Module I2C cho LCD** (PCF8574) — nganh=3
+- #3129 **Mũi khoan** (Đường kính mũi 0.8mm, Đường kính thân: 3mm) — nganh=3
+- #3130 **Mũi khoan PCB 0.8 mm** (Đường kính mũi: 0.8 mm, Đường kính thân: 3mm) — nganh=3
+- #3131 **Mũi khoan PCB 1.2 mm** (Đường kính mũi: 1.2mm, Đường kính thân: 3mm) — nganh=3
+- #3137 **ống gen cách điện** (phi 1 mm, 60 mm) — nganh=1
+- #3138 **Domino** (10 cầu / 20A) — nganh=1
+- #3139 **Domino** (12 cầu / 20A) — nganh=1
+- #3145 **Đầu cos 1.5** (1.5mm) — nganh=2
+- #3146 **Transitor** (A1013) — nganh=2
+- #3147 **Transitor** (A1013) — nganh=2
+- #3148 **Transitor** (A1013) — nganh=2
+- #3149 **Đầu cắm bắp chuối** (5mm) — nganh=2
+- #3150 **Diode** (Cầu diode; 1A) — nganh=2
+- #3151 **Tụ điện** (100uF; 50V) — nganh=2
+- #3152 **Điện trở** (47K ; 0,25W) — nganh=2
+- #3153 **Điện trở** (56K; 0,25W) — nganh=2
+- #3154 **Vi mạch ** (LM7905, Kiểu chân: TO-220 (chân cắm) ) — nganh=2
+- #3155 **Dây điện** (1.0mm) — nganh=2
+- #3156 **Diode** (Cầu Diode; 1A) — nganh=2
+- #3157 **Diode** (Cầu Diode; 1A) — nganh=2
+- #3160 **Ổ Cắm Điện với Công Tắc Cầu Chì** (4.7x2.7x1.8 cm) — nganh=1
+- #3162 **Tụ điện** (103 , 16V) — nganh=2
+- #3163 **Biến trở volume** (50K , 1/4W) — nganh=2
+- #3164 **Điện trở thu quang** (CDS) — nganh=2
+- #3165 **Điện trở** (1M , 0,25W) — nganh=2
+- #3166 **Điện trở** (22K , 0,25W) — nganh=2
+- #3167 **Điện trở** (15K , 0,25W) — nganh=2
+- #3168 **Điện trở** (6,8K , 0,25W) — nganh=2
+- #3169 **Điện trở** (5,6K , 0,25W) — nganh=2
+- #3170 **Điện trở** (390 Ohm, 0,25W) — nganh=2
+- #3171 **Mặt 01 lỗ** (gắn công tắc hạt) — nganh=1
+- #3172 **mặt ổ cắm 3 lỗ** (10A) — nganh=1
+- #3173 **đèn sợi đốt** (220v-9w) — nganh=2
+- #3174 **đèn led** (60cm; 220V) — nganh=2
+- #3175 **đế nỗi** (119x79) — nganh=2
+- #3176 **đèn led** (60cm; 220V) — nganh=1
+- #3177 **đèn sợi đốt** (đuôi xoay; 220V-9W) — nganh=1
+- #3178 **đế nỗi** (119x79) — nganh=1

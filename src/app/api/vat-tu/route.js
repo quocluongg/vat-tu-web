@@ -55,17 +55,17 @@ export async function POST(request) {
 
         if (Array.isArray(body)) {
             const stmts = body.map(item => ({
-                sql: 'INSERT INTO vat_tu (ten_vat_tu, yeu_cau_ky_thuat, don_vi_tinh, so_luong_kho, ki_id, nganh_id) VALUES (?, ?, ?, ?, ?, ?)',
-                args: [item.ten_vat_tu, item.yeu_cau_ky_thuat || null, item.don_vi_tinh, item.so_luong_kho || 0, item.ki_id, item.nganh_id || null]
+                sql: 'INSERT INTO vat_tu (ten_vat_tu, yeu_cau_ky_thuat, don_vi_tinh, so_luong_kho, ki_id, nganh_id, loai_vat_tu) VALUES (?, ?, ?, ?, ?, ?, ?)',
+                args: [item.ten_vat_tu, item.yeu_cau_ky_thuat || null, item.don_vi_tinh, item.so_luong_kho || 0, item.ki_id, item.nganh_id || null, item.loai_vat_tu || 'tieu_hao']
             }));
             await db.batch(stmts, "write");
             return NextResponse.json({ message: `Thêm ${body.length} vật tư thành công` });
         }
 
-        const { ten_vat_tu, yeu_cau_ky_thuat, don_vi_tinh, so_luong_kho, ki_id, nganh_id } = body;
+        const { ten_vat_tu, yeu_cau_ky_thuat, don_vi_tinh, so_luong_kho, ki_id, nganh_id, loai_vat_tu } = body;
         const result = await db.execute({
-            sql: 'INSERT INTO vat_tu (ten_vat_tu, yeu_cau_ky_thuat, don_vi_tinh, so_luong_kho, ki_id, nganh_id) VALUES (?, ?, ?, ?, ?, ?)',
-            args: [ten_vat_tu, yeu_cau_ky_thuat || null, don_vi_tinh, so_luong_kho || 0, ki_id, nganh_id || null]
+            sql: 'INSERT INTO vat_tu (ten_vat_tu, yeu_cau_ky_thuat, don_vi_tinh, so_luong_kho, ki_id, nganh_id, loai_vat_tu) VALUES (?, ?, ?, ?, ?, ?, ?)',
+            args: [ten_vat_tu, yeu_cau_ky_thuat || null, don_vi_tinh, so_luong_kho || 0, ki_id, nganh_id || null, loai_vat_tu || 'tieu_hao']
         });
 
         return NextResponse.json({ id: Number(result.lastInsertRowid), message: 'Thêm vật tư thành công' });
@@ -77,10 +77,10 @@ export async function POST(request) {
 export async function PUT(request) {
     try {
         const db = getDb();
-        const { id, ten_vat_tu, yeu_cau_ky_thuat, don_vi_tinh, so_luong_kho, nganh_id } = await request.json();
+        const { id, ten_vat_tu, yeu_cau_ky_thuat, don_vi_tinh, so_luong_kho, nganh_id, loai_vat_tu } = await request.json();
         await db.execute({
-            sql: 'UPDATE vat_tu SET ten_vat_tu = ?, yeu_cau_ky_thuat = ?, don_vi_tinh = ?, so_luong_kho = ?, nganh_id = ? WHERE id = ?',
-            args: [ten_vat_tu, yeu_cau_ky_thuat || null, don_vi_tinh, so_luong_kho || 0, nganh_id || null, id]
+            sql: 'UPDATE vat_tu SET ten_vat_tu = ?, yeu_cau_ky_thuat = ?, don_vi_tinh = ?, so_luong_kho = ?, nganh_id = ?, loai_vat_tu = ? WHERE id = ?',
+            args: [ten_vat_tu, yeu_cau_ky_thuat || null, don_vi_tinh, so_luong_kho || 0, nganh_id || null, loai_vat_tu || 'tieu_hao', id]
         });
         return NextResponse.json({ message: 'Cập nhật thành công' });
     } catch (error) {

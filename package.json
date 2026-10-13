@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "clasp-login": "clasp login",
+    "push": "clasp push -f"
   },
   "dependencies": {
     "@libsql/client": "^0.17.0",
@@ -24,6 +26,7 @@
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
+    "@google/clasp": "^3.4.1",
     "eslint": "^9",
     "eslint-config-next": "16.1.6"
   }

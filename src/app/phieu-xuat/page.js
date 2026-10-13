@@ -4,7 +4,9 @@ import Link from 'next/link';
 import {
     ArrowLeft, User, BookOpen, FileOutput, Plus, Minus, Send, CheckCircle,
     Download, Package, AlertCircle, ChevronDown, Clock, Inbox,
+    Wrench, ClipboardList, Search, Users, Printer,
 } from 'lucide-react';
+import { buildBienBanHTML } from '@/lib/printBienBan';
 
 export default function PhieuXuatPublicPage() {
     const [kiHocs, setKiHocs] = useState([]);
@@ -27,6 +29,15 @@ export default function PhieuXuatPublicPage() {
     const [dataLoading, setDataLoading] = useState(false);
     const [showAllSlips, setShowAllSlips] = useState(false);
     const [toast, setToast] = useState(null); // { type, message }
+    // Repair (sửa chữa) tab
+    const [activeTab, setActiveTab] = useState('tieu_hao'); // tieu_hao | sua_che
+    const [repairItems, setRepairItems] = useState({}); // { chi_tiet_id: soLuong }
+    const [repairConditions, setRepairConditions] = useState({}); // { chi_tiet_id: tinh_trang }
+    const [repairTinhHinh, setRepairTinhHinh] = useState(''); // C/1 Tình hình (tùy chọn, trống = tự ghép từ tình trạng từng vật tư)
+    const [bienBans, setBienBans] = useState([]);
+    const [creatingBB, setCreatingBB] = useState(false);
+    const [printingBB, setPrintingBB] = useState(false);
+    const [repairFilter, setRepairFilter] = useState('');
 
     // Auto-dismiss toast
     useEffect(() => {
@@ -47,6 +58,15 @@ export default function PhieuXuatPublicPage() {
             setInitLoading(false);
         }).catch(() => setInitLoading(false));
     }, []);
+
+    useEffect(() => {
+        if (selectedKi && selectedGv) {
+            fetch(`/api/bien-ban?ki_id=${selectedKi}&giao_vien_id=${selectedGv}`)
+                .then(r => r.json())
+                .then(d => setBienBans(Array.isArray(d) ? d : []))
+                .catch(() => setBienBans([]));
+        }
+    }, [selectedKi, selectedGv, activeTab]);
 
     useEffect(() => {
         if (selectedKi && selectedGv) {
@@ -100,6 +120,10 @@ export default function PhieuXuatPublicPage() {
     const handleCreatePhieu = () => {
         setMode('create');
         setExportItems({});
+        setRepairItems({});
+        setRepairConditions({});
+        setRepairTinhHinh('');
+        setActiveTab('tieu_hao');
         setSubmitted(false);
         setError('');
         setExpandedClass({});
@@ -142,9 +166,116 @@ export default function PhieuXuatPublicPage() {
         });
     };
 
+    // ---- Repair (sửa chữa) helpers (vật tư từ đề xuất đã nộp, key = chi_tiet id) ----
+    const updateRepairQty = (ctId, value, maxQty) => {
+        const val = value === '' ? '' : Math.max(0, Math.min(parseInt(value) || 0, maxQty));
+        setRepairItems(prev => {
+            if (val === '' || val === 0) {
+                const { [ctId]: _, ...rest } = prev;
+                return rest;
+            }
+            return { ...prev, [ctId]: val };
+        });
+    };
+
+    const handleCreateRepairBB = async () => {
+        const selected = repairEntries
+            .map(([ctId, qty]) => ({ ct: repairRowById[ctId], qty: parseInt(qty) || 0 }))
+            .filter(s => s.ct && s.qty > 0);
+        if (selected.length === 0) {
+            setToast({ type: 'error', message: 'Chọn ít nhất một vật tư sửa chữa' });
+            return;
+        }
+        const missing = selected.find(s => !(repairConditions[s.ct.id] || '').trim());
+        if (missing) {
+            setToast({ type: 'error', message: `Nhập tình trạng cho vật tư "${missing.ct.ten_vat_tu || 'đã chọn'}"` });
+            return;
+        }
+        const tenThietBi = [...new Set(selected.map(s => (s.ct.ten_vat_tu || '').trim()).filter(Boolean))].join(', ')
+            || 'Vật tư sửa chữa';
+        setCreatingBB(true);
+        try {
+            const lopNames = [...new Set(selected.map(s => s.ct.ten_lop).filter(Boolean))].join(', ');
+            // C/1 Tình hình: ưu tiên nội dung giáo viên nhập, trống thì tự ghép từ tình trạng từng vật tư
+            const tomTatTinhTrang = selected.map(s =>
+                `- ${s.ct.ten_vat_tu || 'Vật tư'} (${s.qty} ${s.ct.don_vi_tinh || ''}): ${(repairConditions[s.ct.id] || '').trim()}`
+            ).join('\n');
+            const tinhHinh = (repairTinhHinh || '').trim() || tomTatTinhTrang;
+            const tenGV = giaoViens.find(g => g.id === parseInt(selectedGv))?.ho_ten
+                || deXuatDetail?.ten_gv || '';
+            const thanhPhanAuto = [
+                tenGV ? `- Ông (bà) ${tenGV} — Người lập biên bản` : null,
+                `- Ông (bà) .............................................. Chức vụ: Đại diện Khoa Điện – Điện tử`,
+                tenGV ? `- Ông (bà) ${tenGV} — Người sử dụng` : `- Ông (bà) .............................................. Chức vụ: Người sử dụng`,
+            ].filter(Boolean).join('\n');
+            const res = await fetch('/api/bien-ban', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    ngay_lap: new Date().toISOString().slice(0, 10),
+                    gio_lap: new Date().toTimeString().slice(0, 5),
+                    ki_id: parseInt(selectedKi),
+                    giao_vien_id: parseInt(selectedGv),
+                    thanh_phan: thanhPhanAuto,
+                    ten_thiet_bi: tenThietBi,
+                    phong_khoa: 'Khoa Điện – Điện tử',
+                    dia_diem: null,
+                    nguoi_su_dung: tenGV || null,
+                    nguoi_phat_hien: tenGV || null,
+                    hien_tuong_hu_hong: tomTatTinhTrang,
+                    tinh_hinh: tinhHinh,
+                    ghi_chu: lopNames ? `Lớp: ${lopNames}` : null,
+                    vat_tu_list: selected.map(s => ({
+                        ten: s.ct.ten_vat_tu || '',
+                        dvt: s.ct.don_vi_tinh || '',
+                        so_luong: s.qty,
+                        don_gia: 0,
+                        ghi_chu: (repairConditions[s.ct.id] || '').trim(),
+                    })),
+                }),
+            });
+            const data = await res.json();
+            if (!res.ok) {
+                setToast({ type: 'error', message: data.error || 'Lỗi lập biên bản' });
+                return;
+            }
+            const bbRes = await fetch(`/api/bien-ban?ki_id=${selectedKi}&giao_vien_id=${selectedGv}`);
+            const bbList = await bbRes.json();
+            setBienBans(Array.isArray(bbList) ? bbList : []);
+            setRepairItems({});
+            setRepairConditions({});
+            setRepairTinhHinh('');
+            setToast({ type: 'success', message: `Đã lập biên bản #${data.id} — chờ quản lý duyệt` });
+        } catch {
+            setToast({ type: 'error', message: 'Không thể kết nối đến server' });
+        }
+        setCreatingBB(false);
+    };
+
+    const handlePrintBienBan = async (bbId) => {
+        if (!bbId) return;
+        setPrintingBB(true);
+        try {
+            const bb = await fetch(`/api/bien-ban?id=${bbId}`).then(r => r.json());
+            if (bb.error) {
+                setToast({ type: 'error', message: bb.error });
+                return;
+            }
+            const html = buildBienBanHTML(bb);
+            const printWindow = window.open('', '_blank');
+            printWindow.document.write(html);
+            printWindow.document.close();
+            printWindow.onload = () => printWindow.print();
+        } catch {
+            setToast({ type: 'error', message: 'Không thể tải biên bản để in' });
+        }
+        setPrintingBB(false);
+    };
+
     const handleSubmitPhieu = async () => {
-        if (Object.keys(exportItems).length === 0) {
-            setError('Vui lòng chọn ít nhất một vật tư');
+        const hasTieuHao = Object.keys(exportItems).length > 0;
+
+        if (!hasTieuHao) {
             setToast({ type: 'error', message: 'Vui lòng chọn ít nhất một vật tư' });
             return;
         }
@@ -174,7 +305,8 @@ export default function PhieuXuatPublicPage() {
         setError('');
 
         try {
-            // Create one phieu for each class and subject combination
+            let totalCreated = 0;
+            // Create one phieu for each class and subject combination (tiêu hao)
             for (const group of Object.values(groupedByLopAndMon)) {
                 const chiTiet = Object.entries(group.items).map(([vtId, soLuong]) => ({
                     vat_tu_id: parseInt(vtId),
@@ -200,9 +332,11 @@ export default function PhieuXuatPublicPage() {
                     setSubmitting(false);
                     return;
                 }
+                const created = await res.json();
+                totalCreated += created.phieus?.length || 1;
             }
 
-            setCreatedCount(Object.keys(groupedByLopAndMon).length);
+            setCreatedCount(totalCreated);
             setSubmitted(true);
             setToast({ type: 'success', message: 'Đã gửi phiếu xuất thành công' });
             // Refresh data
@@ -270,7 +404,7 @@ export default function PhieuXuatPublicPage() {
                             <th style="border: 1px solid #000; padding: 5px; text-align: center;">Tên vật tư</th>
                             <th style="border: 1px solid #000; padding: 5px; text-align: center; width: 120px;">Mã(hiệu)</th>
                             <th style="border: 1px solid #000; padding: 5px; width: 60px; text-align: center;">ĐVT</th>
-                            <th style="border: 1px solid #000; padding: 5px; width: 80px; text-align: center;">Số lượng</th>
+                            <th style="border: 1px solid #000; padding: 5px; text-align: center; width: 80px;">Số lượng</th>
                             <th style="border: 1px solid #000; padding: 5px; text-align: center; width: 150px;">Ghi chú</th>
                         </tr>
                     </thead>
@@ -412,18 +546,18 @@ export default function PhieuXuatPublicPage() {
 
     const visibleSlips = (() => {
         if (showAllSlips || !selectedMon) return phieuXuats;
-        return phieuXuats.filter(px => px.mon_hoc_id === parseInt(selectedMon));
+        return phieuXuats?.filter(px => px.mon_hoc_id === parseInt(selectedMon));
     })();
 
     const slipStats = {
-        cho_duyet: phieuXuats.filter(px => px.trang_thai === 'cho_duyet').length,
-        da_ky: phieuXuats.filter(px => px.trang_thai === 'da_ky').length,
-        da_xuat: phieuXuats.filter(px => px.trang_thai === 'da_xuat').length,
+        cho_duyet: phieuXuats?.filter(px => px.trang_thai === 'cho_duyet').length,
+        da_ky: phieuXuats?.filter(px => px.trang_thai === 'da_ky').length,
+        da_xuat: phieuXuats?.filter(px => px.trang_thai === 'da_xuat').length,
     };
 
     const selectedEntries = Object.entries(exportItems).filter(([, q]) => q !== '' && q > 0);
     const totalSelectedItems = selectedEntries.length;
-    const totalSelectedQty = selectedEntries.reduce((sum, [, q]) => sum + (parseInt(q) || 0), 0);
+    const repairEntries = Object.entries(repairItems).filter(([, q]) => q !== '' && q > 0);
 
     const classGroups = (() => {
         if (!deXuatDetail?.chi_tiet) return [];
@@ -447,18 +581,44 @@ export default function PhieuXuatPublicPage() {
             .filter(cls => cls.hasItems);
     })();
 
+    // Nhóm vật tư sửa chữa theo lớp từ đề xuất đã nộp (mirror tab tiêu hao)
+    const repairGroups = (() => {
+        const q = repairFilter.trim().toLowerCase();
+        return classGroups
+            .map(cls => ({
+                ...cls,
+                items: cls.items.filter(ct =>
+                    (ct.loai_vat_tu || 'tieu_hao') === 'sua_che' &&
+                    (!q
+                        || (ct.ten_vat_tu || '').toLowerCase().includes(q)
+                        || (ct.yeu_cau_ky_thuat || '').toLowerCase().includes(q)))
+            }))
+            .filter(cls => cls.items.length > 0);
+    })();
+
+    const repairRowById = {};
+    repairGroups.forEach(cls => cls.items.forEach(ct => { repairRowById[ct.id] = ct; }));
+
+    const hasAnySuaChe = (deXuatDetail?.chi_tiet || []).some(ct => (ct.loai_vat_tu || 'tieu_hao') === 'sua_che');
+
     // Render ---------------------------------------------------------------
+    const appbar = (
+        <div className="tx-appbar">
+            <Link href="/giao-vien" className="tx-appbar-btn" aria-label="Quay lại"><ArrowLeft size={20} /></Link>
+            <div className="tx-appbar-heading">
+                <span className="tx-appbar-title">Phiếu xuất vật tư</span>
+                {currentKi && (
+                    <span className="tx-appbar-sub">{currentKi.ten_ki} · {currentKi.nam_hoc}</span>
+                )}
+            </div>
+        </div>
+    );
 
     if (initLoading) {
         return (
             <div className="public-page tx-shell">
-                <div className="tx-appbar">
-                    <Link href="/giao-vien" className="tx-appbar-btn" aria-label="Quay lại"><ArrowLeft size={20} /></Link>
-                    <span className="tx-appbar-title">Phiếu xuất vật tư</span>
-                </div>
-                <div className="tx-skel" style={{ height: 72, marginBottom: 16 }} />
-                <div className="tx-skel" style={{ height: 56, marginBottom: 24 }} />
-                <div className="tx-skel" style={{ height: 120, marginBottom: 12 }} />
+                {appbar}
+                <div className="tx-skel" style={{ height: 200, marginBottom: 16 }} />
                 <div className="tx-skel" style={{ height: 120, marginBottom: 12 }} />
                 <div className="tx-skel" style={{ height: 120 }} />
             </div>
@@ -468,19 +628,14 @@ export default function PhieuXuatPublicPage() {
     if (kiHocs.length === 0) {
         return (
             <div className="public-page tx-shell">
-                <div className="tx-appbar">
-                    <Link href="/giao-vien" className="tx-appbar-btn" aria-label="Quay lại"><ArrowLeft size={20} /></Link>
-                    <span className="tx-appbar-title">Phiếu xuất vật tư</span>
-                </div>
-                <div className="card" style={{ marginTop: 24 }}>
-                    <div className="empty-state">
-                        <FileOutput size={48} />
-                        <h3>Chưa có kỳ hoạt động</h3>
-                        <p>Kỳ học chưa ở trạng thái hoạt động để tạo phiếu xuất.</p>
-                        <Link href="/giao-vien" className="btn btn-secondary" style={{ marginTop: 16 }}>
-                            <ArrowLeft size={16} /> Về cổng giáo viên
-                        </Link>
-                    </div>
+                {appbar}
+                <div className="tx-empty" style={{ marginTop: 24 }}>
+                    <FileOutput size={40} />
+                    <h3>Chưa có kỳ hoạt động</h3>
+                    <p>Kỳ học chưa mở để tạo phiếu xuất.</p>
+                    <Link href="/giao-vien" className="btn btn-secondary" style={{ marginTop: 14 }}>
+                        <ArrowLeft size={16} /> Về cổng giáo viên
+                    </Link>
                 </div>
             </div>
         );
@@ -488,41 +643,28 @@ export default function PhieuXuatPublicPage() {
 
     return (
         <div className="public-page tx-shell">
-            {/* Sticky app bar */}
-            <div className="tx-appbar">
-                <Link href="/giao-vien" className="tx-appbar-btn" aria-label="Quay lại"><ArrowLeft size={20} /></Link>
-                <div className="tx-appbar-heading">
-                    <span className="tx-appbar-title">Phiếu xuất vật tư</span>
-                    {currentKi && (
-                        <span className="tx-appbar-sub">{currentKi.ten_ki} • {currentKi.nam_hoc}</span>
-                    )}
-                </div>
-            </div>
+            {appbar}
 
-            {/* Step 1: teacher */}
+            {/* Step 1: teacher picker */}
             {!selectedGv ? (
-                <div className="card tx-intro-card">
-                    <div className="card-body">
-                        <h2 className="tx-intro-title"><User size={20} /> Bạn là giáo viên nào?</h2>
-                        <p className="tx-intro-text">Chọn tên của bạn để xem đề xuất và tạo phiếu xuất vật tư.</p>
-                        <div className="tx-field">
-                            <User size={18} className="tx-field-icon" />
-                            <select
-                                className="form-select tx-big-select"
-                                value={selectedGv}
-                                onChange={e => setSelectedGv(e.target.value)}
-                            >
-                                <option value="">-- Chọn giáo viên --</option>
-                                {giaoViens.map(gv => <option key={gv.id} value={gv.id}>{gv.ho_ten}</option>)}
-                            </select>
-                        </div>
-                    </div>
+                <div className="tx-pick">
+                    <div className="tx-pick-icon"><Users size={24} /></div>
+                    <div className="tx-pick-title">Bạn là giáo viên nào?</div>
+                    <div className="tx-pick-sub">Chọn tên để xem đề xuất và tạo phiếu xuất.</div>
+                    <select
+                        className="tx-pick-select"
+                        value={selectedGv}
+                        onChange={e => setSelectedGv(e.target.value)}
+                    >
+                        <option value="">-- Chọn giáo viên --</option>
+                        {giaoViens.map(gv => <option key={gv.id} value={gv.id}>{gv.ho_ten}</option>)}
+                    </select>
                 </div>
             ) : (
                 <>
                     {/* Selected teacher pill */}
                     <div className="tx-gv-pill">
-                        <div className="tx-gv-avatar"><User size={20} /></div>
+                        <div className="tx-gv-avatar"><User size={18} /></div>
                         <div className="tx-gv-info">
                             <span className="tx-gv-name">{currentGv?.ho_ten || 'Giáo viên'}</span>
                             <span className="tx-gv-label">Đang xem phiếu xuất</span>
@@ -532,48 +674,45 @@ export default function PhieuXuatPublicPage() {
                         </button>
                     </div>
 
-                    {/* Step 2: subject chips */}
+                    {/* Subject select */}
                     {dataLoading && subjectList.length === 0 && (
                         <div className="tx-skel" style={{ height: 44, marginBottom: 16 }} />
                     )}
                     {!dataLoading && subjectList.length > 0 && (
                         <div className="tx-block">
-                            <div className="tx-block-label"><BookOpen size={14} /> Môn học</div>
-                            <div className="tx-chips">
-                                {subjectList.map(m => (
-                                    <button
-                                        key={m.id}
-                                        className={`tx-chip ${selectedMon === m.id.toString() ? 'active' : ''}`}
-                                        onClick={() => { setSelectedMon(m.id.toString()); setMode('view'); setShowAllSlips(false); }}
-                                    >
-                                        {m.name}
-                                        <span className="tx-chip-count">{m.count}</span>
-                                    </button>
-                                ))}
+                            <div className="tx-label"><BookOpen size={13} /> Môn học</div>
+                            <div className="tx-select-row">
+                                <select
+                                    className="form-select"
+                                    value={selectedMon}
+                                    onChange={e => { setSelectedMon(e.target.value); setMode('view'); setShowAllSlips(false); }}
+                                >
+                                    {subjectList.map(m => (
+                                        <option key={m.id} value={m.id}>{m.name} ({m.count} vật tư)</option>
+                                    ))}
+                                </select>
                             </div>
                         </div>
                     )}
 
                     {/* No proposal yet */}
                     {!dataLoading && deXuats.length === 0 && (
-                        <div className="card">
-                            <div className="empty-state">
-                                <Inbox size={48} />
-                                <h3>Chưa có đề xuất vật tư</h3>
-                                <p>Bạn cần nộp đề xuất dự trù trước khi tạo phiếu xuất.</p>
-                                <Link href="/de-xuat" className="btn btn-primary" style={{ marginTop: 16 }}>
-                                    <Plus size={16} /> Tạo đề xuất ngay
-                                </Link>
-                            </div>
+                        <div className="tx-empty">
+                            <Inbox size={40} />
+                            <h3>Chưa có đề xuất vật tư</h3>
+                            <p>Bạn cần nộp đề xuất dự trù trước khi tạo phiếu xuất.</p>
+                            <Link href="/de-xuat" className="btn btn-primary" style={{ marginTop: 14 }}>
+                                <Plus size={16} /> Tạo đề xuất
+                            </Link>
                         </div>
                     )}
 
                     {/* Loading data */}
                     {dataLoading && subjectList.length > 0 && (
                         <>
-                            <div className="tx-skel" style={{ height: 84, marginBottom: 12 }} />
-                            <div className="tx-skel" style={{ height: 84, marginBottom: 12 }} />
-                            <div className="tx-skel" style={{ height: 84 }} />
+                            <div className="tx-skel" style={{ height: 80, marginBottom: 12 }} />
+                            <div className="tx-skel" style={{ height: 80, marginBottom: 12 }} />
+                            <div className="tx-skel" style={{ height: 80 }} />
                         </>
                     )}
 
@@ -583,15 +722,15 @@ export default function PhieuXuatPublicPage() {
                             {phieuXuats.length > 0 && (
                                 <div className="tx-stats">
                                     <div className="tx-stat">
-                                        <div className="tx-stat-num" style={{ color: '#fbbf24' }}>{slipStats.cho_duyet}</div>
+                                        <div className="tx-stat-num">{slipStats.cho_duyet}</div>
                                         <div className="tx-stat-label">Chờ duyệt</div>
                                     </div>
                                     <div className="tx-stat">
-                                        <div className="tx-stat-num" style={{ color: '#60a5fa' }}>{slipStats.da_ky}</div>
+                                        <div className="tx-stat-num">{slipStats.da_ky}</div>
                                         <div className="tx-stat-label">Đã ký</div>
                                     </div>
                                     <div className="tx-stat">
-                                        <div className="tx-stat-num" style={{ color: '#34d399' }}>{slipStats.da_xuat}</div>
+                                        <div className="tx-stat-num">{slipStats.da_xuat}</div>
                                         <div className="tx-stat-label">Đã xuất</div>
                                     </div>
                                 </div>
@@ -601,7 +740,7 @@ export default function PhieuXuatPublicPage() {
                                 <>
                                     {/* Slip list */}
                                     <div className="tx-section">
-                                        <h2><FileOutput size={18} /> Phiếu xuất của bạn</h2>
+                                        <h2><FileOutput size={17} /> Phiếu xuất của bạn</h2>
                                         {selectedMon && phieuXuats.length > 0 && (
                                             <button className="tx-link-btn" onClick={() => setShowAllSlips(v => !v)}>
                                                 {showAllSlips ? 'Chỉ môn này' : `Tất cả (${phieuXuats.length})`}
@@ -610,37 +749,46 @@ export default function PhieuXuatPublicPage() {
                                     </div>
 
                                     {visibleSlips.length === 0 ? (
-                                        <div className="card">
-                                            <div className="empty-state" style={{ padding: '36px 20px' }}>
-                                                <Inbox size={40} />
-                                                <h3>Chưa có phiếu xuất nào</h3>
-                                                <p>Phiếu đã tạo sẽ hiển thị tại đây theo trạng thái.</p>
-                                            </div>
+                                        <div className="tx-empty" style={{ padding: '28px 16px' }}>
+                                            <Inbox size={34} />
+                                            <h3>Chưa có phiếu xuất nào</h3>
+                                            <p>Phiếu đã tạo sẽ hiển thị tại đây.</p>
                                         </div>
                                     ) : (
                                         <div>
                                             {visibleSlips.map(px => {
                                                 const canPrint = px.trang_thai === 'da_ky' || px.trang_thai === 'da_xuat';
                                                 const st = statusLabels[px.trang_thai] || {};
+                                                const isSuaChe = px.loai_vat_tu === 'sua_che';
                                                 return (
-                                                    <div key={px.id} className="tx-slip">
+                                                    <div key={px.id} className={`tx-slip ${isSuaChe ? 'tx-slip-repair' : ''}`}>
                                                         <div className="tx-slip-top">
                                                             <span className="tx-slip-code">PX-{String(px.id).padStart(4, '0')}</span>
-                                                            <span className={`badge ${st.badge}`}>{st.label}</span>
+                                                            <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                                                                {isSuaChe && (
+                                                                    <span className="badge badge-danger" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                                                                        <Wrench size={12} /> Sửa chữa
+                                                                    </span>
+                                                                )}
+                                                                <span className={`badge ${st.badge}`}>{st.label}</span>
+                                                            </div>
                                                         </div>
-                                                        <div className="tx-slip-title">{px.ten_mon}{px.ten_lop ? ` • ${px.ten_lop}` : ''}</div>
+                                                        <div className="tx-slip-title">{px.ten_mon}{px.ten_lop ? ` · ${px.ten_lop}` : ''}</div>
                                                         <div className="tx-slip-meta">
-                                                            <span><Package size={13} /> {px.so_vat_tu} vật tư • {px.tong_so_luong} đơn vị</span>
+                                                            <span><Package size={13} /> {px.so_vat_tu} vật tư · {px.tong_so_luong} đơn vị</span>
                                                             <span><Clock size={13} /> {new Date(px.ngay_tao).toLocaleDateString('vi-VN')}</span>
+                                                            {isSuaChe && (
+                                                                <span><ClipboardList size={13} /> BB {px.so_bien_ban || `#${px.bien_ban_id}`}</span>
+                                                            )}
                                                         </div>
                                                         <div className="tx-slip-actions">
                                                             <button
-                                                                className={`btn ${canPrint ? 'btn-primary' : 'btn-secondary'} btn-full`}
+                                                                className={`btn ${canPrint ? 'btn-primary' : 'btn-secondary'}`}
                                                                 onClick={() => generatePDF(px)}
                                                                 disabled={!canPrint}
                                                             >
                                                                 <Download size={16} />
-                                                                {canPrint ? 'Tải phiếu in' : (px.trang_thai === 'tu_choi' ? 'Bị từ chối' : 'Chờ kho ký duyệt')}
+                                                                {canPrint ? 'Tải phiếu in' : (px.trang_thai === 'tu_choi' ? 'Bị từ chối' : 'Chờ kho duyệt')}
                                                             </button>
                                                         </div>
                                                     </div>
@@ -652,14 +800,35 @@ export default function PhieuXuatPublicPage() {
                                     {/* Create CTA */}
                                     {deXuats.length > 0 && (
                                         <button className="tx-cta" onClick={handleCreatePhieu}>
-                                            <span className="tx-cta-icon"><Plus size={22} /></span>
+                                            <span className="tx-cta-icon"><Plus size={20} /></span>
                                             <span className="tx-cta-text">
-                                                <strong>Tạo phiếu xuất mới</strong>
-                                                <small>Chọn vật tư theo lớp từ đề xuất đã duyệt</small>
+                                                <strong>Tạo phiếu / biên bản mới</strong>
+                                                <small>Tiêu hao duyệt bằng phiếu xuất · Sửa chữa duyệt bằng biên bản</small>
                                             </span>
-                                            <ChevronDown size={20} style={{ transform: 'rotate(-90deg)' }} />
+                                            <ChevronDown size={20} style={{ transform: 'rotate(-90deg)', flexShrink: 0 }} />
                                         </button>
                                     )}
+                                    {/* Biên bản sửa chữa của bạn (duyệt thay phiếu xuất) */}
+                                    {bienBans.length > 0 && (
+                                        <div className="tx-section" style={{ marginTop: 18 }}>
+                                            <h2><ClipboardList size={17} /> Biên bản sửa chữa ({bienBans.length})</h2>
+                                        </div>
+                                    )}
+                                    {bienBans.map(bb => (
+                                        <div className="tx-bb-row" key={`view-bb-${bb.id}`}>
+                                            <div className="tx-bb-row-info">
+                                                <strong>#{bb.id} {bb.ten_thiet_bi || 'Biên bản sửa chữa'}</strong>
+                                                <span className={`tx-bb-status ${bb.trang_thai}`}>
+                                                    {{ cho_duyet: 'Chờ duyệt', da_duyet: 'Đã duyệt', tu_choi: 'Từ chối' }[bb.trang_thai] || bb.trang_thai}{bb.ngay_lap ? ` • ${bb.ngay_lap}` : ''}
+                                                </span>
+                                            </div>
+                                            {bb.trang_thai === 'da_duyet' && (
+                                                <button className="btn btn-secondary btn-sm" onClick={() => handlePrintBienBan(bb.id)} disabled={printingBB}>
+                                                    <Printer size={15} /> In
+                                                </button>
+                                            )}
+                                        </div>
+                                    ))}
                                 </>
                             )}
 
@@ -667,133 +836,325 @@ export default function PhieuXuatPublicPage() {
                             {mode === 'create' && !submitted && (
                                 <div>
                                     <div className="tx-section">
-                                        <h2><Package size={18} /> Chọn vật tư xuất</h2>
+                                        <h2><Package size={17} /> Tạo phiếu xuất</h2>
                                         <button className="tx-link-btn" onClick={() => setMode('view')}>Hủy</button>
                                     </div>
-                                    <p className="tx-hint">
-                                        Môn <strong>{subjectList.find(m => m.id.toString() === selectedMon)?.name}</strong> —
-                                        nhấn &ldquo;Chọn đủ&rdquo; để lấy hết định mức của lớp.
-                                    </p>
+
+                                    {/* Tab: tiêu hao vs sửa chữa */}
+                                    <div className="tx-tabs">
+                                        <button
+                                            className={`tx-tab ${activeTab === 'tieu_hao' ? 'active' : ''}`}
+                                            onClick={() => setActiveTab('tieu_hao')}
+                                        >
+                                            <Package size={16} /> Tiêu hao
+                                            {totalSelectedItems > 0 && <span className="tx-tab-count">{totalSelectedItems}</span>}
+                                        </button>
+                                        <button
+                                            className={`tx-tab ${activeTab === 'sua_che' ? 'active' : ''}`}
+                                            onClick={() => setActiveTab('sua_che')}
+                                        >
+                                            <Wrench size={16} /> Sửa chữa
+                                            {repairEntries.length > 0 && <span className="tx-tab-count">{repairEntries.length}</span>}
+                                        </button>
+                                    </div>
 
                                     {error && (
-                                        <div className="alert alert-error" style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
-                                            <AlertCircle size={18} /> {error}
+                                        <div className="alert alert-error" style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+                                            <AlertCircle size={17} /> {error}
                                         </div>
                                     )}
 
-                                    {classGroups.length === 0 ? (
-                                        <div className="card">
-                                            <div className="empty-state"><BookOpen size={48} /><h3>Chưa có đề xuất</h3></div>
-                                        </div>
-                                    ) : (
-                                        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                                            {classGroups.map(cls => {
-                                                const isExpanded = expandedClass[cls.lop_id] !== false; // default open
-                                                const classItems = cls.items.filter(it => it.mon_hoc_id === parseInt(selectedMon));
-                                                const classTotal = classItems.reduce((sum, ct) => {
-                                                    const key = `${cls.lop_id}-${ct.vat_tu_id}`;
-                                                    const q = exportItems[key];
-                                                    return sum + (q !== '' && q > 0 ? q : 0);
-                                                }, 0);
-                                                const classSelectedCount = classItems.filter(ct => {
-                                                    const q = exportItems[`${cls.lop_id}-${ct.vat_tu_id}`];
-                                                    return q !== '' && q > 0;
-                                                }).length;
+                                    {activeTab === 'tieu_hao' && (
+                                        <>
+                                            <p className="tx-hint">
+                                                Môn <strong>{subjectList.find(m => m.id.toString() === selectedMon)?.name}</strong> —
+                                                bấm &ldquo;Chọn đủ&rdquo; để lấy hết định mức.
+                                            </p>
 
-                                                return (
-                                                    <div key={cls.lop_id} className="tx-class">
-                                                        <button className="tx-class-head" onClick={() => toggleClass(cls.lop_id)}>
-                                                            <ChevronDown
-                                                                size={20}
-                                                                className="tx-class-chevron"
-                                                                style={{ transform: isExpanded ? 'rotate(0deg)' : 'rotate(-90deg)' }}
-                                                            />
-                                                            <div className="tx-class-info">
-                                                                <span className="tx-class-name">{cls.ten_lop}</span>
-                                                                <span className="tx-class-meta">Sĩ số {cls.si_so} • {classItems.length} vật tư</span>
-                                                            </div>
-                                                            {classTotal > 0 && (
-                                                                <span className="badge badge-success">{classTotal} đơn vị</span>
-                                                            )}
-                                                        </button>
+                                            {classGroups.length === 0 ? (
+                                                <div className="tx-empty">
+                                                    <BookOpen size={36} />
+                                                    <h3>Chưa có đề xuất</h3>
+                                                </div>
+                                            ) : (
+                                                <div>
+                                                    {classGroups.map(cls => {
+                                                        const isExpanded = expandedClass[cls.lop_id] !== false; // default open
+                                                        const classItems = cls.items.filter(it => it.mon_hoc_id === parseInt(selectedMon));
+                                                        const classTotal = classItems.reduce((sum, ct) => {
+                                                            const key = `${cls.lop_id}-${ct.vat_tu_id}`;
+                                                            const q = exportItems[key];
+                                                            return sum + (q !== '' && q > 0 ? q : 0);
+                                                        }, 0);
+                                                        const classSelectedCount = classItems.filter(ct => {
+                                                            const q = exportItems[`${cls.lop_id}-${ct.vat_tu_id}`];
+                                                            return q !== '' && q > 0;
+                                                        }).length;
 
-                                                        {isExpanded && (
-                                                            <div className="tx-class-body">
-                                                                <div className="tx-class-tools">
-                                                                    <span>{classSelectedCount}/{classItems.length} đã chọn</span>
-                                                                    <button className="tx-link-btn" onClick={() => fillClassMax(cls)}>
-                                                                        Chọn đủ định mức
-                                                                    </button>
-                                                                </div>
-                                                                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                                                                    {classItems.map(ct => {
-                                                                        const key = `${cls.lop_id}-${ct.vat_tu_id}`;
-                                                                        const rawQty = exportItems[key];
-                                                                        const qty = rawQty === '' || rawQty === undefined ? 0 : rawQty;
-                                                                        const lim = computeQtyLimits(ct);
-                                                                        const disabled = lim.maxQty <= 0;
+                                                        return (
+                                                            <div key={cls.lop_id} className="tx-class">
+                                                                <button className="tx-class-head" onClick={() => toggleClass(cls.lop_id)}>
+                                                                    <ChevronDown
+                                                                        size={18}
+                                                                        className="tx-class-chevron"
+                                                                        style={{ transform: isExpanded ? 'rotate(0deg)' : 'rotate(-90deg)' }}
+                                                                    />
+                                                                    <div className="tx-class-info">
+                                                                        <span className="tx-class-name">{cls.ten_lop}</span>
+                                                                        <span className="tx-class-meta">Sĩ số {cls.si_so} · {classItems.length} vật tư</span>
+                                                                    </div>
+                                                                    {classTotal > 0 && (
+                                                                        <span className="badge badge-success">{classTotal} đơn vị</span>
+                                                                    )}
+                                                                </button>
 
-                                                                        return (
-                                                                            <div key={key} className={`tx-mat ${qty > 0 ? 'selected' : ''}`}>
-                                                                                <div className="tx-mat-info">
-                                                                                    <div className="tx-mat-name">{ct.ten_vat_tu}</div>
-                                                                                    {ct.yeu_cau_ky_thuat && (
-                                                                                        <div className="tx-mat-spec">{ct.yeu_cau_ky_thuat}</div>
-                                                                                    )}
-                                                                                    <div className="tx-mat-quota">
-                                                                                        Đề xuất {lim.proposedQty} • Đã xuất {lim.alreadyExported} •{' '}
-                                                                                        <strong className={lim.maxQty > 0 ? 'tx-quota-ok' : 'tx-quota-none'}>
-                                                                                            Còn được {lim.maxQty} {ct.don_vi_tinh}
-                                                                                        </strong>
+                                                                {isExpanded && (
+                                                                    <div className="tx-class-body">
+                                                                        <div className="tx-class-tools">
+                                                                            <span>{classSelectedCount}/{classItems.length} đã chọn</span>
+                                                                            <button className="tx-link-btn" onClick={() => fillClassMax(cls)}>
+                                                                                Chọn đủ định mức
+                                                                            </button>
+                                                                        </div>
+                                                                    <div>
+                                                                        {classItems.map(ct => {
+                                                                            const key = `${cls.lop_id}-${ct.vat_tu_id}`;
+                                                                            const rawQty = exportItems[key];
+                                                                            const qty = rawQty === '' || rawQty === undefined ? 0 : rawQty;
+                                                                            const lim = computeQtyLimits(ct);
+                                                                            const disabled = lim.maxQty <= 0;
+
+                                                                            return (
+                                                                                <div key={key} className={`tx-mat ${qty > 0 ? 'selected' : ''}`}>
+                                                                                    <div className="tx-mat-info">
+                                                                                        <div className="tx-mat-name">{ct.ten_vat_tu}</div>
+                                                                                        {ct.yeu_cau_ky_thuat && (
+                                                                                            <div className="tx-mat-spec">{ct.yeu_cau_ky_thuat}</div>
+                                                                                        )}
+                                                                                        <div className="tx-mat-quota">
+                                                                                            <span>Đã {lim.alreadyExported}/{lim.proposedQty} {ct.don_vi_tinh}</span>
+                                                                                            <strong className={lim.maxQty > 0 ? 'tx-quota-ok' : 'tx-quota-none'}>
+                                                                                                Còn {lim.maxQty}
+                                                                                            </strong>
+                                                                                        </div>
+                                                                                        {lim.isCapped && (
+                                                                                            <span className="tx-mat-warn warn">Kho thiếu — tỉ lệ {Math.round(lim.ratio * 100)}%</span>
+                                                                                        )}
+                                                                                        {lim.isPhysicallyLimited && (
+                                                                                            <span className="tx-mat-warn danger">Kho chỉ còn {lim.physicalFree}</span>
+                                                                                        )}
+                                                                                        {disabled && !lim.isCapped && !lim.isPhysicallyLimited && (
+                                                                                            <span className="tx-mat-warn muted">Đã đủ định mức</span>
+                                                                                        )}
                                                                                     </div>
-                                                                                    {lim.isCapped && (
-                                                                                        <span className="tx-mat-warn warn">Kho thiếu — duyệt theo tỉ lệ {Math.round(lim.ratio * 100)}%</span>
-                                                                                    )}
-                                                                                    {lim.isPhysicallyLimited && (
-                                                                                        <span className="tx-mat-warn danger">Kho thực tế chỉ còn {lim.physicalFree} {ct.don_vi_tinh}</span>
-                                                                                    )}
-                                                                                    {disabled && !lim.isCapped && !lim.isPhysicallyLimited && (
-                                                                                        <span className="tx-mat-warn muted">Đã xuất đủ định mức</span>
-                                                                                    )}
+                                                                                    <div className="tx-stepper">
+                                                                                        <button
+                                                                                            className="tx-step-btn"
+                                                                                            onClick={() => updateExportQty(cls.lop_id, ct.vat_tu_id, -1, lim.maxQty)}
+                                                                                            disabled={qty <= 0}
+                                                                                            aria-label="Giảm"
+                                                                                        >
+                                                                                            <Minus size={17} />
+                                                                                        </button>
+                                                                                        <input
+                                                                                            type="number"
+                                                                                            inputMode="numeric"
+                                                                                            className="tx-step-input"
+                                                                                            value={rawQty === undefined ? 0 : rawQty}
+                                                                                            onChange={e => setExportQty(cls.lop_id, ct.vat_tu_id, e.target.value, lim.maxQty)}
+                                                                                            onBlur={() => handleQtyBlur(cls.lop_id, ct.vat_tu_id)}
+                                                                                            min="0"
+                                                                                            max={lim.maxQty}
+                                                                                            disabled={disabled}
+                                                                                        />
+                                                                                        <button
+                                                                                            className="tx-step-btn"
+                                                                                            onClick={() => updateExportQty(cls.lop_id, ct.vat_tu_id, 1, lim.maxQty)}
+                                                                                            disabled={qty >= lim.maxQty}
+                                                                                            aria-label="Tăng"
+                                                                                        >
+                                                                                            <Plus size={17} />
+                                                                                        </button>
+                                                                                    </div>
                                                                                 </div>
-                                                                                <div className="tx-stepper">
-                                                                                    <button
-                                                                                        className="tx-step-btn"
-                                                                                        onClick={() => updateExportQty(cls.lop_id, ct.vat_tu_id, -1, lim.maxQty)}
-                                                                                        disabled={qty <= 0}
-                                                                                        aria-label="Giảm"
-                                                                                    >
-                                                                                        <Minus size={18} />
-                                                                                    </button>
-                                                                                    <input
-                                                                                        type="number"
-                                                                                        inputMode="numeric"
-                                                                                        className="tx-step-input"
-                                                                                        value={rawQty === undefined ? 0 : rawQty}
-                                                                                        onChange={e => setExportQty(cls.lop_id, ct.vat_tu_id, e.target.value, lim.maxQty)}
-                                                                                        onBlur={() => handleQtyBlur(cls.lop_id, ct.vat_tu_id)}
-                                                                                        min="0"
-                                                                                        max={lim.maxQty}
-                                                                                        disabled={disabled}
-                                                                                    />
-                                                                                    <button
-                                                                                        className="tx-step-btn"
-                                                                                        onClick={() => updateExportQty(cls.lop_id, ct.vat_tu_id, 1, lim.maxQty)}
-                                                                                        disabled={qty >= lim.maxQty}
-                                                                                        aria-label="Tăng"
-                                                                                    >
-                                                                                        <Plus size={18} />
-                                                                                    </button>
-                                                                                </div>
-                                                                            </div>
-                                                                        );
-                                                                    })}
-                                                                </div>
+                                                                            );
+                                                                        })}
+                                                                    </div>
+                                                                    </div>
+                                                                )}
                                                             </div>
-                                                        )}
+                                                        );
+                                                    })}
+                                                </div>
+                                            )}
+                                        </>
+                                    )}
+
+                                    {/* Tab sửa chữa — giống tiêu hao (Lớp + vật tư đã dự trù) + thêm tình trạng, duyệt ra biên bản */}
+                                    {activeTab === 'sua_che' && (
+                                        <div>
+                                            <p className="tx-hint">
+                                                Giống tab tiêu hao: chọn <strong>lớp</strong> + <strong>vật tư sửa chữa đã dự trù</strong> — thêm <strong>tình trạng</strong> từng vật tư rồi trình, duyệt ra <strong>biên bản BM01</strong> (không ra phiếu xuất).
+                                            </p>
+
+                                            {/* C/1 Tình hình — ghi đúng ô trên biên bản BM01 (trống thì tự ghép từ tình trạng từng vật tư) */}
+                                            <div className="tx-block" style={{ marginBottom: 12 }}>
+                                                <div className="tx-label">Tình hình <span style={{ fontWeight: 400, opacity: 0.7 }}>(in ở C/1 — trống thì tự ghép từ tình trạng từng vật tư)</span></div>
+                                                <textarea
+                                                    className="form-input"
+                                                    rows={2}
+                                                    placeholder="VD: Máy rung mạnh, cầu chì cháy do quá tải…"
+                                                    value={repairTinhHinh}
+                                                    onChange={e => setRepairTinhHinh(e.target.value)}
+                                                />
+                                            </div>
+
+                                            {!deXuatDetail ? (
+                                                <div className="tx-empty">
+                                                    <Inbox size={40} />
+                                                    <h3>Chưa có lớp để lập biên bản</h3>
+                                                    <p>Bạn cần có đề xuất dự trù trong kỳ để lấy danh sách lớp.</p>
+                                                    <Link href="/de-xuat" className="btn btn-primary" style={{ marginTop: 14 }}>
+                                                        <Plus size={16} /> Tạo đề xuất
+                                                    </Link>
+                                                </div>
+                                            ) : (
+                                            <>
+                                            {/* Vật tư sửa chữa từ đề xuất đã nộp */}
+                                            {repairGroups.length === 0 ? (
+                                                <div className="tx-empty">
+                                                    <Wrench size={34} />
+                                                    <h3>Chưa có vật tư sửa chữa</h3>
+                                                    <p>{repairFilter.trim()
+                                                        ? `Không tìm thấy vật tư sửa chữa khớp "${repairFilter.trim()}".`
+                                                        : hasAnySuaChe
+                                                            ? 'Môn đang chọn không có vật tư sửa chữa — thử chọn môn khác.'
+                                                            : 'Đề xuất kỳ này chưa có vật tư loại sửa chữa.'}</p>
+                                                </div>
+                                            ) : (
+                                                <>
+                                                    <div className="tx-search-wrap">
+                                                        <Search size={16} className="tx-search-icon" />
+                                                        <input
+                                                            className="form-input"
+                                                            placeholder="Tìm vật tư sửa chữa…"
+                                                            value={repairFilter}
+                                                            onChange={e => setRepairFilter(e.target.value)}
+                                                        />
                                                     </div>
-                                                );
-                                            })}
+                                                    {repairGroups.map(cls => {
+                                                        const isExpanded = expandedClass[cls.lop_id] !== false;
+                                                        const selCount = cls.items.filter(ct => {
+                                                            const qv = repairItems[ct.id];
+                                                            return qv !== '' && qv > 0;
+                                                        }).length;
+                                                        return (
+                                                            <div key={cls.lop_id} className="tx-class">
+                                                                <button className="tx-class-head" onClick={() => toggleClass(cls.lop_id)}>
+                                                                    <ChevronDown
+                                                                        size={18}
+                                                                        className="tx-class-chevron"
+                                                                        style={{ transform: isExpanded ? 'rotate(0deg)' : 'rotate(-90deg)' }}
+                                                                    />
+                                                                    <div className="tx-class-info">
+                                                                        <span className="tx-class-name">{cls.ten_lop}</span>
+                                                                        <span className="tx-class-meta">Sĩ số {cls.si_so} · {cls.items.length} vật tư sửa chữa</span>
+                                                                    </div>
+                                                                    {selCount > 0 && (
+                                                                        <span className="badge badge-success">{selCount} đã chọn</span>
+                                                                    )}
+                                                                </button>
+                                                                {isExpanded && (
+                                                                    <div className="tx-class-body">
+                                                                        {cls.items.map(ct => {
+                                                                            const qty = repairItems[ct.id] || 0;
+                                                                            const max = ct.so_luong || 0;
+                                                                            return (
+                                                                                <div key={ct.id} className="tx-repair-wrap">
+                                                                                <div className={`tx-mat${qty > 0 ? ' selected open' : ''}`}>
+                                                                                    <div className="tx-mat-info">
+                                                                                        <div className="tx-mat-name">{ct.ten_vat_tu}</div>
+                                                                                        {ct.yeu_cau_ky_thuat && <div className="tx-mat-spec">{ct.yeu_cau_ky_thuat}</div>}
+                                                                                        <div className="tx-mat-quota">
+                                                                                            <span>Đề xuất {ct.so_luong} {ct.don_vi_tinh}</span>
+                                                                                        </div>
+                                                                                    </div>
+                                                                                    <div className="tx-stepper">
+                                                                                        <button
+                                                                                            className="tx-step-btn"
+                                                                                            onClick={() => updateRepairQty(ct.id, (repairItems[ct.id] || 0) - 1, max)}
+                                                                                            disabled={qty <= 0}
+                                                                                            aria-label="Giảm"
+                                                                                        >
+                                                                                            <Minus size={17} />
+                                                                                        </button>
+                                                                                        <input
+                                                                                            type="number"
+                                                                                            inputMode="numeric"
+                                                                                            className="tx-step-input"
+                                                                                            value={qty}
+                                                                                            onChange={e => updateRepairQty(ct.id, e.target.value, max)}
+                                                                                            min="0"
+                                                                                            max={max}
+                                                                                        />
+                                                                                        <button
+                                                                                            className="tx-step-btn"
+                                                                                            onClick={() => updateRepairQty(ct.id, (repairItems[ct.id] || 0) + 1, max)}
+                                                                                            disabled={qty >= max}
+                                                                                            aria-label="Tăng"
+                                                                                        >
+                                                                                            <Plus size={17} />
+                                                                                        </button>
+                                                                                    </div>
+                                                                                </div>
+                                                                                {qty > 0 && (
+                                                                                    <input
+                                                                                        className="form-input tx-repair-cond"
+                                                                                        placeholder={`Tình trạng "${ct.ten_vat_tu}" * — bắt buộc`}
+                                                                                        value={repairConditions[ct.id] || ''}
+                                                                                        onChange={e => setRepairConditions(prev => ({ ...prev, [ct.id]: e.target.value }))}
+                                                                                    />
+                                                                                )}
+                                                                                </div>
+                                                                            );
+                                                                        })}
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        );
+                                                    })}
+                                                    <button
+                                                        className="btn btn-primary"
+                                                        style={{ width: '100%', height: 46, marginTop: 4, fontWeight: 600 }}
+                                                        onClick={handleCreateRepairBB}
+                                                        disabled={creatingBB}
+                                                    >
+                                                        {creatingBB ? 'Đang lập...' : <><ClipboardList size={16} /> Lập biên bản sửa chữa</>}
+                                                    </button>
+                                                </>
+                                            )}
+                                            {bienBans.length > 0 && (
+                                                <div style={{ marginTop: 20 }}>
+                                                    <div className="tx-label" style={{ marginBottom: 8 }}>Biên bản của tôi ({bienBans.length})</div>
+                                                    {bienBans.map(bb => (
+                                                        <div className="tx-bb-row" key={bb.id}>
+                                                            <div className="tx-bb-row-info">
+                                                                <strong>#{bb.id} {bb.ten_thiet_bi}</strong>
+                                                                <span className={`tx-bb-status ${bb.trang_thai}`}>
+                                                                    {{ cho_duyet: 'Chờ duyệt', da_duyet: 'Đã duyệt', tu_choi: 'Từ chối' }[bb.trang_thai] || bb.trang_thai}{bb.ngay_lap ? ` • ${bb.ngay_lap}` : ''}
+                                                                </span>
+                                                            </div>
+                                                            {bb.trang_thai === 'da_duyet' && (
+                                                                <button className="btn btn-secondary btn-sm" onClick={() => handlePrintBienBan(bb.id)} disabled={printingBB}>
+                                                                    <Printer size={15} /> In
+                                                                </button>
+                                                            )}
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
+                                            </>
+                                            )}
                                         </div>
                                     )}
                                 </div>
@@ -802,9 +1163,9 @@ export default function PhieuXuatPublicPage() {
                             {/* Success */}
                             {submitted && (
                                 <div className="card tx-success">
-                                    <div className="tx-success-icon"><CheckCircle size={44} /></div>
+                                    <div className="tx-success-icon"><CheckCircle size={40} /></div>
                                     <h2>Đã gửi phiếu xuất!</h2>
-                                    <p>{createdCount > 1 ? `${createdCount} phiếu` : 'Phiếu'} đã được gửi đến quản lý kho để ký duyệt. Bạn sẽ tải được phiếu in sau khi được duyệt.</p>
+                                    <p>{createdCount > 1 ? `${createdCount} phiếu` : 'Phiếu'} đã gửi đến kho để duyệt. Bạn tải phiếu in sau khi được duyệt.</p>
                                     <div className="tx-success-actions">
                                         <button className="btn btn-secondary" onClick={() => { setSubmitted(false); setMode('view'); }}>
                                             Xem phiếu đã gửi
@@ -820,19 +1181,21 @@ export default function PhieuXuatPublicPage() {
                 </>
             )}
 
-            {/* Sticky bottom action bar (create mode) */}
-            {selectedGv && mode === 'create' && !submitted && (
+            {/* Sticky bottom action bar (create mode, chỉ tab tiêu hao — tab sửa chữa dùng nút Lập biên bản riêng) */}
+            {selectedGv && mode === 'create' && !submitted && activeTab === 'tieu_hao' && (
                 <div className="tx-actionbar">
                     <div className="tx-actionbar-info">
-                        <strong>{totalSelectedQty}</strong> đơn vị
-                        <span>{totalSelectedItems} vật tư được chọn</span>
+                        <strong>{totalSelectedItems} vật tư</strong>
+                        <span>
+                            Tiêu hao
+                        </span>
                     </div>
                     <button
                         className="btn btn-primary tx-actionbar-btn"
                         onClick={handleSubmitPhieu}
                         disabled={submitting || totalSelectedItems === 0}
                     >
-                        {submitting ? <div className="spinner" /> : <><Send size={18} /> Trình phiếu</>}
+                        {submitting ? <div className="spinner" /> : <><Send size={17} /> Trình phiếu</>}
                     </button>
                 </div>
             )}
@@ -840,7 +1203,7 @@ export default function PhieuXuatPublicPage() {
             {/* Local toast */}
             {toast && (
                 <div className={`tx-toast ${toast.type}`}>
-                    {toast.type === 'success' ? <CheckCircle size={18} /> : <AlertCircle size={18} />}
+                    {toast.type === 'success' ? <CheckCircle size={17} /> : <AlertCircle size={17} />}
                     {toast.message}
                 </div>
             )}

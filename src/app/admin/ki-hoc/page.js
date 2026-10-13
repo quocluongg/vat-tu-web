@@ -80,7 +80,7 @@ export default function KiHocPage() {
         <div>
             <div className="page-header">
                 <div className="page-header-left">
-                    <h1 style={{ display: 'flex', alignItems: 'center', gap: 8 }}><Calendar size={28} className="text-accent" /> Quản lý Kỳ học</h1>
+                    <h1 style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}><Calendar size={28} className="text-accent" /> Quản lý Kỳ học</h1>
                     <p>Thiết lập và quản lý các kỳ học / đợt</p>
                 </div>
                 <div className="page-header-actions">
@@ -100,8 +100,8 @@ export default function KiHocPage() {
                                 <th>Ngày bắt đầu</th>
                                 <th>Ngày kết thúc</th>
                                 <th>Hạn đề xuất</th>
-                                <th style={{ minWidth: 420 }}>Tiến trình kỳ học</th>
-                                <th style={{ width: 100 }}>Thao tác</th>
+                                <th style={{ minWidth: 360 }}>Tiến trình kỳ học</th>
+                                <th style={{ width: 120 }}>Thao tác</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -116,7 +116,7 @@ export default function KiHocPage() {
                                         <td>{item.ngay_bat_dau ? new Date(item.ngay_bat_dau).toLocaleDateString('vi-VN') : '—'}</td>
                                         <td>{item.ngay_ket_thuc ? new Date(item.ngay_ket_thuc).toLocaleDateString('vi-VN') : '—'}</td>
                                         <td>{item.han_de_xuat ? new Date(item.han_de_xuat).toLocaleDateString('vi-VN') : '—'}</td>
-                                        <td style={{ minWidth: 450, padding: '16px 12px' }}>
+                                        <td style={{ minWidth: 380, padding: '16px 12px' }}>
                                             <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', width: '100%', position: 'relative' }}>
                                                 {statusFlow.map((st, idx) => {
                                                     const isPast = idx < currentIdx;
@@ -138,10 +138,10 @@ export default function KiHocPage() {
                                                         textColor = '#10b981';
                                                         border = '2px solid #10b981';
                                                     } else if (isCurrent) {
-                                                        bgColor = 'rgba(14, 165, 233, 0.1)';
-                                                        iconColor = '#0ea5e9';
-                                                        textColor = '#0ea5e9';
-                                                        border = '2px solid #0ea5e9';
+                                                        bgColor = 'rgba(28, 110, 245, 0.1)';
+                                                        iconColor = '#1c6ef5';
+                                                        textColor = '#1c6ef5';
+                                                        border = '2px solid #1c6ef5';
                                                     } else if (isNext) {
                                                         bgColor = 'transparent';
                                                         iconColor = 'var(--text-primary)';
@@ -151,7 +151,7 @@ export default function KiHocPage() {
                                                     }
 
                                                     return (
-                                                        <div key={st} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', position: 'relative', flex: 1 }}>
+                                                        <div key={st} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', position: 'relative', flex: 1, minWidth: 64 }}>
                                                             {/* Connecting Line (before this step) */}
                                                             {idx > 0 && (
                                                                 <div style={{
@@ -182,10 +182,10 @@ export default function KiHocPage() {
                                                                     cursor: cursor,
                                                                     zIndex: 1,
                                                                     transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
-                                                                    boxShadow: isCurrent ? '0 0 0 4px rgba(14, 165, 233, 0.15)' : 'none',
+                                                                    boxShadow: isCurrent ? '0 0 0 4px rgba(28, 110, 245, 0.15)' : 'none',
                                                                     opacity: isFuture ? 0.4 : 1
                                                                 }}
-                                                                onMouseEnter={(e) => { if (isNext) { e.currentTarget.style.borderColor = '#0ea5e9'; e.currentTarget.style.color = '#0ea5e9'; e.currentTarget.style.transform = 'scale(1.1)'; } }}
+                                                                onMouseEnter={(e) => { if (isNext) { e.currentTarget.style.borderColor = '#1c6ef5'; e.currentTarget.style.color = '#1c6ef5'; e.currentTarget.style.transform = 'scale(1.1)'; } }}
                                                                 onMouseLeave={(e) => { if (isNext) { e.currentTarget.style.borderColor = 'var(--text-muted)'; e.currentTarget.style.color = 'var(--text-primary)'; e.currentTarget.style.transform = 'scale(1)'; } }}
                                                                 title={isNext ? 'Nhấn để chuyển sang bước này' : isCurrent ? 'Trạng thái hiện tại' : ''}
                                                             >
@@ -199,6 +199,8 @@ export default function KiHocPage() {
                                                                 fontWeight: isCurrent ? 700 : 600,
                                                                 color: textColor,
                                                                 textAlign: 'center',
+                                                                whiteSpace: 'nowrap',
+                                                                lineHeight: 1.3,
                                                                 opacity: isFuture ? 0.4 : 1,
                                                             }}>
                                                                 {statusLabels[st].label}
