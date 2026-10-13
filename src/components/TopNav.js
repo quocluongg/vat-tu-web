@@ -18,7 +18,7 @@ const menuGroups = [
         label: 'Dự trù',
         items: [
             { href: '/admin/de-xuat', label: 'Dự trù đầu kỳ', desc: 'Lập kế hoạch vật tư cho cả kỳ' },
-            { href: '/admin/phieu-xuat', label: 'Đề xuất bổ sung', desc: 'Xin thêm đột xuất giữa kỳ' },
+            // TẠM ẨN: { href: '/admin/phieu-xuat', label: 'Đề xuất bổ sung', desc: 'Xin thêm đột xuất giữa kỳ' },
         ],
     },
     {
