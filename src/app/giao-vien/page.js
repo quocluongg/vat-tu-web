@@ -6,7 +6,7 @@ const entries = [
         href: '/de-xuat',
         icon: <FileText size={26} />,
         tone: 'blue',
-        title: 'Đề xuất dự trù vật tư',
+        title: 'Dự trù vật tư',
         desc: 'Đăng ký vật tư cần thiết cho các môn học được phân công trong kỳ.',
         points: ['Chọn giáo viên và kỳ học', 'Chọn vật tư theo từng môn', 'Gửi duyệt và in đề xuất'],
         cta: 'Lập đề xuất ngay',
