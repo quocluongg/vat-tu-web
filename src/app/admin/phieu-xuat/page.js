@@ -1,5 +1,6 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { FileOutput, Eye, Check, X, Truck, Clock, CheckCircle, XCircle, FileCheck, Printer, Edit2, Save, RotateCcw, Plus, Search, Trash2 } from 'lucide-react';
 import { useToast } from '@/components/Toast';
 
@@ -10,7 +11,12 @@ const statusConfig = {
     tu_choi: { label: 'Từ chối', badge: 'badge-danger', icon: XCircle },
 };
 
-export default function PhieuXuatAdminPage() {
+const normalizeLoai = (v) =>
+    (v === 'sua_che' || v === 'sua_chua' ? 'sua_che' : v === 'tieu_hao' ? 'tieu_hao' : 'all');
+
+const pxLoaiOf = (px) => (px.loai_vat_tu === 'sua_che' ? 'sua_che' : 'tieu_hao');
+
+function PhieuXuatAdminPage() {
     const [phieuXuats, setPhieuXuats] = useState([]);
     const [kiHocs, setKiHocs] = useState([]);
     const [selectedKi, setSelectedKi] = useState('');
@@ -25,7 +31,15 @@ export default function PhieuXuatAdminPage() {
     const [addVtSearch, setAddVtSearch] = useState('');
     const [newItems, setNewItems] = useState({}); // { vat_tu_id: so_luong }
     const [addingSaving, setAddingSaving] = useState(false);
+    const [loadingData, setLoadingData] = useState(false);
     const addToast = useToast();
+    const searchParams = useSearchParams();
+    const [loaiFilter, setLoaiFilter] = useState(() => normalizeLoai(searchParams.get('loai')));
+
+    // Menu "Phiếu xuất > ..." dẫn vào cùng trang với ?loai= → đồng bộ tab lọc
+    useEffect(() => {
+        setLoaiFilter(normalizeLoai(searchParams.get('loai')));
+    }, [searchParams]);
 
     useEffect(() => {
         fetch('/api/ki-hoc').then(r => r.json()).then(data => {
@@ -35,11 +49,18 @@ export default function PhieuXuatAdminPage() {
         });
     }, []);
 
-    const fetchData = async () => {
+    const fetchData = async (silent) => {
         if (!selectedKi) return;
-        const res = await fetch(`/api/phieu-xuat?ki_id=${selectedKi}`);
-        const data = await res.json();
-        setPhieuXuats(data);
+        if (!silent) setLoadingData(true);
+        try {
+            const res = await fetch(`/api/phieu-xuat?ki_id=${selectedKi}`);
+            const data = await res.json();
+            setPhieuXuats(data);
+        } catch {
+            if (!silent) setPhieuXuats([]);
+        } finally {
+            if (!silent) setLoadingData(false);
+        }
     };
 
     const fetchAllVatTus = async () => {
@@ -75,7 +96,7 @@ export default function PhieuXuatAdminPage() {
                 addToast(`Đã thêm ${items.length} vật tư vào phiếu`, 'success');
                 setAddVtModal(false); setNewItems({}); setAddVtSearch('');
                 const r2 = await fetch(`/api/phieu-xuat?id=${detail.id}`); setDetail(await r2.json());
-                fetchData();
+                fetchData(true);
             }
         } catch (e) { addToast('Lỗi kết nối', 'error'); }
         setAddingSaving(false);
@@ -91,7 +112,7 @@ export default function PhieuXuatAdminPage() {
             if (res.ok) {
                 addToast('Đã xóa vật tư khỏi phiếu', 'success');
                 const r2 = await fetch(`/api/phieu-xuat?id=${detail.id}`); setDetail(await r2.json());
-                fetchData();
+                fetchData(true);
             } else { const d = await res.json(); addToast(d.error || 'Lỗi', 'error'); }
         } catch (e) { addToast('Lỗi kết nối', 'error'); }
     };
@@ -133,7 +154,7 @@ export default function PhieuXuatAdminPage() {
                 const detailRes = await fetch(`/api/phieu-xuat?id=${detail.id}`);
                 const detailData = await detailRes.json();
                 setDetail(detailData);
-                fetchData();
+                fetchData(true);
             }
         } catch (err) {
             addToast('Lỗi khi kết nối server', 'error');
@@ -156,7 +177,7 @@ export default function PhieuXuatAdminPage() {
             }
 
             addToast(`Cập nhật: ${statusConfig[trang_thai].label}`, 'success');
-            fetchData();
+            fetchData(true);
             setDetail(null);
         } catch (err) {
             addToast('Lỗi kết nối đến máy chủ', 'error');
@@ -289,6 +310,10 @@ export default function PhieuXuatAdminPage() {
 
     if (loading) return <div className="loading-overlay"><div className="spinner" /></div>;
 
+    const visiblePhieuXuats = loaiFilter === 'all'
+        ? phieuXuats
+        : phieuXuats.filter(px => pxLoaiOf(px) === loaiFilter);
+
     return (
         <div>
             <div className="page-header">
@@ -297,15 +322,24 @@ export default function PhieuXuatAdminPage() {
                     <p>Duyệt và xuất vật tư cho giáo viên</p>
                 </div>
                 <div className="page-header-actions">
-                    <select className="form-select" style={{ width: 220 }} value={selectedKi} onChange={e => setSelectedKi(e.target.value)}>
+                    <select className="form-select" style={{ width: '100%', maxWidth: 220 }} value={selectedKi} onChange={e => setSelectedKi(e.target.value)}>
                         {kiHocs.map(k => <option key={k.id} value={k.id}>{k.ten_ki} - {k.nam_hoc}</option>)}
                     </select>
                 </div>
             </div>
 
-            <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)', marginBottom: 24 }}>
+            {loadingData ? (
+                <div className="card">
+                    <div className="card-body" style={{ textAlign: 'center', padding: '56px 20px' }}>
+                        <div className="spinner" style={{ margin: '0 auto 12px' }} />
+                        <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>Đang tải phiếu xuất...</div>
+                    </div>
+                </div>
+            ) : (
+            <>
+            <div className="stats-grid" style={{ marginBottom: 24 }}>
                 {Object.entries(statusConfig).map(([key, config]) => {
-                    const count = phieuXuats.filter(px => px.trang_thai === key).length;
+                    const count = visiblePhieuXuats?.filter(px => px.trang_thai === key).length;
                     return (
                         <div className={`stat-card ${key === 'cho_duyet' ? 'warning' : key === 'da_ky' ? 'info' : key === 'da_xuat' ? 'success' : 'danger'}`} key={key}>
                             <div className={`stat-icon ${key === 'cho_duyet' ? 'warning' : key === 'da_ky' ? 'info' : key === 'da_xuat' ? 'success' : 'danger'}`}>
@@ -320,6 +354,24 @@ export default function PhieuXuatAdminPage() {
                 })}
             </div>
 
+            <div className="tabs">
+                <button type="button" className={`tab ${loaiFilter === 'all' ? 'active' : ''}`} onClick={() => setLoaiFilter('all')}>
+                    Tất cả ({phieuXuats.length})
+                </button>
+                <button type="button" className={`tab ${loaiFilter === 'tieu_hao' ? 'active' : ''}`} onClick={() => setLoaiFilter('tieu_hao')}>
+                    Tiêu hao ({phieuXuats?.filter(px => pxLoaiOf(px) === 'tieu_hao').length})
+                </button>
+                <button type="button" className={`tab ${loaiFilter === 'sua_che' ? 'active' : ''}`} onClick={() => setLoaiFilter('sua_che')}>
+                    Sửa chữa ({phieuXuats?.filter(px => pxLoaiOf(px) === 'sua_che').length})
+                </button>
+            </div>
+            {loaiFilter === 'sua_che' && (
+                <div className="alert alert-warning" style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+                    <span>⚠️ Vật tư sửa chữa duyệt bằng <strong>Biên bản BM01</strong> (giao diện chọn lớp + vật tư dự trù + tình trạng giống hệt tiêu hao), không ra phiếu xuất.</span>
+                    <a href="/admin/bien-ban" className="btn btn-secondary btn-sm" style={{ marginLeft: 'auto', whiteSpace: 'nowrap' }}>Sang Biên bản →</a>
+                </div>
+            )}
+
             <div className="card">
                 <div className="table-container">
                     <table className="data-table">
@@ -332,13 +384,14 @@ export default function PhieuXuatAdminPage() {
                                 <th>Số vật tư</th>
                                 <th>Ngày tạo</th>
                                 <th>Trạng thái</th>
-                                <th style={{ width: 100 }}>Thao tác</th>
+                                <th style={{ minWidth: 110 }}>Loại</th>
+                                <th style={{ minWidth: 170, whiteSpace: 'nowrap' }}>Thao tác</th>
                             </tr>
                         </thead>
                         <tbody>
-                            {phieuXuats.length === 0 ? (
-                                <tr><td colSpan={8}><div className="empty-state"><FileOutput size={48} /><h3>Chưa có phiếu xuất</h3></div></td></tr>
-                            ) : phieuXuats.map(px => (
+                            {visiblePhieuXuats.length === 0 ? (
+                                <tr><td colSpan={9}><div className="empty-state"><FileOutput size={48} /><h3>{loaiFilter === 'all' ? 'Chưa có phiếu xuất' : 'Không có phiếu loại này'}</h3></div></td></tr>
+                            ) : visiblePhieuXuats.map(px => (
                                 <tr key={px.id}>
                                     <td style={{ fontWeight: 500, color: 'var(--text-accent)' }}>PX-{String(px.id).padStart(4, '0')}</td>
                                     <td style={{ fontWeight: 500, color: 'var(--text-primary)' }}>{px.ten_gv}</td>
@@ -347,6 +400,7 @@ export default function PhieuXuatAdminPage() {
                                     <td>{px.so_vat_tu} ({px.tong_so_luong} đơn vị)</td>
                                     <td>{new Date(px.ngay_tao).toLocaleDateString('vi-VN')}</td>
                                     <td><span className={`badge ${statusConfig[px.trang_thai].badge}`}>{statusConfig[px.trang_thai].label}</span></td>
+                                    <td><span className={`badge ${pxLoaiOf(px) === 'sua_che' ? 'badge-warning' : 'badge-info'}`}>{pxLoaiOf(px) === 'sua_che' ? 'Sửa chữa' : 'Tiêu hao'}</span></td>
                                     <td>
                                         <div className="table-actions">
                                             <button className="btn-icon" onClick={() => viewDetail(px)} title="Chi tiết"><Eye size={16} /></button>
@@ -368,6 +422,8 @@ export default function PhieuXuatAdminPage() {
                     </table>
                 </div>
             </div>
+            </>
+            )}
 
             {detail && (
                 <div className="modal-overlay" onClick={() => setDetail(null)}>
@@ -379,12 +435,13 @@ export default function PhieuXuatAdminPage() {
                                     {detail.ten_gv} • {detail.ten_mon}{detail.ten_lop ? ` • Lớp: ${detail.ten_lop}` : ''}
                                 </p>
                             </div>
-                            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                            <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
                                 <span className={`badge ${statusConfig[detail.trang_thai].badge}`}>{statusConfig[detail.trang_thai].label}</span>
                                 <button className="btn-ghost" onClick={() => setDetail(null)}>✕</button>
                             </div>
                         </div>
                         <div className="modal-body">
+                            <div className="table-container">
                             <table className="data-table">
                                 <thead>
                                     <tr>
@@ -433,6 +490,7 @@ export default function PhieuXuatAdminPage() {
                                     ))}
                                 </tbody>
                             </table>
+                            </div>
                             {detail.trang_thai !== 'da_xuat' && (
                                 <div style={{ marginTop: 16, textAlign: 'center' }}>
                                     <button className="btn btn-secondary" onClick={() => { setAddVtModal(true); setNewItems({}); setAddVtSearch(''); }} style={{ gap: 6 }}>
@@ -441,7 +499,7 @@ export default function PhieuXuatAdminPage() {
                                 </div>
                             )}
                         </div>
-                        <div className="modal-footer" style={{ justifyContent: 'space-between' }}>
+                        <div className="modal-footer" style={{ justifyContent: 'space-between', flexWrap: 'wrap' }}>
                             <div>
                                 {(detail.trang_thai !== 'tu_choi') && (
                                     <button className="btn btn-secondary" onClick={() => generatePDF(detail.id)}>
@@ -449,7 +507,7 @@ export default function PhieuXuatAdminPage() {
                                     </button>
                                 )}
                             </div>
-                            <div style={{ display: 'flex', gap: 8 }}>
+                            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
                                 {isEditing ? (
                                     <>
                                         <button className="btn btn-ghost" onClick={() => { setIsEditing(false); setEditedDetails({}); }}>
@@ -500,7 +558,7 @@ export default function PhieuXuatAdminPage() {
                 const selectedCount = Object.values(newItems).filter(q => q > 0).length;
                 return (
                     <div className="modal-overlay" style={{ zIndex: 1100 }} onClick={() => setAddVtModal(false)}>
-                        <div className="modal" style={{ maxWidth: 620, maxHeight: '90vh', display: 'flex', flexDirection: 'column' }} onClick={e => e.stopPropagation()}>
+                        <div className="modal" style={{ maxWidth: 'min(620px, calc(100vw - 48px))', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }} onClick={e => e.stopPropagation()}>
                             <div className="modal-header">
                                 <div>
                                     <h2 style={{ fontSize: 18, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -524,18 +582,20 @@ export default function PhieuXuatAdminPage() {
                                     {filtered.slice(0, 50).map(vt => {
                                         const qty = newItems[vt.id] || 0;
                                         const alreadyInPhieu = existingVtIds.has(vt.id);
+                                        const isSuaChe = (vt.loai_vat_tu || 'tieu_hao') === 'sua_che';
                                         return (
-                                            <div key={vt.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 12px', borderRadius: 10, border: qty > 0 ? '1.5px solid rgba(14,165,233,0.5)' : '1px solid var(--border-color)', background: qty > 0 ? 'rgba(14,165,233,0.05)' : alreadyInPhieu ? 'rgba(99,102,241,0.04)' : 'var(--bg-glass)' }}>
+                                            <div key={vt.id} style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0, padding: '8px 12px', borderRadius: 10, border: qty > 0 ? '1.5px solid rgba(28,110,245,0.5)' : '1px solid var(--border-color)', background: qty > 0 ? 'rgba(28,110,245,0.05)' : alreadyInPhieu ? 'rgba(99,102,241,0.04)' : 'var(--bg-glass)' }}>
                                                 <div style={{ flex: 1, minWidth: 0 }}>
-                                                    <div style={{ fontWeight: 600, fontSize: 13, display: 'flex', alignItems: 'center', gap: 6 }}>
+                                                    <div style={{ fontWeight: 600, fontSize: 13, display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 6, minWidth: 0 }}>
                                                         {vt.ten_vat_tu}
+                                                        <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 4, background: isSuaChe ? 'rgba(249,115,22,0.15)' : 'rgba(16,185,129,0.15)', color: isSuaChe ? '#ea580c' : '#059669' }}>{isSuaChe ? 'Sửa chữa' : 'Tiêu hao'}</span>
                                                         {alreadyInPhieu && <span style={{ fontSize: 10, padding: '1px 5px', borderRadius: 4, background: 'rgba(99,102,241,0.12)', color: '#818cf8' }}>Đã có</span>}
                                                     </div>
                                                     <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 1 }}>
                                                         {vt.yeu_cau_ky_thuat || '—'} • {vt.don_vi_tinh} • Kho: <span style={{ color: vt.so_luong_kho > 0 ? '#34d399' : '#f87171', fontWeight: 600 }}>{vt.so_luong_kho}</span>
                                                     </div>
                                                 </div>
-                                                <input type="number" className="form-input" style={{ width: 70, padding: '4px 8px', textAlign: 'center', fontSize: 13 }} placeholder="SL" min="0" max={vt.so_luong_kho} value={qty || ''} onChange={e => { const v = Math.max(0, Math.min(parseInt(e.target.value) || 0, vt.so_luong_kho)); setNewItems(prev => { if (v === 0) { const { [vt.id]: _, ...rest } = prev; return rest; } return { ...prev, [vt.id]: v }; }); }} />
+                                                <input type="number" className="form-input" style={{ width: 70, flexShrink: 0, padding: '4px 8px', textAlign: 'center', fontSize: 13 }} placeholder="SL" min="0" max={vt.so_luong_kho} value={qty || ''} onChange={e => { const v = Math.max(0, Math.min(parseInt(e.target.value) || 0, vt.so_luong_kho)); setNewItems(prev => { if (v === 0) { const { [vt.id]: _, ...rest } = prev; return rest; } return { ...prev, [vt.id]: v }; }); }} />
                                             </div>
                                         );
                                     })}
@@ -553,5 +613,13 @@ export default function PhieuXuatAdminPage() {
                 );
             })()}
         </div>
+    );
+}
+
+export default function PhieuXuatAdminPageWrapper() {
+    return (
+        <Suspense fallback={<div className="loading-overlay"><div className="spinner" /></div>}>
+            <PhieuXuatAdminPage />
+        </Suspense>
     );
 }

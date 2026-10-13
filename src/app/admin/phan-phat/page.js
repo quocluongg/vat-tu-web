@@ -51,14 +51,14 @@ export default function PhanPhatPage() {
             {/* Header */}
             <div className="page-header" style={{ marginBottom: 24 }}>
                 <div className="page-header-left">
-                    <h1 style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <h1 style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
                         <Scale size={28} className="text-primary" />
                         Theo dõi Phân phát Công bằng
                     </h1>
                     <p>Kiểm tra việc cấp phát thực tế so với định mức & đánh giá độ đồng đều.</p>
                 </div>
                 <div className="page-header-actions" style={{ display: 'flex', gap: 12 }}>
-                    <select className="form-select" style={{ width: 220 }} value={selectedKi} onChange={e => setSelectedKi(e.target.value)}>
+                    <select className="form-select" style={{ width: '100%', maxWidth: 220 }} value={selectedKi} onChange={e => setSelectedKi(e.target.value)}>
                         {kiHocs.map(k => <option key={k.id} value={k.id}>{k.ten_ki} - {k.nam_hoc}</option>)}
                     </select>
                 </div>
@@ -66,7 +66,7 @@ export default function PhanPhatPage() {
 
             {/* Helper Note */}
             <div className="card" style={{ marginBottom: 24, background: 'linear-gradient(135deg, #eff6ff, #fff)', border: '1px solid #bfdbfe' }}>
-                <div className="card-body" style={{ display: 'flex', alignItems: 'start', gap: 16 }}>
+                <div className="card-body" style={{ display: 'flex', alignItems: 'flex-start', flexWrap: 'wrap', gap: 16 }}>
                     <div style={{ color: '#3b82f6', marginTop: 2 }}><Info size={22} /></div>
                     <div>
                         <h4 style={{ fontWeight: 600, marginBottom: 4, color: '#1e3a8a' }}>⚙️ Chi tiết Công thức Phân phối Phức hợp (Global Teacher-Level Allocation)</h4>
@@ -84,8 +84,8 @@ export default function PhanPhatPage() {
 
             {/* Toolbar */}
             <div className="card" style={{ marginBottom: 24, padding: '12px 20px' }}>
-                <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
-                    <div style={{ position: 'relative', flex: 1 }}>
+                <div style={{ display: 'flex', gap: 16, alignItems: 'center', flexWrap: 'wrap' }}>
+                    <div style={{ position: 'relative', flex: '1 1 200px', minWidth: 0 }}>
                         <Search size={18} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
                         <input 
                             type="text" 
@@ -108,7 +108,7 @@ export default function PhanPhatPage() {
                     <p>Đang tải dữ liệu thống kê chuyên sâu...</p>
                 </div>
             ) : filteredData.length === 0 ? (
-                <div className="empty-state card" style={{ padding: 60 }}>
+                <div className="empty-state" style={{ padding: 60 }}>
                     <PackageSearch size={60} style={{ color: 'var(--text-muted)', marginBottom: 16 }} />
                     <h3>Không tìm thấy dữ liệu</h3>
                     <p>Chưa có vật tư nào được ghi nhận cho kỳ này.</p>
@@ -129,13 +129,11 @@ export default function PhanPhatPage() {
                                 {/* Collapsed Bar */}
                                 <div 
                                     onClick={() => toggleExpand(item.vat_tu_id)}
+                                    className="pp-bar"
                                     style={{ 
                                         padding: '16px 20px', 
-                                        display: 'grid', 
-                                        gridTemplateColumns: '40px 2fr 1.5fr 1.5fr 1.5fr', 
-                                        alignItems: 'center', 
                                         cursor: 'pointer',
-                                        background: isExpanded ? 'rgba(56,189,248,0.04)' : 'white'
+                                        background: isExpanded ? 'rgba(28,110,245,0.04)' : 'white'
                                     }}
                                 >
                                     <div style={{ color: 'var(--text-muted)' }}>
@@ -179,12 +177,12 @@ export default function PhanPhatPage() {
                                 {/* Expanded Details: Per Teacher View */}
                                 {isExpanded && (
                                     <div style={{ padding: '0 20px 20px', background: 'rgba(0,0,0,0.01)', borderTop: '1px solid var(--border-color)' }}>
-                                        <div style={{ padding: '20px 0 12px', borderBottom: '1px solid var(--border-color)', marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                        <div style={{ padding: '20px 0 12px', borderBottom: '1px solid var(--border-color)', marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
                                             <h4 style={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: 8, fontSize: 14 }}>
                                                 <Users size={16} /> Chi tiết phân phối cho từng Giáo viên
                                             </h4>
                                             {isDanger && (
-                                                <div className="badge badge-danger" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                                <div className="badge badge-danger" style={{ display: 'flex', alignItems: 'center', gap: 6, whiteSpace: 'normal', textAlign: 'left', maxWidth: '100%' }}>
                                                     <AlertTriangle size={14} /> Quá tải: Voucher chờ duyệt lớn hơn kho
                                                 </div>
                                             )}
@@ -195,6 +193,7 @@ export default function PhanPhatPage() {
                                                 Chưa có giáo viên nào đề xuất hoặc nhận vật tư này.
                                             </div>
                                         ) : (
+                                            <div className="table-container">
                                             <table className="data-table" style={{ background: 'white' }}>
                                                 <thead style={{ background: 'var(--bg-glass)' }}>
                                                     <tr>
@@ -233,14 +232,14 @@ export default function PhanPhatPage() {
                                                                 <td style={{ textAlign: 'center', color: '#f59e0b' }}>{teacher.pending}</td>
                                                                 <td>
                                                                     <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                                                                        <div style={{ flex: 1, height: 6, background: '#e2e8f0', borderRadius: 3, overflow: 'hidden' }}>
+                                                                        <div style={{ flex: 1, minWidth: 0, height: 6, background: '#e2e8f0', borderRadius: 3, overflow: 'hidden' }}>
                                                                             <div style={{ 
                                                                                 width: `${Math.min(100, percentOfQuota)}%`, 
                                                                                 height: '100%', 
                                                                                 background: !isFair ? '#ef4444' : consumedTotal === maxQuota ? '#10b981' : '#3b82f6'
                                                                             }}></div>
                                                                         </div>
-                                                                        <span style={{ fontSize: 12, fontWeight: 600, color: statusColor, minWidth: 70 }}>
+                                                                        <span style={{ fontSize: 12, fontWeight: 600, color: statusColor, minWidth: 70, whiteSpace: 'nowrap' }}>
                                                                             {statusLabel}
                                                                         </span>
                                                                     </div>
@@ -250,6 +249,7 @@ export default function PhanPhatPage() {
                                                     })}
                                                 </tbody>
                                             </table>
+                                            </div>
                                         )}
                                     </div>
                                 )}

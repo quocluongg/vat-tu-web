@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { FileText, ChevronDown, Plus, Minus, Send, CheckCircle, BookOpen, Package, Search, X, Printer, Edit2 } from 'lucide-react';
 
-const SearchableMaterialSelect = ({ vatTus, onSelect }) => {
+const SearchableMaterialSelect = ({ vatTus, onSelect, pcNganhId = null, pcTenNganh = '' }) => {
     const [isOpen, setIsOpen] = useState(false);
     const [search, setSearch] = useState('');
     const wrapperRef = useRef(null);
@@ -17,11 +17,23 @@ const SearchableMaterialSelect = ({ vatTus, onSelect }) => {
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
 
-    const sortedVatTus = [...vatTus].sort((a, b) => a.ten_vat_tu.localeCompare(b.ten_vat_tu));
+    const isSameNganh = (vt) => !vt.nganh_id || (pcNganhId && vt.nganh_id === pcNganhId);
+    const loaiLabel = (vt) => (vt.loai_vat_tu === 'sua_che' ? 'Sửa chữa' : 'Tiêu hao');
+
+    const sortedVatTus = [...vatTus].sort((a, b) => {
+        const sa = isSameNganh(a) ? 0 : 1;
+        const sb = isSameNganh(b) ? 0 : 1;
+        if (sa !== sb) return sa - sb;
+        return a.ten_vat_tu.localeCompare(b.ten_vat_tu);
+    });
+    const q = search.toLowerCase().trim();
+    // Mặc định chỉ show vật tư cùng ngành (+ dùng chung). Gõ tìm mới thấy cả ngành khác (disabled).
     const filteredVatTus = sortedVatTus.filter(vt => {
         const str = `${vt.ten_vat_tu} ${vt.yeu_cau_ky_thuat || ''}`.toLowerCase();
-        return str.includes(search.toLowerCase());
-    });
+        if (!str.includes(q)) return false;
+        if (!q) return isSameNganh(vt);
+        return true;
+    }).slice(0, 100);
 
     return (
         <div ref={wrapperRef} style={{ position: 'relative', width: '100%' }}>
@@ -58,36 +70,48 @@ const SearchableMaterialSelect = ({ vatTus, onSelect }) => {
                         {search && <X size={16} style={{ color: 'var(--text-muted)', cursor: 'pointer' }} onClick={() => setSearch('')} />}
                     </div>
 
-                    <div style={{ padding: '8px 16px', borderBottom: '1px solid var(--border-color)', background: 'rgba(14,165,233,0.03)' }}>
-                        <button
-                            className="btn btn-ghost btn-sm btn-full"
-                            style={{ justifyContent: 'flex-start', color: 'var(--text-accent)', fontWeight: 600 }}
-                            onClick={() => onSelect('NEW_MATERIAL_REQUEST')}
-                        >
-                            <Plus size={16} /> Thêm vật tư ngoài danh mục
-                        </button>
-                    </div>
-
                     <div style={{ overflowY: 'auto', flex: 1 }} className="custom-scrollbar">
+                        <div style={{ padding: '8px 16px 0', fontSize: 11, color: 'var(--text-muted)' }}>
+                            {q
+                                ? `${filteredVatTus.length} kết quả${pcTenNganh ? ` • ngành ${pcTenNganh} chọn được, ngành khác bị khóa` : ''}`
+                                : `${filteredVatTus.length} vật tư ${pcTenNganh ? `ngành ${pcTenNganh}` : 'dùng chung'} • gõ để tìm cả ngành khác`}
+                        </div>
                         {filteredVatTus.length === 0 ? (
                             <div style={{ padding: 24, textAlign: 'center', color: 'var(--text-muted)' }}>Không tìm thấy vật tư "{search}"</div>
                         ) : (
-                            filteredVatTus.map((vt, idx) => (
+                            filteredVatTus.map((vt, idx) => {
+                                const disabled = !isSameNganh(vt);
+                                const isSuaChe = vt.loai_vat_tu === 'sua_che';
+                                return (
                                 <div
                                     key={vt.id}
                                     className="material-dropdown-item"
                                     style={{
                                         padding: '12px 16px',
                                         borderBottom: idx === filteredVatTus.length - 1 ? 'none' : '1px solid var(--border-color)',
-                                        cursor: 'pointer',
+                                        cursor: disabled ? 'not-allowed' : 'pointer',
+                                        opacity: disabled ? 0.55 : 1,
+                                        background: disabled ? 'rgba(0,0,0,0.08)' : 'transparent',
                                     }}
                                     onClick={() => {
+                                        if (disabled) return;
                                         onSelect(vt.id);
                                         setIsOpen(false);
                                         setSearch('');
                                     }}
+                                    title={disabled ? `Thuộc ngành ${vt.ten_nganh || 'khác'} — không chọn được cho lớp này` : vt.ten_vat_tu}
                                 >
-                                    <div style={{ fontWeight: 600, color: 'var(--text-primary)', marginBottom: 4, fontSize: 14 }}>{vt.ten_vat_tu}</div>
+                                    <div style={{ fontWeight: 600, color: 'var(--text-primary)', marginBottom: 4, fontSize: 14, display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                                        {vt.ten_vat_tu}
+                                        <span className="badge" style={{ fontSize: 10, background: isSuaChe ? 'rgba(249,115,22,0.15)' : 'rgba(16,185,129,0.15)', color: isSuaChe ? '#ea580c' : '#059669' }}>
+                                            {loaiLabel(vt)}
+                                        </span>
+                                        {disabled && (
+                                            <span className="badge" style={{ fontSize: 10, background: 'rgba(107,114,128,0.2)', color: 'var(--text-muted)' }}>
+                                                🔒 {vt.ten_nganh || 'Ngành khác'}
+                                            </span>
+                                        )}
+                                    </div>
                                     <div style={{ fontSize: 13, color: 'var(--text-secondary)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                         <span style={{ flex: 1, paddingRight: 8 }}>{vt.yeu_cau_ky_thuat || '—'} • {vt.don_vi_tinh}</span>
                                         <div style={{ display: 'flex', gap: 6 }}>
@@ -102,7 +126,8 @@ const SearchableMaterialSelect = ({ vatTus, onSelect }) => {
                                         </div>
                                     </div>
                                 </div>
-                            ))
+                                );
+                            })
                         )}
                     </div>
                 </div>
@@ -117,8 +142,6 @@ export default function DeXuatPublicPage() {
     const [selectedGv, setSelectedGv] = useState('');
     const [phanCongs, setPhanCongs] = useState([]);
     const [vatTus, setVatTus] = useState([]);
-    const [nganhs, setNganhs] = useState([]);
-    const [selectedNganhDeXuat, setSelectedNganhDeXuat] = useState('all');
     const [selections, setSelections] = useState({}); // { monHocId: { vatTuId: soLuong } }
     const [expandedMon, setExpandedMon] = useState({});
     const [submitted, setSubmitted] = useState(false);
@@ -126,10 +149,9 @@ export default function DeXuatPublicPage() {
     const [error, setError] = useState('');
     const [kiInfo, setKiInfo] = useState(null);
     const [isEditMode, setIsEditMode] = useState(false);
-    const [showNewMaterialModal, setShowNewMaterialModal] = useState(false);
-    const [activePcIdForNewMaterial, setActivePcIdForNewMaterial] = useState(null);
-    const [newMaterialData, setNewMaterialData] = useState({ ten_vat_tu: '', yeu_cau_ky_thuat: '', don_vi_tinh: '' });
     const [vatTuTams, setVatTuTams] = useState([]); // {id, ten_vat_tu, ...}
+    const [initLoading, setInitLoading] = useState(true);
+    const [dataLoading, setDataLoading] = useState(false);
 
     useEffect(() => {
         fetch('/api/ki-hoc').then(r => r.json()).then(data => {
@@ -139,9 +161,9 @@ export default function DeXuatPublicPage() {
                 setSelectedKi(activeKis[0].id.toString());
                 setKiInfo(activeKis[0]);
             }
-        });
+            setInitLoading(false);
+        }).catch(() => setInitLoading(false));
         fetch('/api/giao-vien').then(r => r.json()).then(setGiaoVien);
-        fetch('/api/nganh').then(r => r.json()).then(setNganhs);
     }, []);
 
     useEffect(() => {
@@ -151,6 +173,7 @@ export default function DeXuatPublicPage() {
             setExpandedMon({});
             setIsEditMode(false);
             setSubmitted(false);
+            setDataLoading(true);
 
             // Fetch phân công & vật tư & vật tư tạm của GV này
             Promise.all([
@@ -204,7 +227,7 @@ export default function DeXuatPublicPage() {
                                 });
                         }
                     });
-            });
+            }).catch(() => {}).finally(() => setDataLoading(false));
         }
     }, [selectedKi, selectedGv]);
 
@@ -284,42 +307,6 @@ export default function DeXuatPublicPage() {
         return result;
     };
 
-    const handleCreateNewMaterial = async () => {
-        if (!newMaterialData.ten_vat_tu || !newMaterialData.don_vi_tinh) {
-            alert('Vui lòng nhập tên và đơn vị tính');
-            return;
-        }
-        try {
-            // Determine nganh_id from the currently selected filter
-            let nganh_id = null;
-            if (selectedNganhDeXuat && selectedNganhDeXuat !== 'all' && selectedNganhDeXuat !== 'chung') {
-                nganh_id = parseInt(selectedNganhDeXuat);
-            }
-            const res = await fetch('/api/vat-tu-tam', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    ...newMaterialData,
-                    ki_id: parseInt(selectedKi),
-                    giao_vien_id: parseInt(selectedGv),
-                    nganh_id
-                })
-            });
-            if (res.ok) {
-                const data = await res.json();
-                const newTamId = data.id;
-                const newTamItem = { ...newMaterialData, id: newTamId, is_tam: true, nganh_id };
-
-                setVatTuTams(prev => [...prev, newTamItem]);
-                setQuantity(activePcIdForNewMaterial, `tam_${newTamId}`, 1);
-
-                setShowNewMaterialModal(false);
-                setNewMaterialData({ ten_vat_tu: '', yeu_cau_ky_thuat: '', don_vi_tinh: '' });
-            }
-        } catch (err) {
-            alert('Lỗi khi thêm vật tư mới');
-        }
-    };
     const handleSubmit = async () => {
         const chiTiet = getChiTiet();
         if (chiTiet.length === 0) {
@@ -382,6 +369,17 @@ export default function DeXuatPublicPage() {
         );
     }
 
+    if (initLoading) {
+        return (
+            <div className="public-page">
+                <div className="public-container" style={{ textAlign: 'center', paddingTop: 100 }}>
+                    <div className="spinner" style={{ margin: '0 auto 16px' }} />
+                    <p style={{ color: 'var(--text-secondary)' }}>Đang tải dữ liệu...</p>
+                </div>
+            </div>
+        );
+    }
+
     if (kiHocs.length === 0) {
         return (
             <div className="public-page">
@@ -423,12 +421,6 @@ export default function DeXuatPublicPage() {
 
                     {/* Step 2: Select materials per subject */}
                     {selectedGv && (() => {
-                        const filteredVatTus = vatTus.filter(vt => {
-                            if (selectedNganhDeXuat === 'all') return true;
-                            if (selectedNganhDeXuat === 'chung') return !vt.nganh_id;
-                            return vt.nganh_id?.toString() === selectedNganhDeXuat;
-                        });
-
                         return (
                             <div className="card mb-4" style={{ marginBottom: 24 }}>
                                 <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
@@ -436,57 +428,63 @@ export default function DeXuatPublicPage() {
                                         <h2>2. Chọn vật tư</h2>
                                         <span className="badge badge-primary">{phanCongs.length} môn học</span>
                                     </div>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                        <span style={{ fontSize: 14, color: 'var(--text-secondary)' }}>Bộ vật tư:</span>
-                                        <select className="form-select" style={{ width: 'auto', minWidth: 200, padding: '4px 32px 4px 12px', fontSize: 14 }} value={selectedNganhDeXuat} onChange={e => setSelectedNganhDeXuat(e.target.value)}>
-                                            <option value="all">Tất cả</option>
-                                            <option value="chung">Dùng chung</option>
-                                            {nganhs.map(n => <option key={n.id} value={n.id.toString()}>{n.ten_nganh}</option>)}
-                                        </select>
-                                    </div>
+                                    <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                                        Bộ vật tư được xác định theo từng lớp
+                                    </span>
                                 </div>
                                 <div className="card-body" style={{ padding: 0 }}>
-                                    {phanCongs.length === 0 ? (
+                                    {dataLoading ? (
+                                        <div style={{ padding: 48, textAlign: 'center' }}>
+                                            <div className="spinner" style={{ margin: '0 auto 12px' }} />
+                                            <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>Đang tải phân công...</div>
+                                        </div>
+                                    ) : phanCongs.length === 0 ? (
                                         <div className="empty-state">
                                             <BookOpen size={40} />
                                             <h3>Chưa được phân công môn nào</h3>
                                             <p>Liên hệ quản lý để được phân công môn học</p>
                                         </div>
                                     ) : (
-                                        phanCongs.map(pc => {
+                                        phanCongs?.map(pc => {
                                             const isExpanded = expandedMon[pc.id];
                                             const pcSelections = selections[pc.id] || {};
-                                            const selectedCount = Object.keys(pcSelections).length;
+                                            // Bộ vật tư của dòng này quyết định theo ngành của lớp
+                                            const pcNganhId = pc.lop_nganh_id || null;
                                             return (
                                                 <div key={pc.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
                                                     <div
                                                         className="accordion-header"
                                                         onClick={() => togglePc(pc.id)}
                                                     >
-                                                        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                                                            <ChevronDown size={20} style={{ transform: isExpanded ? 'rotate(0)' : 'rotate(-90deg)', transition: 'transform 0.2s' }} />
-                                                            <BookOpen size={18} style={{ color: 'var(--text-accent)' }} />
-                                                            <div>
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: 12, flex: 1, minWidth: 0 }}>
+                                                            <ChevronDown size={20} style={{ transform: isExpanded ? 'rotate(0)' : 'rotate(-90deg)', transition: 'transform 0.2s', flexShrink: 0 }} />
+                                                            <BookOpen size={18} style={{ color: 'var(--text-accent)', flexShrink: 0 }} />
+                                                            <div style={{ minWidth: 0, overflowWrap: 'anywhere' }}>
                                                                 <h3>{pc.ten_mon}</h3>
                                                                 <p style={{ fontSize: 12, color: 'var(--text-muted)' }}>Lớp: {pc.ten_lop} ({pc.si_so} HV) • {pc.ten_loai_he || pc.loai_he}</p>
                                                             </div>
                                                         </div>
-                                                        {selectedCount > 0 && (
-                                                            <span className="badge badge-success">{selectedCount} vật tư đã chọn</span>
-                                                        )}
+                                                        <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginLeft: 'auto' }}>
+                                                            <span className={`badge ${pcNganhId ? 'badge-primary' : 'badge-warning'}`} style={{ fontSize: 11, maxWidth: '100%', whiteSpace: 'normal', textAlign: 'left' }}>
+                                                                Bộ vật tư: {pc.ten_nganh || 'Chưa gán ngành'}
+                                                            </span>
+                                                        </div>
                                                     </div>
                                                     {isExpanded && (
                                                         <div style={{ padding: '0 20px 16px' }}>
+                                                            {!pcNganhId && (
+                                                                <div className="alert alert-warning" style={{ marginBottom: 16, padding: '10px 14px', borderRadius: 10, fontSize: 13 }}>
+                                                                    Lớp <strong>{pc.ten_lop}</strong> chưa được gán ngành — chỉ hiện vật tư <strong>Dùng chung</strong>.
+                                                                    Liên hệ quản trị viên để gán ngành cho lớp.
+                                                                </div>
+                                                            )}
                                                             <div style={{ marginBottom: 16 }}>
                                                                 <SearchableMaterialSelect
-                                                                    vatTus={filteredVatTus}
+                                                                    vatTus={vatTus}
+                                                                    pcNganhId={pcNganhId}
+                                                                    pcTenNganh={pc.ten_nganh}
                                                                     onSelect={(val) => {
-                                                                        if (val === 'NEW_MATERIAL_REQUEST') {
-                                                                            setActivePcIdForNewMaterial(pc.id);
-                                                                            setShowNewMaterialModal(true);
-                                                                        } else {
-                                                                            setQuantity(pc.id, val, (pcSelections[val] || 0) + 1);
-                                                                        }
+                                                                        setQuantity(pc.id, val, (pcSelections[val] || 0) + 1);
                                                                     }}
                                                                 />
                                                             </div>
@@ -505,10 +503,25 @@ export default function DeXuatPublicPage() {
                                                                         }
                                                                         if (!vt) return null;
                                                                         const qty = pcSelections[vtId];
+                                                                        // Đã chọn từ trước nhưng không thuộc bộ vật tư của lớp (dữ liệu cũ)
+                                                                        const vtNganhId = vt.nganh_id || null;
+                                                                        const outsideSet = pcNganhId ? (vtNganhId && vtNganhId !== pcNganhId) : !!vtNganhId;
                                                                         return (
                                                                             <div className="material-item" key={vtId} style={{ background: 'rgba(14,165,233,0.05)', borderColor: 'rgba(14,165,233,0.2)' }}>
                                                                                 <div className="material-info">
-                                                                                    <h4>{vt.ten_vat_tu}</h4>
+                                                                                     <h4 style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                                                                                        {vt.ten_vat_tu}
+                                                                                        {!isTam && (
+                                                                                            <span className="badge" style={{ fontSize: 10, background: vt.loai_vat_tu === 'sua_che' ? 'rgba(249,115,22,0.15)' : 'rgba(16,185,129,0.15)', color: vt.loai_vat_tu === 'sua_che' ? '#ea580c' : '#059669' }}>
+                                                                                                {vt.loai_vat_tu === 'sua_che' ? 'Sửa chữa' : 'Tiêu hao'}
+                                                                                            </span>
+                                                                                        )}
+                                                                                        {outsideSet && (
+                                                                                            <span className="badge badge-warning" style={{ fontSize: 10 }} title="Vật tư này không thuộc bộ vật tư của lớp — nên xóa nếu chọn nhầm">
+                                                                                                Ngoài ngành lớp
+                                                                                            </span>
+                                                                                        )}
+                                                                                    </h4>
                                                                                     <p>
                                                                                         {vt.yeu_cau_ky_thuat && `${vt.yeu_cau_ky_thuat} • `}
                                                                                         {vt.don_vi_tinh} • Kho: {vt.so_luong_kho}
@@ -582,70 +595,6 @@ export default function DeXuatPublicPage() {
                                             );
                                         })
                                     )}
-                                </div>
-                            </div>
-                        );
-                    })()}
-
-                    {/* New Material Modal */}
-                    {showNewMaterialModal && (() => {
-                        const nganhName = selectedNganhDeXuat === 'all' ? 'Tất cả (chưa xác định)'
-                            : selectedNganhDeXuat === 'chung' ? 'Dùng chung'
-                                : nganhs.find(n => n.id.toString() === selectedNganhDeXuat)?.ten_nganh || 'Không rõ';
-                        return (
-                            <div className="modal-overlay">
-                                <div className="modal">
-                                    <div className="modal-header">
-                                        <h2>Đề xuất vật tư ngoài danh mục</h2>
-                                        <button className="btn-icon btn-ghost" onClick={() => setShowNewMaterialModal(false)}><X size={20} /></button>
-                                    </div>
-                                    <div className="modal-body">
-                                        <div className="alert alert-info" style={{ marginBottom: 16, padding: '10px 14px', borderRadius: 10, fontSize: 13 }}>
-                                            <strong>Bộ vật tư ngành:</strong> {nganhName}
-                                            {selectedNganhDeXuat === 'all' && (
-                                                <div style={{ marginTop: 4, fontSize: 12, opacity: 0.8 }}>Vui lòng chọn bộ vật tư ngành cụ thể trước khi thêm để vật tư được phân loại đúng.</div>
-                                            )}
-                                        </div>
-                                        <div className="form-group">
-                                            <label className="form-label">Tên vật tư <span style={{ color: 'red' }}>*</span></label>
-                                            <input
-                                                type="text"
-                                                className="form-input"
-                                                placeholder="Ví dụ: Cảm biến siêu âm HC-SR04"
-                                                value={newMaterialData.ten_vat_tu}
-                                                onChange={e => setNewMaterialData(prev => ({ ...prev, ten_vat_tu: e.target.value }))}
-                                            />
-                                        </div>
-                                        <div className="form-group">
-                                            <label className="form-label">Yêu cầu kỹ thuật / Mã hiệu / Quy cách</label>
-                                            <input
-                                                type="text"
-                                                className="form-input"
-                                                placeholder="Ví dụ: 5V, dải đo 2cm-400cm"
-                                                value={newMaterialData.yeu_cau_ky_thuat}
-                                                onChange={e => setNewMaterialData(prev => ({ ...prev, yeu_cau_ky_thuat: e.target.value }))}
-                                            />
-                                        </div>
-                                        <div className="form-group">
-                                            <label className="form-label">Đơn vị tính <span style={{ color: 'red' }}>*</span></label>
-                                            <input
-                                                type="text"
-                                                className="form-input"
-                                                placeholder="Ví dụ: Cái, Bộ, Mét..."
-                                                value={newMaterialData.don_vi_tinh}
-                                                onChange={e => setNewMaterialData(prev => ({ ...prev, don_vi_tinh: e.target.value }))}
-                                            />
-                                        </div>
-                                        <p style={{ fontSize: 12, color: 'var(--text-muted)', fontStyle: 'italic' }}>
-                                            * Vật tư này sẽ ở trạng thái "Đợi duyệt" cho đến khi quản trị viên xác nhận.
-                                        </p>
-                                    </div>
-                                    <div className="modal-footer">
-                                        <button className="btn btn-secondary" onClick={() => setShowNewMaterialModal(false)}>Hủy</button>
-                                        <button className="btn btn-primary" onClick={handleCreateNewMaterial}>
-                                            <Plus size={18} /> Gửi đề xuất vật tư
-                                        </button>
-                                    </div>
                                 </div>
                             </div>
                         );

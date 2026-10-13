@@ -69,11 +69,13 @@ export async function GET(request) {
                 sql: `
         SELECT px.*, gv.ho_ten as ten_gv, gv.email, gv.so_dien_thoai,
                m.ten_mon,
-               l.ten_lop, l.si_so, l.loai_he
+               l.ten_lop, l.si_so, l.loai_he,
+               bb.so_bien_ban, bb.trang_thai as bien_ban_trang_thai
         FROM phieu_xuat px
         JOIN giao_vien gv ON px.giao_vien_id = gv.id
         JOIN mon_hoc m ON px.mon_hoc_id = m.id
         LEFT JOIN lop l ON px.lop_id = l.id
+        LEFT JOIN bien_ban bb ON px.bien_ban_id = bb.id
         WHERE px.id = ?
       `,
                 args: [id]
@@ -84,7 +86,7 @@ export async function GET(request) {
 
             const chiTietResult = await db.execute({
                 sql: `
-        SELECT pxct.*, vt.ten_vat_tu, vt.yeu_cau_ky_thuat, vt.don_vi_tinh, vt.so_luong_kho
+        SELECT pxct.*, vt.ten_vat_tu, vt.yeu_cau_ky_thuat, vt.don_vi_tinh, vt.so_luong_kho, vt.loai_vat_tu
         FROM phieu_xuat_chi_tiet pxct
         JOIN vat_tu vt ON pxct.vat_tu_id = vt.id
         WHERE pxct.phieu_xuat_id = ?
@@ -230,11 +232,16 @@ export async function GET(request) {
         let query = `
       SELECT px.*, gv.ho_ten as ten_gv, m.ten_mon, l.ten_lop,
         (SELECT COUNT(*) FROM phieu_xuat_chi_tiet WHERE phieu_xuat_id = px.id) as so_vat_tu,
-        (SELECT SUM(so_luong) FROM phieu_xuat_chi_tiet WHERE phieu_xuat_id = px.id) as tong_so_luong
+        (SELECT SUM(so_luong) FROM phieu_xuat_chi_tiet WHERE phieu_xuat_id = px.id) as tong_so_luong,
+        (SELECT MIN(vt.loai_vat_tu) FROM phieu_xuat_chi_tiet pxct
+           JOIN vat_tu vt ON pxct.vat_tu_id = vt.id
+           WHERE pxct.phieu_xuat_id = px.id) as loai_vat_tu,
+        bb.so_bien_ban, bb.trang_thai as bien_ban_trang_thai
       FROM phieu_xuat px
       JOIN giao_vien gv ON px.giao_vien_id = gv.id
       JOIN mon_hoc m ON px.mon_hoc_id = m.id
       LEFT JOIN lop l ON px.lop_id = l.id
+      LEFT JOIN bien_ban bb ON px.bien_ban_id = bb.id
     `;
 
         const conditions = [];
@@ -267,7 +274,7 @@ export async function GET(request) {
 export async function POST(request) {
     try {
         const db = getDb();
-        const { giao_vien_id, ki_id, mon_hoc_id, lop_id, chi_tiet } = await request.json();
+        const { giao_vien_id, ki_id, mon_hoc_id, lop_id, chi_tiet, bien_ban_id } = await request.json();
 
         // Input validation
         if (!giao_vien_id || !ki_id || !mon_hoc_id) {
@@ -357,7 +364,7 @@ export async function POST(request) {
 
             // Check material exists AND belongs to this semester (ki_id)
             const vtCheck = await db.execute({
-                sql: 'SELECT ten_vat_tu, ki_id FROM vat_tu WHERE id = ?',
+                sql: 'SELECT ten_vat_tu, ki_id, loai_vat_tu FROM vat_tu WHERE id = ?',
                 args: [ct.vat_tu_id]
             });
             if (vtCheck.rows.length === 0) {
@@ -373,29 +380,68 @@ export async function POST(request) {
                 }, { status: 400 });
             }
 
-            materialValidations.push({ vat_tu_id: ct.vat_tu_id, ten_vat_tu: vtCheck.rows[0].ten_vat_tu });
+            materialValidations.push({
+                vat_tu_id: ct.vat_tu_id,
+                ten_vat_tu: vtCheck.rows[0].ten_vat_tu,
+                loai_vat_tu: vtCheck.rows[0].loai_vat_tu || 'tieu_hao',
+            });
         }
 
-        // Validate proposal quantities
-        const deXuatResult = await db.execute({
-            sql: `
+        // ✅ Tách phiếu theo loại vật tư: tiêu hao vs sửa chữa
+        const loaiMap = {};
+        materialValidations.forEach(m => { loaiMap[m.vat_tu_id] = m.loai_vat_tu; });
+        const tieuHaoItems = chi_tiet.filter(ct => (loaiMap[ct.vat_tu_id] || 'tieu_hao') === 'tieu_hao');
+        const suaCheItems = chi_tiet.filter(ct => loaiMap[ct.vat_tu_id] === 'sua_che');
+
+        // ✅ Vật tư sửa chữa BẮT BUỘC gắn biên bản đã duyệt
+        if (suaCheItems.length > 0) {
+            if (!bien_ban_id) {
+                const names = suaCheItems.map(ct => materialValidations.find(m => m.vat_tu_id === ct.vat_tu_id)?.ten_vat_tu).join(', ');
+                return NextResponse.json({
+                    error: `⚠️ Các vật tư sửa chữa (${names}) phải được xuất theo Biên bản hư hỏng đã duyệt. Vui lòng tạo/chọn biên bản BM01.`
+                }, { status: 400 });
+            }
+            const bbCheck = await db.execute({
+                sql: 'SELECT id, trang_thai, ki_id FROM bien_ban WHERE id = ?',
+                args: [bien_ban_id]
+            });
+            if (bbCheck.rows.length === 0) {
+                return NextResponse.json({ error: `Biên bản ID ${bien_ban_id} không tồn tại` }, { status: 400 });
+            }
+            if (bbCheck.rows[0].trang_thai !== 'da_duyet') {
+                return NextResponse.json({
+                    error: `⚠️ Biên bản #${bien_ban_id} chưa được duyệt. Vật tư sửa chữa chỉ được xuất khi biên bản ở trạng thái "Đã duyệt".`
+                }, { status: 400 });
+            }
+        }
+
+        // ✅ Quota/công bằng chỉ áp dụng cho nhóm TIÊU HAO (sửa chữa xuất theo biên bản)
+        const proposalMap = {};
+        const exportedMap = {};
+        const globalExportedMap = {};
+        const globalStatsMap = {};
+        const demandsByMaterial = {};
+
+        if (tieuHaoItems.length > 0) {
+            // Validate proposal quantities
+            const deXuatResult = await db.execute({
+                sql: `
       SELECT dxct.vat_tu_id, SUM(dxct.so_luong) as so_luong
       FROM de_xuat_chi_tiet dxct
       JOIN de_xuat dx ON dxct.de_xuat_id = dx.id
       WHERE dx.giao_vien_id = ? AND dx.ki_id = ? AND dxct.mon_hoc_id = ? AND dx.trang_thai IN ('da_nop', 'duyet', 'dang_lam')
       GROUP BY dxct.vat_tu_id
     `,
-            args: [giao_vien_id, ki_id, mon_hoc_id]
-        });
+                args: [giao_vien_id, ki_id, mon_hoc_id]
+            });
 
-        const proposalMap = {};
-        for (const d of deXuatResult.rows) {
-            proposalMap[d.vat_tu_id] = d.so_luong;
-        }
+            for (const d of deXuatResult.rows) {
+                proposalMap[d.vat_tu_id] = d.so_luong;
+            }
 
-        // 3. Get existing exports for THIS teacher for THIS subject/class
-        const existingExportsResult = await db.execute({
-            sql: `
+            // 3. Get existing exports for THIS teacher for THIS subject/class
+            const existingExportsResult = await db.execute({
+                sql: `
                 SELECT pxct.vat_tu_id, SUM(pxct.so_luong) as da_xuat
                 FROM phieu_xuat_chi_tiet pxct
                 JOIN phieu_xuat px ON pxct.phieu_xuat_id = px.id
@@ -403,35 +449,33 @@ export async function POST(request) {
                   AND px.trang_thai != 'tu_choi'
                 GROUP BY pxct.vat_tu_id
             `,
-            args: [giao_vien_id, ki_id, mon_hoc_id]
-        });
+                args: [giao_vien_id, ki_id, mon_hoc_id]
+            });
 
-        const exportedMap = {};
-        existingExportsResult.rows.forEach(e => {
-            exportedMap[e.vat_tu_id] = e.da_xuat;
-        });
+            existingExportsResult.rows.forEach(e => {
+                exportedMap[e.vat_tu_id] = e.da_xuat;
+            });
 
-        // 3.1. Get GLOBAL exports across ALL subjects for this teacher to properly decrement from global fair limit
-        const globalExportsResult = await db.execute({
-            sql: `
+            // 3.1. Get GLOBAL exports across ALL subjects for this teacher to properly decrement from global fair limit
+            const globalExportsResult = await db.execute({
+                sql: `
                 SELECT pxct.vat_tu_id, SUM(pxct.so_luong) as da_xuat_global
                 FROM phieu_xuat_chi_tiet pxct
                 JOIN phieu_xuat px ON pxct.phieu_xuat_id = px.id
-                WHERE px.giao_vien_id = ? AND px.ki_id = ?
+                WHERE px.giao_vien_id = ? AND px.ki_id = ? 
                   AND px.trang_thai != 'tu_choi'
                 GROUP BY pxct.vat_tu_id
             `,
-            args: [giao_vien_id, ki_id]
-        });
+                args: [giao_vien_id, ki_id]
+            });
 
-        const globalExportedMap = {};
-        globalExportsResult.rows.forEach(e => {
-            globalExportedMap[e.vat_tu_id] = e.da_xuat_global;
-        });
+            globalExportsResult.rows.forEach(e => {
+                globalExportedMap[e.vat_tu_id] = e.da_xuat_global;
+            });
 
-        // 4. Get global stats for materials in this request (inventory & total proposed across ALL teachers)
-        const globalStatsResult = await db.execute({
-            sql: `
+            // 4. Get global stats for materials in this request (inventory & total proposed across ALL teachers)
+            const globalStatsResult = await db.execute({
+                sql: `
                 SELECT vt.id as vat_tu_id, vt.so_luong_kho,
                        COALESCE(SUM(
                            CASE WHEN dx.trang_thai IN ('da_nop', 'duyet', 'dang_lam') 
@@ -452,138 +496,148 @@ export async function POST(request) {
                 FROM vat_tu vt
                 LEFT JOIN de_xuat_chi_tiet dxct ON vt.id = dxct.vat_tu_id
                 LEFT JOIN de_xuat dx ON dxct.de_xuat_id = dx.id AND dx.ki_id = vt.ki_id
-                WHERE vt.id IN (${chi_tiet.map(() => '?').join(',')})
+                WHERE vt.id IN (${tieuHaoItems.map(() => '?').join(',')})
                 GROUP BY vt.id
             `,
-            args: chi_tiet.map(ct => ct.vat_tu_id)
-        });
+                args: tieuHaoItems.map(ct => ct.vat_tu_id)
+            });
 
-        const globalStatsMap = {};
-        globalStatsResult.rows.forEach(r => {
-            globalStatsMap[r.vat_tu_id] = {
-                total_supply: r.so_luong_kho + r.total_da_xuat_all,
-                total_proposed: r.total_proposed,
-                so_luong_kho: r.so_luong_kho,
-                so_luong_free: Math.max(0, r.so_luong_kho - r.total_pending_all)
-            };
-        });
+            globalStatsResult.rows.forEach(r => {
+                globalStatsMap[r.vat_tu_id] = {
+                    total_supply: r.so_luong_kho + r.total_da_xuat_all,
+                    total_proposed: r.total_proposed,
+                    so_luong_kho: r.so_luong_kho,
+                    so_luong_free: Math.max(0, r.so_luong_kho - r.total_pending_all)
+                };
+            });
 
-        // 4.1. Get granular demands AT TEACHER LEVEL for explicit fair-allocation computation
-        const demandsResult = await db.execute({
-            sql: `
+            // 4.1. Get granular demands AT TEACHER LEVEL for explicit fair-allocation computation
+            const demandsResult = await db.execute({
+                sql: `
                 SELECT dxct.vat_tu_id, dx.giao_vien_id, SUM(dxct.so_luong) as demand
                 FROM de_xuat_chi_tiet dxct
                 JOIN de_xuat dx ON dxct.de_xuat_id = dx.id
                 WHERE dx.ki_id = ? AND dx.trang_thai IN ('da_nop', 'duyet', 'dang_lam')
-                AND dxct.vat_tu_id IN (${chi_tiet.map(() => '?').join(',')})
+                AND dxct.vat_tu_id IN (${tieuHaoItems.map(() => '?').join(',')})
                 GROUP BY dxct.vat_tu_id, dx.giao_vien_id
             `,
-            args: [ki_id, ...chi_tiet.map(ct => ct.vat_tu_id)]
-        });
-
-        const demandsByMaterial = {};
-        demandsResult.rows.forEach(r => {
-            if (!demandsByMaterial[r.vat_tu_id]) demandsByMaterial[r.vat_tu_id] = [];
-            demandsByMaterial[r.vat_tu_id].push({
-                gv_id: r.giao_vien_id,
-                demand: r.demand
+                args: [ki_id, ...tieuHaoItems.map(ct => ct.vat_tu_id)]
             });
-        });
 
-        // Validate quantities don't exceed proportional limits
-        for (let i = 0; i < chi_tiet.length; i++) {
-            const ct = chi_tiet[i];
-            const proposedQty = proposalMap[ct.vat_tu_id] || 0;
-            const alreadyExported = exportedMap[ct.vat_tu_id] || 0;
-            
-            // Calculate practical limit using fair waterfill distribution
-            const gStats = globalStatsMap[ct.vat_tu_id] || { total_supply: proposedQty, total_proposed: proposedQty, so_luong_free: 0 };
-            const materialDemands = demandsByMaterial[ct.vat_tu_id] || [];
-            
-            // Compute entire table for this material
-            const fairResults = distributeFairly(gStats.total_supply, materialDemands);
-            
-            // Extract item specific to current Teacher (Global scale)
-            const myResult = fairResults.find(x => x.gv_id === giao_vien_id);
-            const teacherFairTotal = myResult ? myResult.got : 0;
-            
-            // Calculate absolute available slots against WHOLE semester history for this teacher
-            const globalUsed = globalExportedMap[ct.vat_tu_id] || 0;
-            const quotaRemaining = Math.max(0, teacherFairTotal - globalUsed);
-            
-            const canXuatThucTe = Math.min(quotaRemaining, gStats.so_luong_free || 0);
-
-            if (ct.so_luong > canXuatThucTe) {
-                const reasons = [];
-                if (ct.so_luong > quotaRemaining) {
-                    reasons.push(`vượt hạn mức phân bổ công bằng CẢ KỲ của bạn (Hạn mức: ${teacherFairTotal}, Đã lấy các môn khác: ${globalUsed}, Khả dụng: ${quotaRemaining})`);
-                } else {
-                    reasons.push(`vượt số lượng vật lý thực tế còn lại trong kho (${gStats.so_luong_free})`);
-                }
-                const vtInfo = materialValidations.find(v => v.vat_tu_id === ct.vat_tu_id);
-                return NextResponse.json({
-                    error: `⚠️ Vật tư "${vtInfo?.ten_vat_tu}" ${reasons.join(' và ')}.`
-                }, { status: 400 });
-            }
-        }
-
-        // Insert phieu_xuat
-        const insertResult = await db.execute({
-            sql: "INSERT INTO phieu_xuat (giao_vien_id, ki_id, mon_hoc_id, lop_id) VALUES (?, ?, ?, ?)",
-            args: [giao_vien_id, ki_id, mon_hoc_id, lop_id || null]
-        });
-
-        let phieuXuatId = insertResult.lastInsertRowid !== undefined ? Number(insertResult.lastInsertRowid) : null;
-
-        // Fallback to Select if lastInsertRowid is missing
-        if (!phieuXuatId) {
-            const idResult = await db.execute({
-                sql: 'SELECT id FROM phieu_xuat WHERE giao_vien_id = ? AND ki_id = ? AND mon_hoc_id = ? ORDER BY ngay_tao DESC LIMIT 1',
-                args: [giao_vien_id, ki_id, mon_hoc_id]
-            });
-            phieuXuatId = idResult.rows[0]?.id;
-        }
-
-        if (!phieuXuatId) {
-            return NextResponse.json({
-                error: 'Không thể tạo phiếu xuất (ID lỗi)'
-            }, { status: 500 });
-        }
-
-        // Convert to number for consistency
-        phieuXuatId = parseInt(phieuXuatId) || phieuXuatId;
-        console.log('✅ Created/Found phieu_xuat ID:', phieuXuatId, 'type:', typeof phieuXuatId);
-
-        // Insert chi_tiet records
-        if (!chi_tiet || chi_tiet.length === 0) {
-            return NextResponse.json({
-                id: phieuXuatId,
-                message: 'Tạo phiếu xuất thành công (không có chi tiết)'
-            });
-        }
-
-        console.log('📝 Inserting', chi_tiet.length, 'chi_tiet records with phieu_xuat_id:', phieuXuatId);
-        console.log('🔍 Data:', JSON.stringify({ phieu_xuat_id: phieuXuatId, chi_tiet: chi_tiet }, null, 2));
-
-        // Insert one by one to catch exact error
-        for (let i = 0; i < chi_tiet.length; i++) {
-            const ct = chi_tiet[i];
-            try {
-                console.log(`  Inserting row ${i + 1}/${chi_tiet.length}: vat_tu_id=${ct.vat_tu_id}, so_luong=${ct.so_luong}`);
-                await db.execute({
-                    sql: 'INSERT INTO phieu_xuat_chi_tiet (phieu_xuat_id, vat_tu_id, so_luong) VALUES (?, ?, ?)',
-                    args: [phieuXuatId, ct.vat_tu_id, ct.so_luong]
+            demandsResult.rows.forEach(r => {
+                if (!demandsByMaterial[r.vat_tu_id]) demandsByMaterial[r.vat_tu_id] = [];
+                demandsByMaterial[r.vat_tu_id].push({
+                    gv_id: r.giao_vien_id,
+                    demand: r.demand
                 });
-            } catch (err) {
-                console.error(`  ❌ Failed on row ${i + 1}:`, err.message);
-                throw err;
+            });
+
+            // Validate quantities don't exceed proportional limits
+            for (let i = 0; i < tieuHaoItems.length; i++) {
+                const ct = tieuHaoItems[i];
+                const proposedQty = proposalMap[ct.vat_tu_id] || 0;
+                const alreadyExported = exportedMap[ct.vat_tu_id] || 0;
+
+                // Calculate practical limit using fair waterfill distribution
+                const gStats = globalStatsMap[ct.vat_tu_id] || { total_supply: proposedQty, total_proposed: proposedQty, so_luong_free: 0 };
+                const materialDemands = demandsByMaterial[ct.vat_tu_id] || [];
+
+                // Compute entire table for this material
+                const fairResults = distributeFairly(gStats.total_supply, materialDemands);
+
+                // Extract item specific to current Teacher (Global scale)
+                const myResult = fairResults.find(x => x.gv_id === giao_vien_id);
+                const teacherFairTotal = myResult ? myResult.got : 0;
+
+                // Calculate absolute available slots against WHOLE semester history for this teacher
+                const globalUsed = globalExportedMap[ct.vat_tu_id] || 0;
+                const quotaRemaining = Math.max(0, teacherFairTotal - globalUsed);
+
+                const canXuatThucTe = Math.min(quotaRemaining, gStats.so_luong_free || 0);
+
+                if (ct.so_luong > canXuatThucTe) {
+                    const reasons = [];
+                    if (ct.so_luong > quotaRemaining) {
+                        reasons.push(`vượt hạn mức phân bổ công bằng CẢ KỲ của bạn (Hạn mức: ${teacherFairTotal}, Đã lấy các môn khác: ${globalUsed}, Khả dụng: ${quotaRemaining})`);
+                    } else {
+                        reasons.push(`vượt số lượng vật lý thực tế còn lại trong kho (${gStats.so_luong_free})`);
+                    }
+                    const vtInfo = materialValidations.find(v => v.vat_tu_id === ct.vat_tu_id);
+                    return NextResponse.json({
+                        error: `⚠️ Vật tư "${vtInfo?.ten_vat_tu}" ${reasons.join(' và ')}.`
+                    }, { status: 400 });
+                }
             }
         }
-        console.log('✅ Chi_tiet inserted successfully');
+
+        // ✅ Vật tư sửa chữa: chỉ kiểm tra tồn kho vật lý
+        if (suaCheItems.length > 0) {
+            const statsResult = await db.execute({
+                sql: `
+                    SELECT vt.id, vt.ten_vat_tu, vt.so_luong_kho
+                    FROM vat_tu vt
+                    WHERE vt.id IN (${suaCheItems.map(() => '?').join(',')})
+                `,
+                args: suaCheItems.map(ct => ct.vat_tu_id)
+            });
+            for (const item of statsResult.rows) {
+                const requested = suaCheItems
+                    .filter(ct => ct.vat_tu_id === item.id)
+                    .reduce((s, ct) => s + ct.so_luong, 0);
+                if (requested > item.so_luong_kho) {
+                    return NextResponse.json({
+                        error: `⚠️ Vật tư sửa chữa "${item.ten_vat_tu}" thiếu hàng trong kho (Cần: ${requested}, Kho có: ${item.so_luong_kho}).`
+                    }, { status: 400 });
+                }
+            }
+        }
+
+        // ✅ Tạo phiếu — mỗi loại một phiếu riêng
+        const created = [];
+        const createPhieu = async (items, bienBanId) => {
+            const insertResult = await db.execute({
+                sql: "INSERT INTO phieu_xuat (giao_vien_id, ki_id, mon_hoc_id, lop_id, bien_ban_id) VALUES (?, ?, ?, ?, ?)",
+                args: [giao_vien_id, ki_id, mon_hoc_id, lop_id || null, bienBanId || null]
+            });
+            let pxId = insertResult.lastInsertRowid !== undefined ? Number(insertResult.lastInsertRowid) : null;
+            if (!pxId) {
+                const idResult = await db.execute({
+                    sql: 'SELECT id FROM phieu_xuat WHERE giao_vien_id = ? AND ki_id = ? AND mon_hoc_id = ? ORDER BY ngay_tao DESC LIMIT 1',
+                    args: [giao_vien_id, ki_id, mon_hoc_id]
+                });
+                pxId = idResult.rows[0]?.id;
+            }
+            if (!pxId) throw new Error('Không thể tạo phiếu xuất (ID lỗi)');
+
+            const detailStmts = items.map(ct => ({
+                sql: 'INSERT INTO phieu_xuat_chi_tiet (phieu_xuat_id, vat_tu_id, so_luong) VALUES (?, ?, ?)',
+                args: [pxId, ct.vat_tu_id, ct.so_luong]
+            }));
+            if (detailStmts.length > 0) {
+                await db.batch(detailStmts, 'write');
+            }
+            return parseInt(pxId) || pxId;
+        };
+
+        if (tieuHaoItems.length > 0) {
+            const pxId = await createPhieu(tieuHaoItems, null);
+            created.push({ id: pxId, loai_vat_tu: 'tieu_hao' });
+        }
+        if (suaCheItems.length > 0) {
+            const pxId = await createPhieu(suaCheItems, bien_ban_id);
+            created.push({ id: pxId, loai_vat_tu: 'sua_che', bien_ban_id });
+        }
+
+        const message = created.length > 1
+            ? `Tạo 2 phiếu xuất thành công: 1 phiếu tiêu hao (#${created[0].id}) và 1 phiếu sửa chữa (#${created[1].id}, biên bản #${bien_ban_id})`
+            : created[0]?.loai_vat_tu === 'sua_che'
+                ? `Tạo phiếu xuất sửa chữa thành công (biên bản #${bien_ban_id})`
+                : 'Tạo phiếu xuất thành công';
 
         return NextResponse.json({
-            id: phieuXuatId,
-            message: 'Tạo phiếu xuất thành công'
+            id: created[0]?.id,
+            phieus: created,
+            message
         });
     } catch (error) {
         console.error('phieu-xuat POST error:', error);
@@ -604,7 +658,7 @@ export async function PUT(request) {
 
         // Check phieu_xuat status once for both chi_tiet and new_items
         const pxCheck = await db.execute({
-            sql: 'SELECT trang_thai, ki_id FROM phieu_xuat WHERE id = ?',
+            sql: 'SELECT trang_thai, ki_id, bien_ban_id FROM phieu_xuat WHERE id = ?',
             args: [id]
         });
         if (pxCheck.rows.length === 0) {
@@ -612,6 +666,7 @@ export async function PUT(request) {
         }
         const currentStatus = pxCheck.rows[0].trang_thai;
         const pxKiId = pxCheck.rows[0].ki_id;
+        const pxBienBanId = pxCheck.rows[0].bien_ban_id;
 
         // Adjusting quantities if chi_tiet is provided
         if (chi_tiet && Array.isArray(chi_tiet)) {
@@ -703,6 +758,19 @@ export async function PUT(request) {
             }
             // When exported, reduce inventory, but CHECK it first!
             if (trang_thai === 'da_xuat') {
+                // ✅ Phiếu sửa chữa: bắt buộc biên bản đã duyệt trước khi xuất kho
+                if (pxBienBanId) {
+                    const bbCheck = await db.execute({
+                        sql: 'SELECT trang_thai FROM bien_ban WHERE id = ?',
+                        args: [pxBienBanId]
+                    });
+                    if (bbCheck.rows.length === 0 || bbCheck.rows[0].trang_thai !== 'da_duyet') {
+                        return NextResponse.json({
+                            error: `⚠️ Biên bản #${pxBienBanId} chưa được duyệt. Không thể xuất kho vật tư sửa chữa.`
+                        }, { status: 400 });
+                    }
+                }
+
                 const detailsResult = await db.execute({
                     sql: `
           SELECT pxct.vat_tu_id, pxct.so_luong, vt.so_luong_kho, vt.ten_vat_tu

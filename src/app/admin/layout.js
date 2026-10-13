@@ -1,7 +1,8 @@
 import { getServerSession } from 'next-auth';
 import { redirect } from 'next/navigation';
+import { Suspense } from 'react';
 import { authOptions } from '@/lib/auth';
-import Sidebar from '@/components/Sidebar';
+import TopNav from '@/components/TopNav';
 import { ToastProvider } from '@/components/Toast';
 
 export default async function AdminLayout({ children }) {
@@ -14,7 +15,9 @@ export default async function AdminLayout({ children }) {
     return (
         <ToastProvider>
             <div className="admin-layout">
-                <Sidebar />
+                <Suspense>
+                    <TopNav />
+                </Suspense>
                 <main className="main-content">
                     {children}
                 </main>

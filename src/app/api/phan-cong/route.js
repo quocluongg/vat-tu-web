@@ -16,6 +16,8 @@ export async function GET(request) {
              l.ten_lop,
              l.si_so,
              l.loai_he,
+             l.nganh_id as lop_nganh_id,
+             n.ten_nganh,
              CASE l.loai_he
                WHEN 'T' THEN 'Trung cấp'
                WHEN 'C' THEN 'Cao đẳng'
@@ -25,6 +27,7 @@ export async function GET(request) {
       JOIN giao_vien gv ON pc.giao_vien_id = gv.id
       JOIN mon_hoc m ON pc.mon_hoc_id = m.id
       JOIN lop l ON pc.lop_id = l.id
+      LEFT JOIN nganh n ON l.nganh_id = n.id
     `;
 
         const conditions = [];

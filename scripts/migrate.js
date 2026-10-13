@@ -72,7 +72,9 @@ async function migrate() {
       ten_lop TEXT NOT NULL UNIQUE,
       loai_he TEXT NOT NULL CHECK(loai_he IN ('T', 'C', 'L')),
       si_so INTEGER DEFAULT 0,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      nganh_id INTEGER,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (nganh_id) REFERENCES nganh(id) ON DELETE SET NULL
     )`,
         `CREATE TABLE IF NOT EXISTS phan_cong (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -229,6 +231,63 @@ async function migrate() {
     try {
         await db.execute("UPDATE vat_tu_tam SET trang_thai = 'cho_duyet' WHERE trang_thai IS NULL");
         console.log('   ✅ Đã cập nhật trang_thai mặc định cho vat_tu_tam');
+    } catch (e) {}
+
+    // ===== Cơ cấu lại vật tư: tiêu hao / sửa chữa + Biên bản BM01 =====
+    console.log('✅ Đang cập nhật schema tiêu hao/sửa chữa + biên bản...');
+
+    try {
+        await db.execute("ALTER TABLE vat_tu ADD COLUMN loai_vat_tu TEXT NOT NULL DEFAULT 'tieu_hao' CHECK(loai_vat_tu IN ('tieu_hao', 'sua_che'))");
+        console.log('   ✅ Đã thêm cột vat_tu.loai_vat_tu');
+    } catch (e) {}
+
+    console.log('✅ Đang cập nhật schema lớp → ngành (bộ vật tư)...');
+
+    try {
+        await db.execute("ALTER TABLE lop ADD COLUMN nganh_id INTEGER REFERENCES nganh(id) ON DELETE SET NULL");
+        console.log('   ✅ Đã thêm cột lop.nganh_id');
+    } catch (e) {}
+
+    try {
+        await db.execute(`
+            CREATE TABLE IF NOT EXISTS bien_ban (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              so_bien_ban TEXT,
+              ngay_lap TEXT,
+              gio_lap TEXT,
+              ki_id INTEGER,
+              thanh_phan TEXT,
+              ten_thiet_bi TEXT,
+              ma_so TEXT,
+              phong_khoa TEXT,
+              dia_diem TEXT,
+              nguoi_su_dung TEXT,
+              thoi_gian_phat_hien TEXT,
+              nguoi_phat_hien TEXT,
+              hien_tuong_hu_hong TEXT,
+              tinh_hinh TEXT,
+              nguyen_nhan TEXT,
+              de_nghi_khac_phuc TEXT,
+              ket_qua_kiem_tra TEXT,
+              phuong_an TEXT,
+              vat_tu_phat_sinh TEXT,
+              cong_viec_nghiem_thu TEXT,
+              ngay_hoan_thanh TEXT,
+              giao_vien_id INTEGER,
+              trang_thai TEXT DEFAULT 'cho_duyet' CHECK(trang_thai IN ('cho_duyet', 'da_duyet', 'tu_choi')),
+              ngay_duyet DATETIME,
+              ghi_chu TEXT,
+              created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+              FOREIGN KEY (ki_id) REFERENCES ki_hoc(id) ON DELETE SET NULL,
+              FOREIGN KEY (giao_vien_id) REFERENCES giao_vien(id) ON DELETE SET NULL
+            )
+        `);
+        console.log('   ✅ Đã tạo bảng bien_ban (BM01)');
+    } catch (e) {}
+
+    try {
+        await db.execute("ALTER TABLE phieu_xuat ADD COLUMN bien_ban_id INTEGER REFERENCES bien_ban(id)");
+        console.log('   ✅ Đã thêm cột phieu_xuat.bien_ban_id');
     } catch (e) {}
 
     console.log('✅ Đang kiểm tra admin...');

@@ -112,7 +112,7 @@ export default function GiaoVienPage() {
                                 <th>Họ tên</th>
                                 <th>Email</th>
                                 <th>Số điện thoại</th>
-                                <th style={{ width: 100 }}>Thao tác</th>
+                                <th style={{ width: 120 }}>Thao tác</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -124,15 +124,15 @@ export default function GiaoVienPage() {
                                     <td style={{ color: 'var(--text-primary)', fontWeight: 500 }}>{gv.ho_ten}</td>
                                     <td>
                                         {gv.email ? (
-                                            <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                                                <Mail size={14} style={{ color: 'var(--text-muted)' }} /> {gv.email}
+                                            <span style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0, overflowWrap: 'anywhere' }}>
+                                                <Mail size={14} style={{ color: 'var(--text-muted)', flexShrink: 0 }} /> {gv.email}
                                             </span>
                                         ) : '—'}
                                     </td>
                                     <td>
                                         {gv.so_dien_thoai ? (
-                                            <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                                                <Phone size={14} style={{ color: 'var(--text-muted)' }} /> {gv.so_dien_thoai}
+                                            <span style={{ display: 'flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap' }}>
+                                                <Phone size={14} style={{ color: 'var(--text-muted)', flexShrink: 0 }} /> {gv.so_dien_thoai}
                                             </span>
                                         ) : '—'}
                                     </td>

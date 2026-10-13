@@ -29,9 +29,12 @@ export async function GET(request) {
                COALESCE(vt.yeu_cau_ky_thuat, vtt.yeu_cau_ky_thuat) as yeu_cau_ky_thuat,
                COALESCE(vt.don_vi_tinh, vtt.don_vi_tinh) as don_vi_tinh,
                COALESCE(vt.so_luong_kho, 0) as so_luong_kho,
+               COALESCE(vt.loai_vat_tu, 'tieu_hao') as loai_vat_tu,
                vtt.id as vat_tu_tam_id,
                m.ten_mon,
                l.ten_lop, l.si_so, l.loai_he,
+               l.nganh_id as lop_nganh_id,
+               n.ten_nganh,
                CASE l.loai_he
                  WHEN 'T' THEN 'Trung cấp'
                  WHEN 'C' THEN 'Cao đẳng'
@@ -42,6 +45,7 @@ export async function GET(request) {
         LEFT JOIN vat_tu_tam vtt ON dxct.vat_tu_tam_id = vtt.id
         JOIN mon_hoc m ON dxct.mon_hoc_id = m.id
         JOIN lop l ON dxct.lop_id = l.id
+        LEFT JOIN nganh n ON l.nganh_id = n.id
         WHERE dxct.de_xuat_id = ?
         ORDER BY l.ten_lop, m.ten_mon, COALESCE(vt.ten_vat_tu, vtt.ten_vat_tu)
       `,
