@@ -43,6 +43,7 @@ const menuGroups = [
         items: [
             { href: '/admin/ki-hoc', label: 'Kỳ học', desc: 'Thiết lập kỳ học và đợt' },
             { href: '/admin/nganh-he', label: 'Chương trình đào tạo', desc: 'Ngành, hệ và môn học' },
+            { href: '/admin/nganh-he?tab=lop', label: 'Bộ vật tư theo lớp', desc: 'Gán ngành (bộ vật tư) cho từng lớp' },
             { href: '/admin/giao-vien', label: 'Giáo viên', desc: 'Danh sách giáo viên' },
         ],
     },
@@ -50,24 +51,26 @@ const menuGroups = [
 
 const parseHref = (href) => {
     const qIndex = href.indexOf('?');
-    if (qIndex === -1) return { path: href, loai: null };
+    if (qIndex === -1) return { path: href, loai: null, tab: null };
     const params = new URLSearchParams(href.slice(qIndex + 1));
-    return { path: href.slice(0, qIndex), loai: params.get('loai') };
+    return { path: href.slice(0, qIndex), loai: params.get('loai'), tab: params.get('tab') };
 };
 
-// Active khi trùng path; với mục có ?loai= thì phải trùng cả loai trên URL hiện tại
-const isActiveLink = (pathname, currentLoai, href) => {
-    const { path, loai } = parseHref(href);
+// Active khi trùng path; với mục có ?loai=/?tab= thì phải trùng cả tham số trên URL hiện tại
+const isActiveLink = (pathname, currentLoai, currentTab, href) => {
+    const { path, loai, tab } = parseHref(href);
     const pathMatch = pathname === path || (path !== '/admin' && pathname.startsWith(path));
     if (!pathMatch) return false;
     if (loai) return currentLoai === loai;
-    return currentLoai == null;
+    if (tab) return currentTab === tab;
+    return currentLoai == null && currentTab == null;
 };
 
 export default function TopNav() {
     const pathname = usePathname();
     const searchParams = useSearchParams();
     const currentLoai = searchParams.get('loai');
+    const currentTab = searchParams.get('tab');
     const { data: session } = useSession();
     const [openGroup, setOpenGroup] = useState(null);
     const [openUser, setOpenUser] = useState(false);
@@ -173,7 +176,7 @@ export default function TopNav() {
 
                 <div className="topnav-list">
                     {menuGroups.map(group => {
-                        const groupActive = group.items.some(item => isActiveLink(pathname, currentLoai, item.href));
+                        const groupActive = group.items.some(item => isActiveLink(pathname, currentLoai, currentTab, item.href));
                         const isOpen = openGroup === group.id;
                         return (
                             <div
@@ -200,7 +203,7 @@ export default function TopNav() {
                                                 key={item.href}
                                                 href={item.href}
                                                 onClick={() => setOpenGroup(null)}
-                                                className={`nav-subitem ${isActiveLink(pathname, currentLoai, item.href) ? 'active' : ''}`}
+                                                className={`nav-subitem ${isActiveLink(pathname, currentLoai, currentTab, item.href) ? 'active' : ''}`}
                                             >
                                                 <span className="nav-subitem-label">{item.label}</span>
                                                 {item.desc && <span className="nav-subitem-desc">{item.desc}</span>}
@@ -225,7 +228,7 @@ export default function TopNav() {
                                         key={item.href}
                                         href={item.href}
                                         onClick={() => setMobileOpen(false)}
-                                        className={`mobile-item ${isActiveLink(pathname, currentLoai, item.href) ? 'active' : ''}`}
+                                        className={`mobile-item ${isActiveLink(pathname, currentLoai, currentTab, item.href) ? 'active' : ''}`}
                                     >
                                         <span className="mobile-item-label">{item.label}</span>
                                         {item.desc && <span className="mobile-item-desc">{item.desc}</span>}

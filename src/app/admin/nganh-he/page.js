@@ -1,5 +1,6 @@
 'use client';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { GraduationCap, Plus, Edit3, Trash2, BookOpen, UserPlus, X, Search, School, Upload, CheckCircle2, AlertCircle, ChevronDown, FolderOpen, Calendar, Settings, FileText } from 'lucide-react';
 import { useToast } from '@/components/Toast';
 import { detectNganhId } from '@/lib/nganh-code';
@@ -17,7 +18,9 @@ function HeBadge({ loai }) {
     );
 }
 
-export default function NganhHePage() {
+const VALID_TABS = ['phan_cong', 'mon', 'lop', 'import', 'cai_dat'];
+
+function NganhHePage() {
     const [nganhs, setNganhs] = useState([]);
     const [hes, setHes] = useState([]);
     const [monHocs, setMonHocs] = useState([]);
@@ -26,7 +29,11 @@ export default function NganhHePage() {
     const [kiHocs, setKiHocs] = useState([]);
     const [phanCongs, setPhanCongs] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [activeTab, setActiveTab] = useState('phan_cong');
+    const searchParams = useSearchParams();
+    const [activeTab, setActiveTab] = useState(() => {
+        const t = searchParams.get('tab');
+        return VALID_TABS.includes(t) ? t : 'phan_cong';
+    });
     const [expandedNganh, setExpandedNganh] = useState({});
 
     const [showModal, setShowModal] = useState(null);
@@ -39,6 +46,7 @@ export default function NganhHePage() {
     const [showOnlyTH, setShowOnlyTH] = useState(true);
     const [selectedMons, setSelectedMons] = useState(new Set());
     const [selectedLops, setSelectedLops] = useState(new Set());
+    const [lopScope, setLopScope] = useState('ky'); // all | ky (lớp có dạy trong kỳ đang chọn)
     const [showBulkNganhModal, setShowBulkNganhModal] = useState(false);
     const [bulkNganhId, setBulkNganhId] = useState('');
     const [csvText, setCsvText] = useState('');
@@ -82,6 +90,12 @@ export default function NganhHePage() {
 
     useEffect(() => { fetchAll(); }, [fetchAll]);
     useEffect(() => { if (selectedKi) fetchPhanCong(); }, [selectedKi, fetchPhanCong]);
+
+    // Menu "Cài đặt > ..." dẫn vào cùng trang với ?tab= → đồng bộ tab
+    useEffect(() => {
+        const t = searchParams.get('tab');
+        if (VALID_TABS.includes(t)) setActiveTab(t);
+    }, [searchParams]);
 
     /* ---- helpers ---- */
     const openModal = (type, item = null) => {
@@ -192,7 +206,11 @@ export default function NganhHePage() {
         addToast('Đã xóa ' + selectedMons.size + ' môn'); setSelectedMons(new Set()); fetchAll();
     };
 
-    const filteredLop = lops.filter(l => !search || l.ten_lop.toLowerCase().includes(search.toLowerCase()));
+    const lopIdsInKi = new Set(phanCongs.map(pc => pc.lop_id));
+    const filteredLop = lops.filter(l =>
+        (lopScope === 'all' || !selectedKi || lopIdsInKi.has(l.id)) &&
+        (!search || l.ten_lop.toLowerCase().includes(search.toLowerCase()))
+    );
     const allLopIds = filteredLop.map(l => l.id);
     const allLopsSelected = allLopIds.length > 0 && allLopIds.every(id => selectedLops.has(id));
     const someLopsSelected = allLopIds.some(id => selectedLops.has(id));
@@ -471,6 +489,15 @@ export default function NganhHePage() {
             {/* ══════════════════════════════════════ */}
             {activeTab === 'lop' && (
                 <div className="card">
+                    {/* Tabs theo kỳ */}
+                    <div className="tabs" style={{ margin: '12px 20px 0' }}>
+                        <button type="button" className={`tab ${lopScope === 'ky' ? 'active' : ''}`} onClick={() => { setLopScope('ky'); setSelectedLops(new Set()); }}>
+                            Dạy {selectedKiObj ? selectedKiObj.ten_ki : 'kỳ này'} ({lopIdsInKi.size})
+                        </button>
+                        <button type="button" className={`tab ${lopScope === 'all' ? 'active' : ''}`} onClick={() => { setLopScope('all'); setSelectedLops(new Set()); }}>
+                            Tất cả lớp ({lops.length})
+                        </button>
+                    </div>
                     {/* Toolbar */}
                     <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 20px', borderBottom: '1px solid var(--border-color)', flexWrap: 'wrap' }}>
                         {someLopsSelected ? (
@@ -817,7 +844,7 @@ export default function NganhHePage() {
                                         {nganhs.map(n => <option key={n.id} value={n.id}>{n.ten_nganh}</option>)}
                                     </select>
                                     <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
-                                        Bên đề xuất chỉ cho chọn vật tư thuộc ngành này (+ vật tư Dùng chung).
+                                        Bên đề xuất chỉ cho chọn vật tư thuộc đúng ngành này.
                                         Mã lớp có <strong>DC</strong> = Điện công nghiệp, <strong>DT</strong> = Điện tử, <strong>CD</strong> = Cơ điện tử, <strong>DL</strong> = Máy lạnh.
                                     </p>
                                 </div>
@@ -870,5 +897,13 @@ export default function NganhHePage() {
                 </div>
             )}
         </div>
+    );
+}
+
+export default function NganhHePageWrapper() {
+    return (
+        <Suspense fallback={<div className="loading-overlay"><div className="spinner" /></div>}>
+            <NganhHePage />
+        </Suspense>
     );
 }

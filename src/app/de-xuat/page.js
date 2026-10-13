@@ -17,7 +17,8 @@ const SearchableMaterialSelect = ({ vatTus, onSelect, pcNganhId = null, pcTenNga
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
 
-    const isSameNganh = (vt) => !vt.nganh_id || (pcNganhId && vt.nganh_id === pcNganhId);
+    // Lớp có ngành → chỉ đúng bộ ngành đó (KHÔNG kèm dùng chung). Chưa gán ngành → chỉ dùng chung.
+    const isSameNganh = (vt) => pcNganhId ? vt.nganh_id === pcNganhId : !vt.nganh_id;
     const loaiLabel = (vt) => (vt.loai_vat_tu === 'sua_che' ? 'Sửa chữa' : 'Tiêu hao');
 
     const sortedVatTus = [...vatTus].sort((a, b) => {
@@ -27,11 +28,11 @@ const SearchableMaterialSelect = ({ vatTus, onSelect, pcNganhId = null, pcTenNga
         return a.ten_vat_tu.localeCompare(b.ten_vat_tu);
     });
     const q = search.toLowerCase().trim();
-    // Mặc định chỉ show vật tư cùng ngành (+ dùng chung). Gõ tìm mới thấy cả ngành khác (disabled).
+    // Có ngành: chỉ lọc trong bộ ngành đó (gõ tìm cũng vậy). Chưa gán ngành: mặc định chỉ dùng chung, gõ tìm thấy cả ngành khác (disabled).
     const filteredVatTus = sortedVatTus.filter(vt => {
         const str = `${vt.ten_vat_tu} ${vt.yeu_cau_ky_thuat || ''}`.toLowerCase();
         if (!str.includes(q)) return false;
-        if (!q) return isSameNganh(vt);
+        if (pcNganhId || !q) return isSameNganh(vt);
         return true;
     }).slice(0, 100);
 
@@ -72,9 +73,11 @@ const SearchableMaterialSelect = ({ vatTus, onSelect, pcNganhId = null, pcTenNga
 
                     <div style={{ overflowY: 'auto', flex: 1 }} className="custom-scrollbar">
                         <div style={{ padding: '8px 16px 0', fontSize: 11, color: 'var(--text-muted)' }}>
-                            {q
-                                ? `${filteredVatTus.length} kết quả${pcTenNganh ? ` • ngành ${pcTenNganh} chọn được, ngành khác bị khóa` : ''}`
-                                : `${filteredVatTus.length} vật tư ${pcTenNganh ? `ngành ${pcTenNganh}` : 'dùng chung'} • gõ để tìm cả ngành khác`}
+                            {pcTenNganh
+                                ? `${filteredVatTus.length} vật tư ngành ${pcTenNganh}`
+                                : (q
+                                    ? `${filteredVatTus.length} kết quả • vật tư dùng chung chọn được, ngành khác bị khóa`
+                                    : `${filteredVatTus.length} vật tư dùng chung • gõ để tìm cả ngành khác`)}
                         </div>
                         {filteredVatTus.length === 0 ? (
                             <div style={{ padding: 24, textAlign: 'center', color: 'var(--text-muted)' }}>Không tìm thấy vật tư "{search}"</div>
@@ -455,18 +458,20 @@ export default function DeXuatPublicPage() {
                                                     <div
                                                         className="accordion-header"
                                                         onClick={() => togglePc(pc.id)}
+                                                        style={{ flexDirection: 'column', alignItems: 'stretch', gap: 8 }}
                                                     >
-                                                        <div style={{ display: 'flex', alignItems: 'center', gap: 12, flex: 1, minWidth: 0 }}>
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
                                                             <ChevronDown size={20} style={{ transform: isExpanded ? 'rotate(0)' : 'rotate(-90deg)', transition: 'transform 0.2s', flexShrink: 0 }} />
                                                             <BookOpen size={18} style={{ color: 'var(--text-accent)', flexShrink: 0 }} />
-                                                            <div style={{ minWidth: 0, overflowWrap: 'anywhere' }}>
+                                                            <div style={{ minWidth: 0, flex: 1, overflowWrap: 'break-word', wordBreak: 'break-word' }}>
                                                                 <h3>{pc.ten_mon}</h3>
                                                                 <p style={{ fontSize: 12, color: 'var(--text-muted)' }}>Lớp: {pc.ten_lop} ({pc.si_so} HV) • {pc.ten_loai_he || pc.loai_he}</p>
                                                             </div>
                                                         </div>
-                                                        <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginLeft: 'auto' }}>
-                                                            <span className={`badge ${pcNganhId ? 'badge-primary' : 'badge-warning'}`} style={{ fontSize: 11, maxWidth: '100%', whiteSpace: 'normal', textAlign: 'left' }}>
-                                                                Bộ vật tư: {pc.ten_nganh || 'Chưa gán ngành'}
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, paddingLeft: 50, minWidth: 0 }}>
+                                                            <span style={{ fontSize: 11, color: 'var(--text-muted)', flexShrink: 0 }}>Bộ vật tư:</span>
+                                                            <span className={`badge ${pcNganhId ? 'badge-primary' : 'badge-warning'}`} style={{ fontSize: 10, minWidth: 0, maxWidth: '100%', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={pc.ten_nganh || 'Chưa gán ngành'}>
+                                                                {pc.ten_nganh || 'Chưa gán ngành'}
                                                             </span>
                                                         </div>
                                                     </div>
@@ -503,9 +508,9 @@ export default function DeXuatPublicPage() {
                                                                         }
                                                                         if (!vt) return null;
                                                                         const qty = pcSelections[vtId];
-                                                                        // Đã chọn từ trước nhưng không thuộc bộ vật tư của lớp (dữ liệu cũ)
+                                                                        // Đã chọn từ trước nhưng không thuộc bộ vật tư của lớp (kể cả dùng chung khi lớp đã có ngành)
                                                                         const vtNganhId = vt.nganh_id || null;
-                                                                        const outsideSet = pcNganhId ? (vtNganhId && vtNganhId !== pcNganhId) : !!vtNganhId;
+                                                                        const outsideSet = pcNganhId ? vtNganhId !== pcNganhId : !!vtNganhId;
                                                                         return (
                                                                             <div className="material-item" key={vtId} style={{ background: 'rgba(14,165,233,0.05)', borderColor: 'rgba(14,165,233,0.2)' }}>
                                                                                 <div className="material-info">
