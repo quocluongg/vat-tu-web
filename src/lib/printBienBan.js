@@ -392,6 +392,12 @@ export function buildBienBanHTML(bb) {
   </div>
 </td></tr></tbody>
 </table>
+<script>
+  window.addEventListener('load', function() {
+    window.focus();
+    window.print();
+  });
+</script>
 </body>
 </html>`;
 }

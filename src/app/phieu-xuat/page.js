@@ -256,16 +256,31 @@ export default function PhieuXuatPublicPage() {
         if (!bbId) return;
         setPrintingBB(true);
         try {
-            const bb = await fetch(`/api/bien-ban?id=${bbId}`).then(r => r.json());
+            const res = await fetch(`/api/bien-ban?id=${bbId}`);
+            const bb = await res.json();
             if (bb.error) {
                 setToast({ type: 'error', message: bb.error });
+                setPrintingBB(false);
                 return;
             }
             const html = buildBienBanHTML(bb);
             const printWindow = window.open('', '_blank');
+            if (!printWindow) {
+                setToast({ type: 'error', message: 'Vui lòng cho phép popup để in biên bản' });
+                setPrintingBB(false);
+                return;
+            }
+            printWindow.document.open();
             printWindow.document.write(html);
             printWindow.document.close();
-            printWindow.onload = () => printWindow.print();
+            printWindow.focus();
+            setTimeout(() => {
+                try {
+                    printWindow.print();
+                } catch {
+                    // Ignore print error
+                }
+            }, 300);
         } catch {
             setToast({ type: 'error', message: 'Không thể tải biên bản để in' });
         }
@@ -469,11 +484,21 @@ export default function PhieuXuatPublicPage() {
         const html = getPrintHTML(data);
 
         const printWindow = window.open('', '_blank');
+        if (!printWindow) {
+            setToast({ type: 'error', message: 'Vui lòng cho phép popup để in phiếu' });
+            return;
+        }
+        printWindow.document.open();
         printWindow.document.write(html);
         printWindow.document.close();
-        printWindow.onload = () => {
-            printWindow.print();
-        };
+        printWindow.focus();
+        setTimeout(() => {
+            try {
+                printWindow.print();
+            } catch {
+                // Ignore print error
+            }
+        }, 300);
     };
 
     const statusLabels = {
