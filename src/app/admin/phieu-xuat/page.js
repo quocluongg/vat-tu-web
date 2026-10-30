@@ -213,7 +213,7 @@ function PhieuXuatAdminPage() {
                     <p style="font-size: 11pt; text-transform: uppercase;">UBND THÀNH PHỐ HỒ CHÍ MINH</p>
                     <p style="font-size: 11pt; font-weight: bold; text-transform: uppercase;">TRƯỜNG CAO ĐẲNG NGHỀ VIỆT NAM – SINGAPORE</p>
                     <p>***************************************</p>
-                    <h2 style="font-size: 16pt; font-weight: bold; margin: 15px 0; text-transform: uppercase;">Phiếu xuất vật tư cho đào tạo</h2>
+                    <h2 style="font-size: 16pt; font-weight: bold; margin: 15px 0; text-transform: uppercase;">${data.loai_vat_tu === 'sua_che' || data.bien_ban_id ? 'Phiếu xuất vật tư cho sửa chữa' : 'Phiếu xuất vật tư cho đào tạo'}</h2>
                 </div>
 
                 <table style="width: 100%; margin-bottom: 10px; border-collapse: collapse;">
@@ -226,7 +226,7 @@ function PhieuXuatAdminPage() {
                         <td style="width: 40%; vertical-align: top; padding: 5px; border: none;">
                             <p>Lớp: <span style="border-bottom: 1px dotted #000; flex: 1; display: inline-block; min-width: 200px;">${data.ten_lop || '....................'}</span></p>
                             <p style="margin-top: 5px;">Sĩ số: <span style="border-bottom: 1px dotted #000; flex: 1; display: inline-block; min-width: 195px;">${data.si_so || '......'}</span></p>
-                            <p style="margin-top: 5px;">Môn: <span style="border-bottom: 1px dotted #000; flex: 1; display: inline-block; min-width: 198px;">${data.ten_mon || '....................'}</span></p>
+                            <p style="margin-top: 5px;">Môn: <span style="border-bottom: 1px dotted #000; flex: 1; display: inline-block; min-width: 198px;">${data.ten_mon || '....................'}${data.so_bien_ban ? ` (BB: ${data.so_bien_ban})` : (data.bien_ban_id ? ` (BB #${data.bien_ban_id})` : '')}</span></p>
                         </td>
                     </tr>
                 </table>

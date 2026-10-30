@@ -4,9 +4,9 @@ import Link from 'next/link';
 import {
     ArrowLeft, User, BookOpen, FileOutput, Plus, Minus, Send, CheckCircle,
     Download, Package, AlertCircle, ChevronDown, Clock, Inbox,
-    Wrench, ClipboardList, Search, Users, Printer,
+    Wrench, ClipboardList, Search, Users, Printer, FileText,
 } from 'lucide-react';
-import { buildBienBanHTML } from '@/lib/printBienBan';
+import { buildBienBanHTML, buildPhieuXuatSuaChuaHTML } from '@/lib/printBienBan';
 
 export default function PhieuXuatPublicPage() {
     const [kiHocs, setKiHocs] = useState([]);
@@ -37,6 +37,7 @@ export default function PhieuXuatPublicPage() {
     const [bienBans, setBienBans] = useState([]);
     const [creatingBB, setCreatingBB] = useState(false);
     const [printingBB, setPrintingBB] = useState(false);
+    const [printingPX, setPrintingPX] = useState(false);
     const [repairFilter, setRepairFilter] = useState('');
 
     // Auto-dismiss toast
@@ -287,6 +288,40 @@ export default function PhieuXuatPublicPage() {
         setPrintingBB(false);
     };
 
+    const handlePrintPhieuXuatSuaChua = async (bbId) => {
+        if (!bbId) return;
+        setPrintingPX(true);
+        try {
+            const bb = await fetch(`/api/bien-ban?id=${bbId}`).then(r => r.json());
+            if (bb.error) {
+                setToast({ type: 'error', message: bb.error });
+                setPrintingPX(false);
+                return;
+            }
+            const html = buildPhieuXuatSuaChuaHTML(bb);
+            const printWindow = window.open('', '_blank');
+            if (!printWindow) {
+                setToast({ type: 'error', message: 'Vui lòng cho phép popup để in phiếu xuất' });
+                setPrintingPX(false);
+                return;
+            }
+            printWindow.document.open();
+            printWindow.document.write(html);
+            printWindow.document.close();
+            printWindow.focus();
+            setTimeout(() => {
+                try {
+                    printWindow.print();
+                } catch {
+                    // Ignore print error
+                }
+            }, 300);
+        } catch {
+            setToast({ type: 'error', message: 'Không thể tải phiếu xuất sửa chữa để in' });
+        }
+        setPrintingPX(false);
+    };
+
     const handleSubmitPhieu = async () => {
         const hasTieuHao = Object.keys(exportItems).length > 0;
 
@@ -394,7 +429,7 @@ export default function PhieuXuatPublicPage() {
                     <p style="font-size: 11pt; text-transform: uppercase;">UBND THÀNH PHỐ HỒ CHÍ MINH</p>
                     <p style="font-size: 11pt; font-weight: bold; text-transform: uppercase;">TRƯỜNG CAO ĐẲNG NGHỀ VIỆT NAM – SINGAPORE</p>
                     <p>***************************************</p>
-                    <h2 style="font-size: 16pt; font-weight: bold; margin: 15px 0; text-transform: uppercase;">Phiếu xuất vật tư cho đào tạo</h2>
+                    <h2 style="font-size: 16pt; font-weight: bold; margin: 15px 0; text-transform: uppercase;">${data.loai_vat_tu === 'sua_che' || data.bien_ban_id ? 'Phiếu xuất vật tư cho sửa chữa' : 'Phiếu xuất vật tư cho đào tạo'}</h2>
                 </div>
 
                 <table style="width: 100%; margin-bottom: 10px; border-collapse: collapse;">
@@ -407,7 +442,7 @@ export default function PhieuXuatPublicPage() {
                         <td style="width: 40%; vertical-align: top; padding: 5px; border: none;">
                             <p>Lớp: <span style="border-bottom: 1px dotted #000; flex: 1; display: inline-block; min-width: 200px;">${data.ten_lop || '....................'}</span></p>
                             <p style="margin-top: 5px;">Sĩ số: <span style="border-bottom: 1px dotted #000; flex: 1; display: inline-block; min-width: 195px;">${data.si_so || '......'}</span></p>
-                            <p style="margin-top: 5px;">Môn: <span style="border-bottom: 1px dotted #000; flex: 1; display: inline-block; min-width: 198px;">${data.ten_mon || '....................'}</span></p>
+                            <p style="margin-top: 5px;">Môn: <span style="border-bottom: 1px dotted #000; flex: 1; display: inline-block; min-width: 198px;">${data.ten_mon || '....................'}${data.so_bien_ban ? ` (BB: ${data.so_bien_ban})` : (data.bien_ban_id ? ` (BB #${data.bien_ban_id})` : '')}</span></p>
                         </td>
                     </tr>
                 </table>
@@ -848,9 +883,14 @@ export default function PhieuXuatPublicPage() {
                                                 </span>
                                             </div>
                                             {bb.trang_thai === 'da_duyet' && (
-                                                <button className="btn btn-secondary btn-sm" onClick={() => handlePrintBienBan(bb.id)} disabled={printingBB}>
-                                                    <Printer size={15} /> In
-                                                </button>
+                                                <div style={{ display: 'inline-flex', gap: 6, flexWrap: 'wrap' }}>
+                                                    <button className="btn btn-secondary btn-sm" onClick={() => handlePrintBienBan(bb.id)} disabled={printingBB} title="In biên bản hư hỏng (BM01)">
+                                                        <FileText size={15} /> In BB
+                                                    </button>
+                                                    <button className="btn btn-primary btn-sm" onClick={() => handlePrintPhieuXuatSuaChua(bb.id)} disabled={printingPX} title="In phiếu xuất vật tư sửa chữa">
+                                                        <Printer size={15} /> In phiếu xuất
+                                                    </button>
+                                                </div>
                                             )}
                                         </div>
                                     ))}
@@ -1170,9 +1210,14 @@ export default function PhieuXuatPublicPage() {
                                                                 </span>
                                                             </div>
                                                             {bb.trang_thai === 'da_duyet' && (
-                                                                <button className="btn btn-secondary btn-sm" onClick={() => handlePrintBienBan(bb.id)} disabled={printingBB}>
-                                                                    <Printer size={15} /> In
-                                                                </button>
+                                                                <div style={{ display: 'inline-flex', gap: 6, flexWrap: 'wrap' }}>
+                                                                    <button className="btn btn-secondary btn-sm" onClick={() => handlePrintBienBan(bb.id)} disabled={printingBB} title="In biên bản hư hỏng (BM01)">
+                                                                        <FileText size={15} /> In BB
+                                                                    </button>
+                                                                    <button className="btn btn-primary btn-sm" onClick={() => handlePrintPhieuXuatSuaChua(bb.id)} disabled={printingPX} title="In phiếu xuất vật tư sửa chữa">
+                                                                        <Printer size={15} /> In phiếu xuất
+                                                                    </button>
+                                                                </div>
                                                             )}
                                                         </div>
                                                     ))}
