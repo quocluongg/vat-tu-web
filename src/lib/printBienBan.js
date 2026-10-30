@@ -237,16 +237,16 @@ export function buildBienBanHTML(bb) {
   .frow > .fval:first-child { padding-left: 0; }
   .iv { display: inline-block; text-align: center; }
   .u { text-decoration: underline; }
-  .keep-next, .hd { break-after: avoid; }
-  .sigrow.keep-next { break-after: avoid; }
+  .keep-next, .hd { break-after: avoid; page-break-after: avoid; }
+  .sigrow.keep-next { break-after: avoid; page-break-after: avoid; }
   .gap8 { height: 8pt; }
 
   /* Khối chữ ký: nhãn căn trái theo vị trí tab của mẫu */
-  .sigrow { display: grid; font-weight: 700; white-space: nowrap; break-inside: avoid; }
+  .sigrow { display: grid; font-weight: 700; white-space: nowrap; break-inside: avoid; page-break-inside: avoid; }
   .sigrow.names { font-weight: 700; white-space: normal; }
   .sig-name { border-bottom: 1.6px dotted #000; font-weight: 700; min-height: var(--lh); line-height: calc(var(--lh) - 2px); padding: 0 3px; word-break: break-word; }
-  .keep { break-inside: avoid; }
-  .yk { display: grid; grid-template-columns: 3.17in 3.01in; column-gap: 0.22in; break-inside: avoid; } /* mỗi dòng 1 lưới: được phép ngắt trang giữa các dòng như Word */
+  .keep { break-inside: avoid; page-break-inside: avoid; }
+  .yk { display: grid; grid-template-columns: 3.17in 3.01in; column-gap: 0.22in; break-inside: avoid; page-break-inside: avoid; }
 
   /* Bảng F: rộng hết khổ chữ (mẫu gốc 10790 twips ≈ 7.49in) */
   .vtable { width: 100%; border-collapse: collapse; table-layout: fixed; }
@@ -330,10 +330,12 @@ export function buildBienBanHTML(bb) {
   </div>
   ${SP()}
 
-  <!-- Ý KIẾN LÃNH ĐẠO / TRƯỞNG PHÒNG (KHOA): nhãn tại 0 và 3.5in, rồi 4 dòng chấm 2 cột -->
-  ${SIGROW(['3.5in', '1fr'], ['Ý KIẾN LÃNH ĐẠO', 'TRƯỞNG PHÒNG (KHOA)'], 'keep-next')}
-  ${SP()}
-  ${ykRows}
+  <!-- Ý KIẾN LÃNH ĐẠO / TRƯỞNG PHÒNG (KHOA): nguyên 1 cụm nhãn + dòng trống + 4 dòng chấm đi chung, không ngắt đôi khi sang trang -->
+  <div class="keep">
+    ${SIGROW(['3.5in', '1fr'], ['Ý KIẾN LÃNH ĐẠO', 'TRƯỞNG PHÒNG (KHOA)'])}
+    ${SP()}
+    ${ykRows}
+  </div>
   ${SP()}
 
   <!-- E/ : 4 dòng chấm cho Kết quả, 5 dòng cho Phương án, mỗi khối cách 8pt như mẫu -->
