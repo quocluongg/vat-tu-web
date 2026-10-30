@@ -395,3 +395,132 @@ export function buildBienBanHTML(bb) {
 </body>
 </html>`;
 }
+
+// Template in Phiếu xuất vật tư (cho sửa chữa) — dựa theo Biên bản hư hỏng đã duyệt
+export function buildPhieuXuatSuaChuaHTML(bb) {
+    const b = bb || {};
+    const vtList = Array.isArray(b.vat_tu_list) ? b.vat_tu_list : [];
+    const tenGV = b.ten_gv || b.nguoi_su_dung || '';
+    const tenThietBi = b.ten_thiet_bi || '';
+    const phongKhoa = b.phong_khoa || 'Điện - Điện tử';
+    const soBBText = b.so_bien_ban ? b.so_bien_ban : (b.id ? `Số #${b.id}` : '');
+    const ngayLap = fmtDateVN(b.ngay_lap);
+    const lopOrDiaDiem = b.dia_diem || b.ghi_chu || '';
+
+    const rows = vtList.map((v, i) => {
+        const sl = v.so_luong ?? '';
+        const ten = v.ten || v.ten_vat_tu || '';
+        const ma = v.ma_so || v.yeu_cau_ky_thuat || '';
+        const dvt = v.dvt || v.don_vi_tinh || '';
+        const gc = v.ghi_chu || '';
+        return `
+            <tr>
+                <td style="text-align:center">${i + 1}</td>
+                <td>${esc(ten)}</td>
+                <td>${esc(ma)}</td>
+                <td style="text-align:center">${esc(dvt)}</td>
+                <td style="text-align:center">${esc(sl)}</td>
+                <td>${esc(gc)}</td>
+            </tr>
+        `;
+    }).join('');
+
+    const emptyRows = Array.from({ length: Math.max(0, 8 - vtList.length) }).map(() => `
+        <tr>
+            <td style="color:transparent">-</td>
+            <td></td>
+            <td></td>
+            <td></td>
+            <td></td>
+            <td></td>
+        </tr>
+    `).join('');
+
+    const copyHTML = `
+        <div style="padding: 10px; margin-bottom: 20px; page-break-inside: avoid;">
+            <div style="text-align: center; margin-bottom: 15px;">
+                <p style="font-size: 11pt; text-transform: uppercase;">UBND THÀNH PHỐ HỒ CHÍ MINH</p>
+                <p style="font-size: 11pt; font-weight: bold; text-transform: uppercase;">TRƯỜNG CAO ĐẲNG NGHỀ VIỆT NAM – SINGAPORE</p>
+                <p>***************************************</p>
+                <h2 style="font-size: 16pt; font-weight: bold; margin: 15px 0; text-transform: uppercase;">Phiếu xuất vật tư cho sửa chữa</h2>
+            </div>
+
+            <table style="width: 100%; margin-bottom: 10px; border-collapse: collapse;">
+                <tr>
+                    <td style="width: 55%; vertical-align: top; padding: 5px; border: none;">
+                        <p>Tên người đề nghị: <span style="border-bottom: 1px dotted #000; flex: 1; display: inline-block; min-width: 200px;"><b>${escInline(tenGV)}</b></span></p>
+                        <p style="margin-top: 5px;">Chức vụ: <span style="border-bottom: 1px dotted #000; flex: 1; display: inline-block; min-width: 240px;">Giảng viên</span></p>
+                        <p style="margin-top: 5px;">Phòng (Khoa): <span style="border-bottom: 1px dotted #000; flex: 1; display: inline-block; min-width: 220px;">${escInline(phongKhoa)}</span></p>
+                    </td>
+                    <td style="width: 45%; vertical-align: top; padding: 5px; border: none;">
+                        <p>Thiết bị: <span style="border-bottom: 1px dotted #000; flex: 1; display: inline-block; min-width: 180px;"><b>${escInline(tenThietBi)}</b></span></p>
+                        <p style="margin-top: 5px;">Theo biên bản: <span style="border-bottom: 1px dotted #000; flex: 1; display: inline-block; min-width: 160px;">${escInline(soBBText)}${ngayLap ? ` (${ngayLap})` : ''}</span></p>
+                        <p style="margin-top: 5px;">Lớp / Địa điểm: <span style="border-bottom: 1px dotted #000; flex: 1; display: inline-block; min-width: 150px;">${escInline(lopOrDiaDiem)}</span></p>
+                    </td>
+                </tr>
+            </table>
+
+            <table style="width: 100%; border-collapse: collapse; margin-bottom: 15px;">
+                <thead>
+                    <tr style="background: #f8f9fa;">
+                        <th style="border: 1px solid #000; padding: 5px; width: 40px; text-align: center;">TT</th>
+                        <th style="border: 1px solid #000; padding: 5px; text-align: center;">Tên vật tư</th>
+                        <th style="border: 1px solid #000; padding: 5px; text-align: center; width: 120px;">Mã(hiệu)</th>
+                        <th style="border: 1px solid #000; padding: 5px; width: 60px; text-align: center;">ĐVT</th>
+                        <th style="border: 1px solid #000; padding: 5px; text-align: center; width: 80px;">Số lượng</th>
+                        <th style="border: 1px solid #000; padding: 5px; text-align: center; width: 150px;">Ghi chú</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${rows}
+                    ${emptyRows}
+                </tbody>
+            </table>
+
+            <div style="text-align: right; font-style: italic; margin-bottom: 40px;">
+                Bình Dương, Ngày ........ tháng ........ năm ............
+            </div>
+
+            <table style="width: 100%; border-collapse: collapse; text-align: center;">
+                <tr>
+                    <td style="width: 33.33%; padding: 10px; height: 120px; vertical-align: top; border: none;">
+                        <p style="font-weight: bold;">Hiệu trưởng</p>
+                    </td>
+                    <td style="width: 33.33%; padding: 10px; height: 120px; vertical-align: top; border: none;">
+                        <p style="font-weight: bold;">Trưởng khoa</p>
+                    </td>
+                    <td style="width: 33.33%; padding: 10px; height: 120px; vertical-align: top; position: relative; border: none;">
+                        <p style="font-weight: bold;">Người đề nghị</p>
+                        <p style="position: absolute; bottom: 10px; left: 0; right: 0; font-weight: bold;">${escInline(tenGV)}</p>
+                    </td>
+                </tr>
+            </table>
+            <div style="text-align: center; font-size: 10pt; font-style: italic; margin-top: 20px; opacity: 0.6;">
+                Phần mềm quản lý vật tư Khoa Điện - Điện tử
+            </div>
+        </div>
+    `;
+
+    return `<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <title>Phiếu Xuất Vật Tư (Sửa chữa) - ${escInline(tenGV)}</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Times New Roman', serif; font-size: 11pt; color: #000; padding: 15mm; }
+        table { border-collapse: collapse; }
+        th, td { border: 1px solid #000; padding: 4px 8px; }
+        h2 { margin-top: 0; }
+        p { margin: 0; }
+        @media print {
+            body { padding: 5mm; }
+            .no-print { display: none; }
+        }
+    </style>
+</head>
+<body>
+    ${copyHTML}
+</body>
+</html>`;
+}

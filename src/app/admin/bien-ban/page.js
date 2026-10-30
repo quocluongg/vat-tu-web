@@ -4,7 +4,7 @@ import {
     ClipboardList, Plus, Trash2, CheckCircle, XCircle, Printer, Pencil, FileText,
     Eye, Check, X, Clock, AlertTriangle
 } from 'lucide-react';
-import { buildBienBanHTML } from '@/lib/printBienBan';
+import { buildBienBanHTML, buildPhieuXuatSuaChuaHTML } from '@/lib/printBienBan';
 
 const EMPTY_FORM = {
     so_bien_ban: '',
@@ -236,6 +236,21 @@ export default function BienBanPage() {
             printWindow.onload = () => printWindow.print();
         } catch {
             showToast('Không in được biên bản', 'err');
+        }
+    };
+
+    const printPhieuXuatSuaChua = async (id) => {
+        try {
+            const bb = await fetch(`/api/bien-ban?id=${id}`).then(r => r.json());
+            if (bb.error) { showToast(bb.error, 'err'); return; }
+            const html = buildPhieuXuatSuaChuaHTML(bb);
+
+            const printWindow = window.open('', '_blank');
+            printWindow.document.write(html);
+            printWindow.document.close();
+            printWindow.onload = () => printWindow.print();
+        } catch {
+            showToast('Không in được phiếu xuất sửa chữa', 'err');
         }
     };
 
@@ -536,7 +551,10 @@ export default function BienBanPage() {
                                     <td>
                                         <div className="table-actions">
                                             <button className="btn-icon" onClick={() => viewDetail(bb.id)} title="Chi tiết"><Eye size={16} /></button>
-                                            <button className="btn-icon" onClick={() => printBienBan(bb.id)} title="In biên bản"><Printer size={16} /></button>
+                                            <button className="btn-icon" onClick={() => printBienBan(bb.id)} title="In biên bản (BM01)"><FileText size={16} /></button>
+                                            {bb.trang_thai === 'da_duyet' && (
+                                                <button className="btn-icon" onClick={() => printPhieuXuatSuaChua(bb.id)} title="In phiếu xuất sửa chữa" style={{ color: 'var(--primary, #2563eb)' }}><Printer size={16} /></button>
+                                            )}
                                             {bb.trang_thai === 'cho_duyet' && (
                                                 <>
                                                     <button className="btn-icon" onClick={() => setStatus(bb.id, 'da_duyet')} title="Duyệt" style={{ color: '#34d399' }}><Check size={16} /></button>
@@ -620,10 +638,15 @@ export default function BienBanPage() {
                             )}
                         </div>
                         <div className="modal-footer" style={{ justifyContent: 'space-between', flexWrap: 'wrap' }}>
-                            <div>
+                            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                                 <button className="btn btn-secondary" onClick={() => printBienBan(detail.id)}>
-                                    <Printer size={16} /> In biên bản
+                                    <FileText size={16} /> In biên bản
                                 </button>
+                                {detail.trang_thai === 'da_duyet' && (
+                                    <button className="btn btn-primary" onClick={() => printPhieuXuatSuaChua(detail.id)}>
+                                        <Printer size={16} /> In phiếu xuất sửa chữa
+                                    </button>
+                                )}
                             </div>
                             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
                                 {detailEditable && (
